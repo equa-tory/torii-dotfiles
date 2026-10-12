@@ -26,6 +26,7 @@ o.set("x", "<C-_>", "gc", { remap = true })
 o.set("n", "<C-/>", "gcc", { remap = true })
 o.set("x", "<C-/>", "gc", { remap = true })
 o.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
+o.set("n", "U", "<C-r>", { desc = "Redo" })
 
 o.set("n", "<leader>?", function()
   require("telescope.builtin").find_files({
