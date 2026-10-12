@@ -1,0 +1,2 @@
+# Replace
+:%s/text/newtext/
