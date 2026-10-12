@@ -20,7 +20,7 @@ hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd(
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(browser))
-local closeWindowBind = hl.bind(mainMod .. " + Q", hl.dsp.window.close())
+hl.bind(mainMod .. " + Q", hl.dsp.window.close())
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + F", hl.dsp.window.float({ action = "toggle" }))
@@ -28,7 +28,7 @@ hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + R", hl.dsp.layout("togglesplit"))    -- dwindle only
 
 -- Resize active window: mainMod + CTRL + arrow
-local STEP = 50
+local STEP = 100
 local resize = {
     left  = { x = -STEP, y = 0 },
     right = { x =  STEP, y = 0 },
