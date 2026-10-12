@@ -165,3 +165,49 @@ vim.lsp.config("lua_ls", {
     },
   },
 })
+
+
+-- Floating Terminal Panel
+local term = { buf = nil, win = nil }
+
+local function toggle_terminal()
+  -- already open: hide it (the shell keeps running)
+  if term.win and vim.api.nvim_win_is_valid(term.win) then
+    vim.api.nvim_win_hide(term.win)
+    term.win = nil
+    return
+  end
+
+  local fresh = not (term.buf and vim.api.nvim_buf_is_valid(term.buf))
+  if fresh then term.buf = vim.api.nvim_create_buf(false, true) end
+
+  local w = math.floor(vim.o.columns * 0.6)
+  local h = math.floor(vim.o.lines * 0.4)
+  term.win = vim.api.nvim_open_win(term.buf, true, {
+    relative = "editor", width = w, height = h,
+    col = math.floor((vim.o.columns - w) / 2),
+    row = math.floor((vim.o.lines - h) / 2),
+    style = "minimal", border = "rounded",
+  })
+
+  if fresh then
+    vim.fn.jobstart(vim.o.shell, { term = true })
+    -- when you type `exit`, clean up so the next toggle starts a new shell
+    vim.api.nvim_create_autocmd("TermClose", {
+      buffer = term.buf,
+      callback = function()
+        local buf = term.buf
+        term.buf, term.win = nil, nil
+        vim.schedule(function()
+          if buf and vim.api.nvim_buf_is_valid(buf) then
+            vim.api.nvim_buf_delete(buf, { force = true })
+          end
+        end)
+      end,
+    })
+  end
+  vim.cmd("startinsert")
+end
+
+vim.keymap.set("n", "<leader>i", toggle_terminal, { desc = "Floating terminal" })
+vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Leave terminal mode" })
