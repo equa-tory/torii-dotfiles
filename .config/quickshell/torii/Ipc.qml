@@ -10,18 +10,18 @@ Scope {
     }
     IpcHandler {
         target: "panels"
-        function close(): void { State.close(); }
+        function close(): void { Panels.close(); }
     }
     IpcHandler {
         target: "control"
-        function toggle(): void { State.toggle("control"); }
+        function toggle(): void { Panels.toggle("control"); }
     }
     IpcHandler {
         target: "launcher"
-        function toggle(): void { State.toggle("launcher"); }
+        function toggle(): void { Panels.toggle("launcher"); }
     }
     IpcHandler {
         target: "switcher"
-        function toggle(): void { State.toggle("switcher"); }
+        function toggle(): void { Panels.toggle("switcher"); }
     }
 }

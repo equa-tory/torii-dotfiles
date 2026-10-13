@@ -61,3 +61,4 @@ bluez-utils
 
 # testing (synthetic keypresses for shell checks)
 wtype
+ydotool

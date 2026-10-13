@@ -1,4 +1,5 @@
 import qs
+import qs.panels
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
@@ -13,30 +14,42 @@ PanelWindow {
     readonly property real barH: Config.notch.height
     readonly property real topGap: floating ? Config.notch.gap : 0
     readonly property real ear: floating ? 0 : Config.notch.radius
-    readonly property bool panelHere: State.panel !== "" && State.panelScreen === screen.name
+    readonly property bool panelHere: Panels.panel !== "" && Panels.panelScreen === screen.name
 
     readonly property real contentW: row.implicitWidth + 36
-    readonly property real bodyW: Math.max(contentW, panelHere ? panelHost.implicitWidth : 0)
-    readonly property real bodyH: barH + (panelHere ? panelHost.implicitHeight : 0)
+    readonly property real panelW: panelHere && panelLoader.item ? panelLoader.item.implicitWidth : 0
+    readonly property real panelH: panelHere && panelLoader.item ? panelLoader.item.implicitHeight : 0
+    readonly property real bodyW: Math.max(contentW, panelW)
+    readonly property real bodyH: barH + panelH
 
     WlrLayershell.namespace: "torii-notch"
     WlrLayershell.keyboardFocus: panelHere ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     anchors { top: true; left: true; right: true }
-    implicitHeight: 620
+    // full height: while a panel is open the whole window takes input so a click outside the panel closes it
+    // (Hyprland routes pointer input only to the exclusive-keyboard layer, so a separate scrim never sees it)
+    implicitHeight: screen.height
     exclusiveZone: topGap + barH
     color: "transparent"
-    mask: Region { item: shape }
+    mask: Region { item: win.panelHere ? catcher : shape }
 
-    HyprlandFocusGrab {
-        windows: [win]
-        active: win.panelHere
-        onCleared: State.close()
+    // Esc closes the panel. (QML `Shortcut` segfaults in Qt 6.12 when the shell hot-reloads, so use a key handler.)
+    Item {
+        id: keys
+        anchors.fill: parent
+        focus: true
+        Keys.onEscapePressed: Panels.close()
     }
+    onPanelHereChanged: if (panelHere) keys.forceActiveFocus()
 
-    Shortcut {
-        sequence: "Escape"
-        enabled: win.panelHere
-        onActivated: State.close()
+    Item {
+        id: catcher
+        anchors.fill: parent
+        MouseArea {
+            anchors.fill: parent
+            enabled: win.panelHere
+            acceptedButtons: Qt.AllButtons
+            onPressed: Panels.close()
+        }
     }
 
     NotchShape {
@@ -52,6 +65,9 @@ PanelWindow {
         Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutQuint } }
         Behavior on height { NumberAnimation { duration: 260; easing.type: Easing.OutQuint } }
 
+        // clicks on the black body itself never fall through to the catcher
+        MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
+
         Row {
             id: row
             x: win.ear + (win.bodyW - width) / 2
@@ -61,17 +77,20 @@ PanelWindow {
             Workspaces { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
             Clock { anchors.verticalCenter: parent.verticalCenter }
             Weather { anchors.verticalCenter: parent.verticalCenter }
-            ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && State.panel === "control" }
+            ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
         }
 
-        Item {
-            id: panelHost
+        Loader {
+            id: panelLoader
             x: win.ear
             y: win.barH
             width: win.bodyW
-            implicitWidth: 0
-            implicitHeight: 0
+            height: win.panelH
+            active: win.panelHere
             clip: true
+            sourceComponent: Panels.panel === "control" ? controlPanel : null
         }
     }
+
+    Component { id: controlPanel; ControlPanel {} }
 }

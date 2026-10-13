@@ -27,6 +27,6 @@ Item {
         anchors.fill: parent
         anchors.margins: -4
         cursorShape: Qt.PointingHandCursor
-        onClicked: State.toggle("control")
+        onClicked: Panels.toggle("control")
     }
 }

@@ -7,8 +7,8 @@ import QtQuick
 PanelWindow {
     id: win
 
-    readonly property bool previewing: State.previewWallpaper !== "" && State.panelScreen === screen.name
-    readonly property string path: previewing ? State.previewWallpaper : Theme.wallpaper
+    readonly property bool previewing: Panels.previewWallpaper !== "" && Panels.panelScreen === screen.name
+    readonly property string path: previewing ? Panels.previewWallpaper : Theme.wallpaper
 
     property Image top: null          // the image currently fully shown
     property Image pending: null      // the image being faded in
