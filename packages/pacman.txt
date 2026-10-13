@@ -25,3 +25,6 @@ nodejs
 npm
 unzip
 dotnet-runtime
+rsync
+cifs-utils
+ntfs-3g
