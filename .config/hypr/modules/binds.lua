@@ -21,13 +21,26 @@ hl.bind(mainMod .. " + SPACE",          hl.dsp.exec_cmd(qsipc .. "launcher toggl
 hl.bind(mainMod .. " + N",              hl.dsp.exec_cmd(qsipc .. "control toggle"))
 hl.bind(mainMod .. " + CTRL + SPACE",   hl.dsp.exec_cmd(qsipc .. "switcher toggle"))
 
+hl.bind(mainMod .. "+ SHIFT + F", function()
+    hl.dispatch(hl.dsp.window.fullscreen({
+        mode = "fullscreen", -- or fullscreen
+        action = "toggle"
+    }))
+end)
+hl.bind(mainMod .. " + F", function()
+    hl.dispatch(hl.dsp.window.fullscreen({
+        mode = "maximized", -- or fullscreen
+        action = "toggle"
+    }))
+end)
+
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(browser))
 hl.bind(mainMod .. " + Q", hl.dsp.window.close())
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
-hl.bind(mainMod .. " + F", hl.dsp.window.float({ action = "toggle" }))
+--hl.bind(mainMod .. " + F", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + R", hl.dsp.layout("togglesplit"))    -- dwindle only
 
@@ -135,16 +148,25 @@ hl.on("window.open", function(w)
 end)
 
 -- Toggle the mode and convert the windows that are already open
-hl.bind(mainMod .. " + SHIFT + F", function()
-    float_mode = not float_mode
-    local action = float_mode and "set" or "unset"
-    for _, w in ipairs(hl.get_windows()) do
-       hl.dispatch(hl.dsp.window.float({ action = action, window = w }))
-       hl.dispatch(hl.dsp.window.resize({ x = FLOAT_X, y = FLOAT_Y, window = w }))
-    end
-    --hl.notification.create({ text = float_mode and "Float mode" or "Tile mode" })
-end)
+--hl.bind(mainMod .. " + SHIFT + F", function()
+--    float_mode = not float_mode
+--    local action = float_mode and "set" or "unset"
+--    for _, w in ipairs(hl.get_windows()) do
+--       hl.dispatch(hl.dsp.window.float({ action = action, window = w }))
+--       hl.dispatch(hl.dsp.window.resize({ x = FLOAT_X, y = FLOAT_Y, window = w }))
+--    end
+--    --hl.notification.create({ text = float_mode and "Float mode" or "Tile mode" })
+--end)
 
 
 -- Dark / light mode (torii-theme restyles everything; dark is the default)
-hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-theme mode toggle"))
+-- Keyboard layout (a normal bind, so it doesn't fire on mainMod+SHIFT+<other key>)
+hl.bind(mainMod .. " + SHIFT + D",hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-theme mode toggle"))
+
+-- Keyboard layout: mainMod+SHIFT pressed and released on their own.
+-- Release binds don't fire if another key was pressed in between, so
+-- mainMod+SHIFT+<key> binds (e.g. RETURN) are not affected.
+-- The released key has to be listed in the modifiers too, once per release order.
+local switchLayout = hl.dsp.exec_cmd("hyprctl switchxkblayout all next")
+hl.bind(mainMod .. " + SHIFT + Shift_L", switchLayout, { release = true })
+hl.bind(mainMod .. " + SHIFT + " .. mainMod:sub(1, 1) .. mainMod:sub(2):lower() .. "_L", switchLayout, { release = true })

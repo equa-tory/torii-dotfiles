@@ -1,6 +1,6 @@
 {
-  "notch": { "shape": "attached", "opacity": 1.0, "radius": 16, "height": 34, "gap": 6 },
-  "workspaces": { "count": 5 },
+  "notch": { "shape": "floating", "opacity": 1.0, "radius": 16, "height": 34, "gap": 6 },
+  "workspaces": { "count": 4 },
   "weather": { "lat": 55.75, "lon": 37.62, "refreshMin": 20 },
   "wallpaper": { "dir": "~/Pictures/wallpapers", "transitionMs": 600 },
   "theme": { "tint": 0.15 },

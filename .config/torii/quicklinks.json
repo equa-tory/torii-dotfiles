@@ -1,6 +1,6 @@
 {
-  "yt":  "https://www.youtube.com/results?search_query={q}",
-  "g":   "https://www.google.com/search?q={q}",
+  "v":  "https://www.youtube.com/results?search_query={q}",
+  "g":   "https://www.duckduckgo.com/search?q={q}",
   "x":   "https://x.com/search?q={q}",
   "gh":  "https://github.com/search?q={q}",
   "git": "https://github.com/equa-tory",
