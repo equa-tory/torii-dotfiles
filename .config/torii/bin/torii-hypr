@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""torii-hypr layout <dwindle|master|scrolling> | gaps <inner> <outer> | status | apply
+
+Runtime choices made from the launcher. They are kept in ~/.local/state/torii/hypr-user.json, applied to the running
+Hyprland at once and re-applied at every start through hypr-user.lua (hyprland.lua loads it last).
+"""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii"))
+JS, LUA = STATE / "hypr-user.json", STATE / "hypr-user.lua"
+LAYOUTS = ("dwindle", "master", "scrolling")
+
+
+def load():
+    try:
+        return json.loads(JS.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def lua(s):
+    parts = []
+    if "layout" in s:
+        parts.append(f'layout="{s["layout"]}"')
+    if "gaps_in" in s:
+        parts.append(f'gaps_in={int(s["gaps_in"])}, gaps_out={int(s["gaps_out"])}')
+    return "hl.config({general={%s}})\n" % ", ".join(parts) if parts else "-- nothing chosen yet\n"
+
+
+def save(s):
+    STATE.mkdir(parents=True, exist_ok=True)
+    for path, text in ((JS, json.dumps(s)), (LUA, lua(s))):
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(text)
+        os.replace(tmp, path)
+
+
+def apply(s):
+    if not os.environ.get("TORII_NO_HOOKS") and s:
+        subprocess.run(["hyprctl", "eval", lua(s).strip()], capture_output=True)
+
+
+def main(a):
+    s = load()
+    if a[:1] == ["status"]:
+        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20}
+        print(json.dumps({**cur, **s}))
+        return
+    if a[:1] == ["layout"] and len(a) == 2 and a[1] in LAYOUTS:
+        s["layout"] = a[1]
+    elif a[:1] == ["gaps"] and len(a) == 3 and a[1].isdigit() and a[2].isdigit():
+        s["gaps_in"], s["gaps_out"] = int(a[1]), int(a[2])
+    elif a[:1] == ["apply"]:
+        apply(s)
+        return
+    else:
+        print(__doc__)
+        sys.exit(2)
+    save(s)
+    apply(s)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

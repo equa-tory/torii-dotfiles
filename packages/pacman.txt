@@ -76,3 +76,15 @@ docker
 docker-compose
 docker-buildx
 hyprsunset
+
+# launcher Trigger menu: capture, OCR, QR, colour picker, recording, emoji, notifications
+wl-clipboard
+tesseract
+tesseract-data-eng
+tesseract-data-rus
+zbar
+hyprpicker
+wf-recorder
+libnotify
+unicode-emoji
+noto-fonts-emoji

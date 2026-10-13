@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# torii-capture screen|zone|record|text|qr|color   -  screenshots, screen recording and screen readers.
+#   screen   whole focused monitor -> ~/Pictures/Screenshots + clipboard
+#   zone     drag a rectangle       -> same
+#   record   start recording the focused monitor to ~/Videos; run again to stop
+#   text     drag a rectangle, read the text in it (OCR) -> clipboard
+#   qr       drag a rectangle around a QR code           -> clipboard
+#   color    pick a colour on screen                     -> clipboard (#rrggbb)
+set -uo pipefail
+
+pics="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"; vids="${XDG_VIDEOS_DIR:-$HOME/Videos}"
+ts=$(date +%Y-%m-%d_%H-%M-%S)
+note() { notify-send -a torii "$@"; }
+need() { command -v "$1" >/dev/null 2>&1 || { note "torii-capture" "$1 is not installed"; exit 1; }; }
+focused() { hyprctl monitors -j | jq -r '.[] | select(.focused) | .name'; }
+zone() { slurp -d; }                       # empty when you press Esc
+
+case "${1:-}" in
+  screen)
+    need grim; mkdir -p "$pics"; sleep 0.4
+    f="$pics/$ts.png"; grim -o "$(focused)" "$f" && { wl-copy < "$f"; note "Screenshot saved" "$f" -i "$f"; } ;;
+  zone)
+    need grim; need slurp; mkdir -p "$pics"
+    geo=$(zone) || exit 0; [ -n "$geo" ] || exit 0; sleep 0.2
+    f="$pics/$ts.png"; grim -g "$geo" "$f" && { wl-copy < "$f"; note "Screenshot saved" "$f" -i "$f"; } ;;
+  record)
+    need wf-recorder
+    if pgrep -x wf-recorder >/dev/null; then pkill -INT -x wf-recorder; exit 0; fi
+    mkdir -p "$vids"; f="$vids/$ts.mp4"
+    note "Recording started" "Run Capture > Record again to stop"
+    wf-recorder -o "$(focused)" -f "$f"
+    note "Recording saved" "$f" ;;
+  text)
+    need grim; need slurp; need tesseract
+    geo=$(zone) || exit 0; [ -n "$geo" ] || exit 0; sleep 0.2
+    langs=eng; tesseract --list-langs 2>/dev/null | grep -qx rus && langs=eng+rus
+    txt=$(grim -g "$geo" - | tesseract - - -l "$langs" 2>/dev/null | sed 's/[[:space:]]*$//')
+    if [ -n "$txt" ]; then printf '%s' "$txt" | wl-copy; note "Text copied" "$(printf '%s' "$txt" | head -c 200)"
+    else note "No text found"; fi ;;
+  qr)
+    need grim; need slurp; need zbarimg
+    geo=$(zone) || exit 0; [ -n "$geo" ] || exit 0; sleep 0.2
+    code=$(grim -g "$geo" - | zbarimg -q --raw - 2>/dev/null | head -n1)
+    if [ -n "$code" ]; then printf '%s' "$code" | wl-copy; note "QR code copied" "$code"
+    else note "No QR code found"; fi ;;
+  color)
+    need hyprpicker
+    c=$(hyprpicker -a -n 2>/dev/null | head -n1)
+    [ -n "$c" ] && note "Colour copied" "$c" ;;
+  *) sed -n '2,9p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac

@@ -77,6 +77,21 @@ Quicklinks work at the top level (`v cats`, `git`). No history is kept.
 `configs`, `defaults`, ...), `hidden` for ids to remove. Entries not listed keep their default place after the listed ones.
 It reloads while the launcher is closed.
 
+**Trigger** menu (`torii-*` scripts in `~/.config/torii/bin`, each also works from a terminal):
+- Capture (`torii-capture`): screenshot of the screen or a zone (saved in `~/Pictures/Screenshots` and copied), screen recording
+  of the focused monitor (run it again to stop, saved in `~/Videos`), text from a screen zone (OCR, English + Russian), QR code,
+  colour picker.
+- Transcode (`torii-transcode`): pick a recent image or video, a format (png jpg jpeg webp / mp4 mov gif) and a size; the
+  result is written next to the original.
+- Emoji: Trigger > Emoji, or type `:grin` at the top level. It copies the emoji and types it into the focused window.
+- Reminder: minutes, then a message; a systemd timer shows a notification.
+- File auto mover (`torii-automove`): while it is on, files that newly appear in `~/Downloads` are moved to the folder in
+  `automove.to` of `config.json` (default `/mnt/mass/Media_MASS/Photo/inbox`). It waits on inotify, ignores partial
+  downloads and files that existed before you switched it on, and never creates the folder when the share is not mounted.
+- Switches: mute microphone, do not disturb (swaync), dark mode, menu bar shape (floating or attached), workspace layout
+  (dwindle, master, scrolling) and window gaps (`torii-hypr`, remembered across logins).
+- Speed test: network (Cloudflare) or disk (512 MB in your home folder); the result comes as a notification.
+
 **Setup** menu: open any Hyprland/shell/kitty/tmux/nvim/zsh config in the editor (`Configs`); choose the default
 browser, editor, files app and terminal (`Defaults`, `torii-default`; Hyprland binds and uwsm read
 `~/.local/state/torii/defaults.env`); night light (`torii-nightlight`, needs `hyprsunset`: temperature, manual or daily

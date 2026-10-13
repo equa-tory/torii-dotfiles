@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""torii-automove on|off|status|apply  -  move NEW files from ~/Downloads to a folder, while it is switched on.
+
+  on       remember the time now; only files that appear after it are moved
+  off      stop
+  status   JSON: {"enabled", "since", "from", "to"}
+  apply    start the watcher again after login when it was left on (autostart runs this)
+Folders: "automove": {"from": "~/Downloads", "to": "/mnt/mass/Media_MASS/Photo/inbox"} in ~/.config/torii/config.json.
+The watcher is a systemd user service (torii-automove) that waits on inotify, so it uses no CPU while nothing happens.
+If the destination is not there (share not mounted) nothing is moved or created and the files stay in Downloads.
+"""
+import ctypes
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HOME = Path.home()
+STATE = Path(os.environ.get("TORII_STATE", HOME / ".local/state/torii")) / "automove.json"
+SKIP_EXT = (".part", ".crdownload", ".tmp", ".download", ".opdownload", ".partial")
+IN_CLOSE_WRITE, IN_MOVED_TO = 0x8, 0x80
+
+
+def cfg():
+    src, dst = "~/Downloads", "/mnt/mass/Media_MASS/Photo/inbox"
+    try:
+        c = json.loads((HOME / ".config/torii/config.json").read_text()).get("automove", {})
+        src, dst = c.get("from", src), c.get("to", dst)
+    except (OSError, ValueError):
+        pass
+    return Path(os.path.expanduser(src)), Path(os.path.expanduser(dst))
+
+
+def load():
+    try:
+        return json.loads(STATE.read_text())
+    except (OSError, ValueError):
+        return {"enabled": False, "since": 0}
+
+
+def save(s):
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(s))
+    os.replace(tmp, STATE)
+
+
+def notify(title, body=""):
+    subprocess.run(["notify-send", "-a", "torii", title, body], check=False)
+
+
+def unit(action):
+    subprocess.run(["systemctl", "--user", "stop", "torii-automove.service"], capture_output=True)
+    if action == "start":
+        subprocess.run(["systemd-run", "--user", "--collect", "--unit=torii-automove", os.path.abspath(sys.argv[0]), "watch"],
+                       capture_output=True)
+
+
+def sweep(src, dst, since, warned):
+    if not dst.is_dir():
+        if dst.parent.is_dir():
+            dst.mkdir(exist_ok=True)
+        else:
+            if not warned[0]:
+                notify("Auto mover waiting", f"{dst} is not there (is the share mounted?)")
+                warned[0] = True
+            return
+    warned[0] = False
+    for f in sorted(src.iterdir()):
+        try:
+            if f.name.startswith(".") or f.name.lower().endswith(SKIP_EXT) or not f.is_file():
+                continue
+            if f.stat().st_mtime < since:
+                continue
+            size = f.stat().st_size
+            time.sleep(0.8)                       # still being written?
+            if f.stat().st_size != size:
+                continue
+            target = dst / f.name
+            n = 1
+            while target.exists():
+                target = dst / f"{f.stem}-{n}{f.suffix}"
+                n += 1
+            shutil.move(str(f), str(target))
+        except OSError as e:
+            notify("Auto mover: could not move " + f.name, str(e))
+
+
+def watch():
+    src, dst = cfg()
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    fd = libc.inotify_init1(os.O_CLOEXEC)
+    if fd < 0 or libc.inotify_add_watch(fd, str(src).encode(), IN_CLOSE_WRITE | IN_MOVED_TO) < 0:
+        sys.exit("cannot watch " + str(src))
+    warned = [False]
+    sweep(src, dst, load().get("since", 0), warned)
+    while True:
+        os.read(fd, 4096)                         # blocks until something lands in the folder
+        time.sleep(0.5)
+        s = load()
+        if not s.get("enabled"):
+            return
+        sweep(src, dst, s.get("since", 0), warned)
+
+
+def main(a):
+    cmd = a[0] if a else "status"
+    src, dst = cfg()
+    if cmd == "status":
+        s = load()
+        print(json.dumps({"enabled": bool(s.get("enabled")), "since": s.get("since", 0), "from": str(src), "to": str(dst)}))
+    elif cmd == "on":
+        save({"enabled": True, "since": time.time()})
+        unit("start")
+    elif cmd == "off":
+        save({"enabled": False, "since": load().get("since", 0)})
+        unit("stop")
+    elif cmd == "apply":
+        if load().get("enabled"):
+            unit("start")
+    elif cmd == "watch":
+        watch()
+    else:
+        print(__doc__)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# torii-speed net|disk [dir]  -  quick speed tests, the result comes as a notification.
+#   net    download and upload through Cloudflare's speed server, plus latency (uses your current route, TUN included)
+#   disk   write and read 512 MB in [dir] (default: your home folder), the test file is removed
+set -uo pipefail
+note() { notify-send -a torii "$@"; }
+mbps() { awk -v b="$1" 'BEGIN { printf "%.0f", b * 8 / 1000000 }'; }
+
+case "${1:-}" in
+  net)
+    note "Network speed test" "running…"
+    lat=$(curl -s -o /dev/null -m 10 -w '%{time_connect}' https://speed.cloudflare.com/cdn-cgi/trace) || lat=""
+    down=$(curl -s -o /dev/null -m 40 -w '%{speed_download}' 'https://speed.cloudflare.com/__down?bytes=50000000') || down=0
+    up=$(head -c 20000000 /dev/zero | curl -s -o /dev/null -m 40 -w '%{speed_upload}' --data-binary @- https://speed.cloudflare.com/__up) || up=0
+    if [ "${down%.*}" = 0 ] && [ "${up%.*}" = 0 ]; then note "Network speed test" "no connection"; exit 1; fi
+    note "Network speed" "Down $(mbps "$down") Mbit/s  ·  Up $(mbps "$up") Mbit/s  ·  latency $(awk -v t="${lat:-0}" 'BEGIN{printf "%.0f", t*1000}') ms" ;;
+  disk)
+    dir="${2:-$HOME}"; f="$dir/.torii-speed.$$"
+    [ -w "$dir" ] || { note "Disk speed test" "$dir is not writable"; exit 1; }
+    note "Disk speed test" "$dir: writing 512 MB…"
+    trap 'rm -f "$f"' EXIT
+    w=$(dd if=/dev/zero of="$f" bs=1M count=512 oflag=direct conv=fsync 2>&1 | tail -n1 | sed 's/.*, //') || w="?"
+    r=$(dd if="$f" of=/dev/null bs=1M iflag=direct 2>&1 | tail -n1 | sed 's/.*, //') || r="?"
+    note "Disk speed ($dir)" "Write $w  ·  Read $r" ;;
+  *) sed -n '2,4p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac

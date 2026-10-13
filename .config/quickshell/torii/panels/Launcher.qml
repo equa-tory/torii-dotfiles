@@ -53,6 +53,8 @@ Item {
 
         if (q === "") {
             out = Menus.childrenOf(scope).map(n => ({ node: n, trail: [] }));
+        } else if (q.charAt(0) === ":" && !scope) {
+            out = q.length > 1 ? Menus.emojiSearch(q.slice(1)) : [];
         } else {
             if (!scope) {
                 const link = Quicklinks.resolve(q);
@@ -149,7 +151,7 @@ Item {
                 renderType: Text.CurveRendering
                 selectionColor: Theme.accent
                 selectedTextColor: Theme.accentFg
-                echoMode: root.asking && Menus.prompt.secret ? TextInput.Password : TextInput.Normal
+                echoMode: Menus.prompt !== null && Menus.prompt.secret ? TextInput.Password : TextInput.Normal
                 clip: true
                 onTextChanged: { if (!root.asking) { root.update(false); } }
 
@@ -190,8 +192,8 @@ Item {
 
                 Label {
                     visible: !input.text.length
-                    text: root.asking ? Menus.prompt.label
-                        : root.path.length ? "Search in " + root.scope.name
+                    text: Menus.prompt !== null ? Menus.prompt.label
+                        : root.scope ? "Search in " + root.scope.name
                         : "Search apps and menus, or try  v cats  ·  git"
                     color: Theme.muted
                     font.pixelSize: parent.font.pixelSize

@@ -6,5 +6,6 @@
   "theme": { "tint": 0.15 },
   "apps": { "dir": "~/apps" },
   "quicklinks": "~/.config/torii/quicklinks.json",
-  "font": { "family": "JetBrainsMono Nerd Font", "size": 13 }
+  "font": { "family": "JetBrainsMono Nerd Font", "size": 13 },
+  "automove": { "from": "~/Downloads", "to": "/mnt/mass/Media_MASS/Photo/inbox" }
 }

@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""torii-config get|set <dotted.key> [json]  -  read or change one key of ~/.config/torii/config.json.
+
+  torii-config set notch.shape '"floating"'      the value is JSON; the shell picks the change up at once
+Other keys and the file's place (it may be a stow link into the dotfiles repo) are kept.
+"""
+import json
+import os
+import sys
+from pathlib import Path
+
+P = Path(os.environ.get("TORII_CONFIG", Path.home() / ".config/torii/config.json"))
+
+
+def main(a):
+    if len(a) < 2 or a[0] not in ("get", "set") or (a[0] == "set" and len(a) != 3):
+        print(__doc__)
+        sys.exit(2)
+    real = P.resolve()
+    try:
+        cfg = json.loads(real.read_text())
+    except (OSError, ValueError):
+        cfg = {}
+    keys = a[1].split(".")
+    node = cfg
+    for k in keys[:-1]:
+        node = node.setdefault(k, {}) if a[0] == "set" else node.get(k, {})
+    if a[0] == "get":
+        print(json.dumps(node.get(keys[-1])))
+        return
+    node[keys[-1]] = json.loads(a[2])
+    tmp = real.with_name(real.name + ".tmp")
+    tmp.write_text(json.dumps(cfg, indent=2) + "\n")
+    os.replace(tmp, real)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -60,7 +60,15 @@ Singleton {
     JsonFetch { id: fTerminal; command: [root.bin("torii-default"), "list", "terminal"]; onDataChanged: root.bump() }
     JsonFetch { id: fEditor;   command: [root.bin("torii-default"), "list", "editor"];   onDataChanged: root.bump() }
     JsonFetch { id: fNight;    command: [root.bin("torii-nightlight"), "status"];         onDataChanged: root.bump() }
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fNight]
+    JsonFetch { id: fTrig;     command: [root.bin("torii-trigger"), "status"];            onDataChanged: root.bump() }
+    JsonFetch { id: fEmoji;    command: [root.bin("torii-emoji"), "list"];
+                onDataChanged: { root.emojiNodes = (data || []).map(e => ({ id: "e:" + e.c, name: e.n, sub: e.g, glyph: e.c, run: () => app([root.bin("torii-emoji"), "copy", e.c]) }));
+                    root.bump(); } }
+    JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
+    property var emojiNodes: []
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fNight, fTrig, fEmoji, fTrans]
+    Connections { target: Theme; function onModeChanged() { root.bump(); } }
+    Connections { target: Config; function onNotchChanged() { fTrig.stale(); } }
     function invalidate() { for (const f of allFetch) f.stale(); }
 
     // ---- ordering
@@ -79,7 +87,7 @@ Singleton {
         return node.sorted ? c : ordered(node.id, c);
     }
 
-    function rootNodes() { return ordered("", [appsMenu(), setupMenu()]); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), setupMenu()]); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
@@ -105,6 +113,118 @@ Singleton {
         }
         scored.sort((a, b) => b.s - a.s);
         return scored.map(x => x.e);
+    }
+
+
+    // ":grin" at the top level searches emoji only
+    function emojiSearch(query) {
+        fEmoji.ensure();
+        const q = query.trim().toLowerCase();
+        const scored = [];
+        for (const n of emojiNodes) {
+            const sc = Fuzzy.scoreFields(q, [{ text: n.name, weight: 1 }, { text: n.sub, weight: 0.3 }]);
+            if (sc >= 0) scored.push({ e: { node: n, trail: ["Emoji"] }, s: sc });
+        }
+        scored.sort((a, b) => b.s - a.s);
+        return scored.map(x => x.e);
+    }
+
+    // ================= Trigger
+    function toggle(fetch, args, keep) { sh(args); later(fetch, 500); }
+    function human(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+
+    function triggerMenu() {
+        fTrig.ensure();
+        const t = fTrig.data || { automove: {}, hypr: {}, shape: "attached" };
+        const hyprBin = bin("torii-hypr");
+        return { id: "trigger", name: "Trigger", glyph: Icons.flash, sub: "Capture, convert, remind, switches", children: () => [
+            captureMenu(t),
+            transcodeMenu(),
+            { id: "emoji", name: "Emoji", glyph: Icons.emoji, sub: "Copy and type an emoji", noSearch: true, sorted: true,
+              children: () => { fEmoji.ensure(); return emojiNodes; } },
+            { id: "reminder", name: "Reminder", glyph: Icons.timer, sub: "In some minutes, with a message", keywords: "timer alarm notify", keep: true,
+              run: () => ask("Remind me in (minutes)", false, m => {
+                  const n = parseFloat(String(m).replace(",", "."));
+                  if (!(n > 0)) { say("Type a number of minutes, like 25"); return; }
+                  ask("Remind me about…", false, msg => {
+                      sh(["systemd-run", "--user", "--collect", "--unit=torii-remind-" + Date.now(), "--on-active=" + Math.round(n * 60) + "s",
+                          "notify-send", "-a", "torii", "-u", "critical", "Reminder", msg || "Time is up"]);
+                      Panels.close();
+                  });
+              }) },
+            { id: "automove", name: "File auto mover", glyph: Icons.folderMove, keywords: "downloads move inbox photos",
+              sub: t.automove.enabled ? "Moving new files to " + (t.automove.to || "").replace(home, "~") : "Downloads → " + (t.automove.to || "").replace(home, "~"),
+              badge: t.automove.enabled ? "On" : "Off", keep: true, run: () => toggle(fTrig, [bin("torii-automove"), t.automove.enabled ? "off" : "on"]) },
+            { id: "mic", name: "Mute microphone", glyph: Audio.sourceMuted ? Icons.micOff : Icons.mic, keywords: "input mic mute",
+              badge: Audio.sourceMuted ? "Muted" : "", keep: true, run: () => { Audio.toggleSourceMute(); bump(); } },
+            { id: "dnd", name: "Do not disturb", glyph: t.dnd ? Icons.bellOff : Icons.bell, keywords: "notifications silence",
+              sub: "Notifications", badge: t.dnd ? "On" : "Off", keep: true, run: () => toggle(fTrig, ["swaync-client", "-d", "-sw"]) },
+            { id: "dark", name: "Dark mode", glyph: Icons.themeDark, keywords: "light theme appearance",
+              badge: Theme.mode === "dark" ? "On" : "Off", keep: true, run: () => sh([bin("torii-theme"), "mode", "toggle"]) },
+            { id: "shape", name: "Menu bar shape", glyph: Icons.layout, keywords: "notch floating attached",
+              sub: t.shape === "floating" ? "Floating" : "Attached", badge: t.shape === "floating" ? "Floating" : "Attached", keep: true,
+              run: () => { sh([bin("torii-config"), "set", "notch.shape", t.shape === "floating" ? '"attached"' : '"floating"']); later(fTrig, 500); } },
+            { id: "layout", name: "Workspace layout", glyph: Icons.layout, sub: t.hypr.layout || "dwindle", keywords: "tiling dwindle master scrolling", children: () =>
+                [["dwindle", "Split in halves, newest window splits the focused one"], ["master", "One big window and a stack"], ["scrolling", "Columns that scroll sideways"]].map(l => ({
+                    id: l[0], name: l[0].charAt(0).toUpperCase() + l[0].slice(1), sub: l[1], badge: (t.hypr.layout || "dwindle") === l[0] ? "●" : "", keep: true,
+                    run: () => { sh([hyprBin, "layout", l[0]]); later(fTrig, 500); } })) },
+            { id: "gaps", name: "Window gaps", glyph: Icons.layout, sub: (t.hypr.gaps_in ?? 8) + " / " + (t.hypr.gaps_out ?? 20), keywords: "spacing margin", children: () =>
+                [["None", 0, 0], ["Tight", 2, 5], ["Small", 4, 10], ["Default", 8, 20], ["Large", 12, 32]].map(g => ({
+                    id: "g" + g[0], name: g[0], sub: g[1] + " inside, " + g[2] + " outside", badge: (t.hypr.gaps_out ?? 20) === g[2] ? "●" : "", keep: true,
+                    run: () => { sh([hyprBin, "gaps", String(g[1]), String(g[2])]); later(fTrig, 500); } })) },
+            { id: "speed", name: "Speed test", glyph: Icons.speed, sub: "Network or disk, result as a notification", children: () => [
+                { id: "net", name: "Network", sub: "Download, upload, latency", glyph: Icons.wifi, run: () => app([bin("torii-speed"), "net"]) },
+                { id: "disk", name: "Disk", sub: "Write and read 512 MB in your home folder", glyph: Icons.folder, run: () => app([bin("torii-speed"), "disk"]) } ] }
+        ] };
+    }
+
+    function captureMenu(t) {
+        const cap = what => () => app([bin("torii-capture"), what]);
+        return { id: "capture", name: "Capture", glyph: Icons.camera, sub: "Screenshot, record, text, QR, colour", children: () => [
+            { id: "screen", name: "Screenshot", sub: "The whole screen", glyph: Icons.camera, keywords: "screenshot fullscreen", run: cap("screen") },
+            { id: "zone", name: "Screenshot zone", sub: "Drag a rectangle", glyph: Icons.camera, keywords: "screenshot region area", run: cap("zone") },
+            { id: "record", name: t.recording ? "Stop recording" : "Record screen", sub: "The focused monitor, saved in ~/Videos", glyph: Icons.record,
+              keywords: "video screencast", badge: t.recording ? "●" : "", run: cap("record") },
+            { id: "text", name: "Text from screen", sub: "Drag a rectangle, the text is copied", glyph: Icons.textScan, keywords: "ocr read copy", run: cap("text") },
+            { id: "qr", name: "QR code", sub: "Drag a rectangle around it", glyph: Icons.qr, keywords: "scan barcode", run: cap("qr") },
+            { id: "color", name: "Colour picker", sub: "Click a pixel, the hex is copied", glyph: Icons.eyedropper, keywords: "color eyedropper hex", run: cap("color") }
+        ] };
+    }
+
+    // transcode: file -> format -> size
+    function transcodeMenu() {
+        return { id: "transcode", name: "Transcode", glyph: Icons.swap, sub: "Convert images and videos", keywords: "convert resize png jpg webp mp4 mov gif", sorted: true, children: () => {
+            fTrans.ensure();
+            const out = (fTrans.data || []).map(fileNode);
+            if (pendingFile) out.unshift(fileNode(pendingFile));
+            out.push({ id: "path", name: "Another file…", sub: "Type or paste a path", glyph: Icons.pencil, keep: true,
+                       run: () => ask("Path of the file", false, p => {
+                           const path = p.replace(/^~/, home).replace(/^["']|["']$/g, "");
+                           const ext = (path.split(".").pop() || "").toLowerCase();
+                           if (!path) return;
+                           pendingFile = { path: path, name: path.split("/").pop(), dir: "your file", size: 0,
+                                           kind: ["mp4", "mov", "mkv", "webm", "avi", "gif", "m4v"].indexOf(ext) >= 0 ? "video" : "image" };
+                           bump(); }) });
+            if (!(fTrans.data || []).length && !pendingFile) out.unshift({ id: "none", name: "No recent media found", sub: "Downloads, Pictures, Videos" });
+            return out;
+        } };
+    }
+    property var pendingFile: null
+    function fileNode(f) {
+        return { id: "f:" + f.path, name: f.name, sub: f.dir + (f.size ? "  ·  " + human(f.size) : ""), glyph: f.kind === "image" ? Icons.image : Icons.video,
+                 noSearch: true, children: () => formatsFor(f) };
+    }
+    function formatsFor(f) {
+        const ext = f.name.split(".").pop().toLowerCase();
+        const fmts = f.kind === "image" ? ["png", "jpg", "jpeg", "webp"] : ["mp4", "mov", "gif"];
+        return fmts.filter(x => x !== ext).map(x => ({ id: x, name: x.toUpperCase(), sub: "Convert " + f.name, glyph: Icons.swap, children: () => sizesFor(f, x) }));
+    }
+    function sizesFor(f, fmt) {
+        const img = f.kind === "image";
+        const list = [["orig", "Original size"], ["p75", "75 %"], ["p50", "50 %"], ["p25", "25 %"]].concat(img
+            ? [["w3840", "3840 px wide"], ["w1920", "1920 px wide"], ["w1280", "1280 px wide"], ["w800", "800 px wide"]]
+            : [["h1080", "1080p"], ["h720", "720p"], ["h480", "480p"], ["h360", "360p"]]);
+        return list.map(z => ({ id: z[0], name: z[1], glyph: Icons.tune, sub: f.name + " → " + fmt, run: () => app([bin("torii-transcode"), "run", f.path, fmt, z[0]]) }));
     }
 
     // ================= Apps

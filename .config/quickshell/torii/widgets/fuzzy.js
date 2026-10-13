@@ -16,7 +16,7 @@ function scoreOne(q, t) {
     if (at >= 0) return 600 - at - t.length * 0.1;
 
     // subsequence: every char of q appears in order; reward consecutive runs and word starts
-    let ti = 0, score = 0, prev = -2;
+    let ti = 0, score = 0, prev = -2, first = -1;
     for (let qi = 0; qi < q.length; qi++) {
         let found = -1;
         for (let j = ti; j < t.length; j++) {
@@ -26,9 +26,12 @@ function scoreOne(q, t) {
         score += 10;
         if (found === prev + 1) score += 8;
         if (found === 0 || /[\s\-_.\/]/.test(t[found - 1])) score += 12;
+        if (first < 0) first = found;
         prev = found;
         ti = found + 1;
     }
+    // letters scattered all over a long text are not a match: the span must stay close to the query length
+    if (prev - first + 1 > q.length * 2 + 2) return -1;
     return 200 + score - t.length * 0.5;
 }
 
