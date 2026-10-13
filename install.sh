@@ -11,10 +11,8 @@ bash "packages/install.sh"
 
 mv ~/.config/hypr ~/.config/hypr.bak
 mv ~/.config/kitty ~/.config/kitty.bak
+mv ~/.zshrc ~/.zshrc.bak
 stow .
-
-echo "source ~/.config/dotfiles/shellrc" >> ~/.zshrc
-echo "source ~/.config/powerlevel10k/powerlevel10k.zsh-theme" >> ~/.zshrc
 
 mkdir ~/.ssh && chmod 700 ~/.ssh
 curl https://github.com/equa-tory.keys > ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
