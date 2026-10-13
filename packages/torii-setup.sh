@@ -27,6 +27,9 @@ if [[ -d $REPO/wallpapers ]]; then
   cp -an "$REPO/wallpapers/." "$HOME/Pictures/wallpapers/"
 fi
 
+say "App manifests for the launcher (~/apps)"
+bash "$REPO/packages/apps-sync.sh"
+
 if [[ $SKIP_SYSTEM != 1 ]]; then
   say "Bluetooth service"
   if systemctl list-unit-files bluetooth.service >/dev/null 2>&1; then

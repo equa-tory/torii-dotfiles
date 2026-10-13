@@ -1,0 +1,1 @@
+{ "name": "cliamp", "exec": "kitty cliamp", "icon": "audio-x-generic", "keywords": ["music", "player", "audio"], "description": "Terminal music player" }

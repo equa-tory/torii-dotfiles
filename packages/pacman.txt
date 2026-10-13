@@ -18,8 +18,7 @@ zoxide
 zsh
 translate-shell
 steam
-nvidia-open
-#cuda
+# NVIDIA driver + cuda: packages/nvidia.sh (pinned, only on machines with an NVIDIA GPU)
 
 nodejs
 npm
@@ -66,3 +65,7 @@ ydotool
 # dark mode for GTK/Chromium apps (settings portal + gsettings backend)
 xdg-desktop-portal-gtk
 dconf
+
+# shell comfort (zsh suggestions as you type, syntax colours)
+zsh-autosuggestions
+zsh-syntax-highlighting

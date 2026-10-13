@@ -1,0 +1,1 @@
+{ "name": "v2rayN", "exec": "v2rayN-linux-64/v2rayN", "icon": "network-vpn", "keywords": ["vpn", "proxy", "tun"], "description": "Proxy client (the program folder is restored by personal.sh)" }

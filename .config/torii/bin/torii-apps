@@ -7,6 +7,7 @@ Every folder directly inside ~/apps (apps.dir in ~/.config/torii/config.json) is
   {
     "name": "v2rayN",                      optional, defaults to the folder name
     "exec": "v2rayN-linux-64/v2rayN",      required: command, relative to the folder (string or list)
+    "bottle": "Games", "program": "x.exe"  instead of exec: a Windows program run by Bottles (bottles-cli)
     "icon": "icon.png",                    optional: file in the folder, or an icon-theme name
     "keywords": ["vpn", "proxy"],          optional
     "description": "Proxy client"          optional
@@ -40,10 +41,15 @@ def scan():
             m = json.loads(manifest.read_text())
         except (OSError, ValueError):
             continue
-        if not isinstance(m, dict) or not m.get("exec"):
+        if not isinstance(m, dict):
             continue
-        ex = m["exec"]
-        ex = " ".join(ex) if isinstance(ex, list) else str(ex)
+        if m.get("bottle") and m.get("program"):
+            ex = "bottles-cli run -b '%s' -p '%s'" % (m["bottle"], m["program"])
+        elif m.get("exec"):
+            ex = m["exec"]
+            ex = " ".join(ex) if isinstance(ex, list) else str(ex)
+        else:
+            continue
         icon = str(m.get("icon", ""))
         if icon and (d / icon).is_file():
             icon = str(d / icon)

@@ -23,7 +23,7 @@ done
 
 echo "==> Linking dotfiles"
 # real parent dirs first, otherwise stow folds all of ~/.config into this repo (and apps would write into it)
-mkdir -p ~/.config ~/.local/share ~/.local/state
+mkdir -p ~/.config ~/.config/autostart ~/.local/share ~/.local/state
 stow .
 
 echo "==> Torii shell (wallpapers, theme, services)"
@@ -31,6 +31,16 @@ bash packages/torii-setup.sh
 
 echo "==> Personal data from the home server (skipped if unreachable)"
 bash packages/personal.sh || true
+bash packages/apps-sync.sh || true
+
+echo "==> Mirrors on the home server (skipped if unreachable)"
+bash packages/mirrors.sh || true
+
+echo "==> NVIDIA driver (skipped without an NVIDIA GPU)"
+bash packages/nvidia.sh || true
+
+echo "==> Claude Code status line"
+bash packages/claude-statusline.sh || true
 
 echo "==> Authorizing SSH keys from GitHub"
 mkdir -p ~/.ssh && chmod 700 ~/.ssh

@@ -1,0 +1,1 @@
+{ "name": "Vim", "exec": "kitty vim", "icon": "vim", "keywords": ["editor", "text"], "description": "Vim (same as Neovim here)" }

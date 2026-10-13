@@ -1,2 +1,5 @@
 helium-browser-bin
 cliamp
+localsend-bin
+protonup-qt
+bottles
