@@ -307,5 +307,5 @@ eval "$(zoxide init "${SHELL##*/}" --cmd cd)"
 source <(fzf --zsh)
 
 
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$HOME/.config/torii/bin:$PATH"
 

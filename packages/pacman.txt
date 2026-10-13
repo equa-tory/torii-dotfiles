@@ -62,3 +62,7 @@ bluez-utils
 # testing (synthetic keypresses for shell checks)
 wtype
 ydotool
+
+# dark mode for GTK/Chromium apps (settings portal + gsettings backend)
+xdg-desktop-portal-gtk
+dconf

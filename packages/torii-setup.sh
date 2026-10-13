@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Everything the Quickshell desktop needs that `stow` and the package lists do not do. Safe to run again.
+# Run it after `stow .` (install.sh does):   bash packages/torii-setup.sh
+#
+#   TORII_SKIP_SYSTEM=1   skip the steps that need root or touch system settings (used for tests)
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SKIP_SYSTEM="${TORII_SKIP_SYSTEM:-0}"
+SUDO="${SUDO-sudo}"; if [[ $EUID -eq 0 ]]; then SUDO=""; fi
+say() { printf '\n==> %s\n' "$*"; }
+
+say "Directories (real ones, never stow links: wallpapers you add must not land in the public repo)"
+# an older layout had ~/Pictures stow-linked into the repo: make it a real directory, keep the files
+if [[ -L $HOME/Pictures ]]; then
+  tmp="$(mktemp -d)"
+  cp -aL "$HOME/Pictures/." "$tmp/" 2>/dev/null || true
+  rm "$HOME/Pictures"
+  mkdir -p "$HOME/Pictures"
+  cp -an "$tmp/." "$HOME/Pictures/"
+  rm -rf "$tmp"
+fi
+mkdir -p "$HOME/Pictures/wallpapers" "$HOME/.local/state/torii" "$HOME/.cache/torii"
+
+say "Default wallpapers (existing files are left alone)"
+if [[ -d $REPO/wallpapers ]]; then
+  cp -an "$REPO/wallpapers/." "$HOME/Pictures/wallpapers/"
+fi
+
+if [[ $SKIP_SYSTEM != 1 ]]; then
+  say "Bluetooth service"
+  if systemctl list-unit-files bluetooth.service >/dev/null 2>&1; then
+    $SUDO systemctl enable --now bluetooth.service || echo "!!  could not enable bluetooth.service (no adapter here is fine)"
+  fi
+
+  say "Helium: theme colour policy + default browser"
+  if command -v helium-browser >/dev/null 2>&1; then
+    bash "$REPO/packages/helium-policy.sh"
+    if [[ $(xdg-settings get default-web-browser 2>/dev/null) != helium.desktop ]]; then
+      xdg-settings set default-web-browser helium.desktop || echo "!!  could not set the default browser"
+    fi
+  else
+    echo "  Helium is not installed, skipping"
+  fi
+fi
+
+say "Theme (first run picks the first wallpaper; later runs keep your current one)"
+export PATH="$HOME/.config/torii/bin:$PATH"
+if command -v torii-theme >/dev/null 2>&1 && command -v matugen >/dev/null 2>&1; then
+  torii-theme restore || echo "!!  torii-theme restore failed (see above); the shell starts with built-in colours"
+else
+  echo "  torii-theme or matugen missing, skipping (run torii-theme restore after installing matugen)"
+fi
+
+say "Torii shell setup done. Log out and back in, or start it now:  torii-shell start"

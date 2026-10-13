@@ -335,6 +335,8 @@ def ensure_qt_conf():
 
 
 def run_hooks():
+    if os.environ.get("TORII_NO_HOOKS"):          # installers / tests: write files only, touch no running app
+        return
     hypr = THEME_DIR / "hypr.lua"
     if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE") and hypr.exists():
         # a leading "--" comment would be parsed by hyprctl as a flag

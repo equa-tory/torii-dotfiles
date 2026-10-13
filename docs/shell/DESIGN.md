@@ -265,3 +265,24 @@ Reload hooks:
   fix problems before reporting.
 - The final report lists what works, what was verified only against mocks, and a real-machine checklist: two
   monitors, Wi-Fi connect, Bluetooth pair/forget, Steam + v2rayN in the tray, Helium theme, SUPER as `mainMod`.
+
+---
+
+## As built (differences from the plan above)
+
+* **Token rename:** `onAccent` became `accentFg` (`onAccent` is parsed by QML as a signal handler).
+* **Dark / light:** `torii-theme mode dark|light|toggle`, dark by default, bound to `mainMod + SHIFT + D`. Adds the
+  tokens `browser`, `mode`, `gtkTheme`, `catppuccin`. Helium gets a dark-toned seed colour (a bright seed makes
+  Chromium derive a light frame even with `BrowserColorScheme = dark`).
+* **Singleton `State` is `Panels`:** `State` collides with the QtQuick type.
+* **Click outside:** a transparent full-screen scrim and `HyprlandFocusGrab` both failed (Hyprland routes pointer input only to the
+  exclusive-keyboard layer). The notch window is full height instead, and its input mask grows to the whole window
+  while a panel is open.
+* **No QML `Shortcut`:** it segfaults in Qt 6.12 when the shell hot-reloads; Esc is a key handler.
+* **Switcher:** previews the wallpaper (and shows the accent swatch) on the focused monitor; it does not recolour the
+  shell until you confirm.
+* **Mac-style apps:** `~/apps/<name>/app.json`, scanned by the launcher; no `.desktop` generation (nothing is moved).
+* **Wallpapers in the repo** moved from `Pictures/wallpapers` to the stow-ignored `wallpapers/` so that `~/Pictures`
+  stays a real directory.
+* **Idempotent install:** `packages/torii-setup.sh`, `TORII_NO_HOOKS=1` / `TORII_SKIP_SYSTEM=1` for tests.
+* **Shell state/IPC:** targets are `shell reload`, `panels close`, `control|launcher|switcher toggle`.
