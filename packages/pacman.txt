@@ -20,3 +20,8 @@ translate-shell
 steam
 nvidia-open
 #cuda
+
+nodejs
+npm
+unzip
+dotnet-runtime
