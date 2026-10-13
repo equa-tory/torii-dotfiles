@@ -8,6 +8,8 @@ echo "==> Setting up torii-dotfiles"
 sudo sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 sudo pacman -Syu
 bash packages/install.sh
+sudo sed -i '/^timeout:.*/a quiet: yes' /boot/limine.conf
+
 
 echo "==> Installing powerlevel10k"
 [ -d ~/.local/share/powerlevel10k ] || git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.local/share/powerlevel10k
