@@ -27,6 +27,7 @@ keys="$(curl -fsSL https://github.com/equa-tory.keys)"
 while IFS= read -r key; do
   grep -qxF "$key" ~/.ssh/authorized_keys || echo "$key" >> ~/.ssh/authorized_keys
 done <<< "$keys"
+ssh-keygen -q -N "" -t ed25519 -f ~/.ssh/id_ed25519
 
 echo "==> Setting zsh as default shell"
 chsh -s "$(command -v zsh)"
