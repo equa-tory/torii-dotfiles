@@ -8,7 +8,8 @@ PanelWindow {
     id: win
 
     readonly property bool previewing: Panels.previewWallpaper !== "" && Panels.panelScreen === screen.name
-    readonly property string path: previewing ? Panels.previewWallpaper : Theme.wallpaper
+    readonly property string path: previewing ? Panels.previewWallpaper
+                                 : (Panels.pendingWallpaper !== "" ? Panels.pendingWallpaper : Theme.wallpaper)
 
     property Image top: null          // the image currently fully shown
     property Image pending: null      // the image being faded in

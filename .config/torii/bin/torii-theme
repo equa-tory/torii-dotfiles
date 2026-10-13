@@ -227,7 +227,7 @@ def get_mode():
 
 
 def compute(image):
-    image = Path(image).expanduser().resolve()
+    image = Path(os.path.abspath(os.path.expanduser(str(image))))  # keep symlinks: ~/Pictures may be stow-linked
     if not image.is_file():
         raise SystemExit(f"no such image: {image}")
     digest = sha256_file(image)
