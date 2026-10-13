@@ -13,7 +13,7 @@ echo "==> Installing powerlevel10k"
 [ -d ~/.local/share/powerlevel10k ] || git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.local/share/powerlevel10k
 
 echo "==> Backing up existing configs"
-for p in ~/.config/hypr ~/.config/kitty ~/.config/nvim ~/.config/tmux ~/.config/waybar ~/.config/dotfiles ~/.zshrc ~/.p10k.zsh; do
+for p in ~/.zprofile ~/.config/hypr ~/.config/kitty ~/.config/nvim ~/.config/tmux ~/.config/waybar ~/.config/dotfiles ~/.zshrc ~/.p10k.zsh; do
   if [ -e "$p" ] && [ ! -L "$p" ]; then mv "$p" "$p.bak-$(date +%s)"; fi
 done
 
