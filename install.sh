@@ -39,9 +39,6 @@ bash packages/mirrors.sh || true
 echo "==> NVIDIA driver (skipped without an NVIDIA GPU)"
 bash packages/nvidia.sh || true
 
-echo "==> Claude Code status line"
-bash packages/claude-statusline.sh || true
-
 echo "==> Authorizing SSH keys from GitHub"
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys

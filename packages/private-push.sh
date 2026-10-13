@@ -13,7 +13,7 @@ extra=(); [[ ${1:-} == --dry-run ]] && extra=(--dry-run)
 command -v rsync >/dev/null || { echo "rsync is not installed" >&2; exit 1; }
 
 ONLY="${ONLY:-all}"
-if [[ $ONLY != localsend ]] && { pgrep -x helium >/dev/null 2>&1 || pgrep -f '[h]elium-browser' >/dev/null 2>&1; }; then
+if [[ $ONLY != localsend ]] && ps -eo comm= | grep -qxE 'helium(-browser)?'; then
   echo "!!  Helium is running: the copy may be inconsistent (databases open). Close it and run again," >&2
   echo "!!  or continue anyway with  FORCE=1 bash packages/private-push.sh" >&2
   [[ ${FORCE:-0} == 1 ]] || exit 1

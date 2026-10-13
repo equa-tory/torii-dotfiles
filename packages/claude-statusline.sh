@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code status line (github.com/daniel3303/ClaudeCodeStatusLine): clone it and set "statusLine" in
-# ~/.claude/settings.json. Other keys of settings.json stay as they are. Safe to run again (it just pulls).
+# ~/.claude/settings.json. NOT run by install.sh: run it by hand (bash packages/claude-statusline.sh). Other keys of settings.json stay as they are. Safe to run again (it just pulls).
 set -euo pipefail
 
 DIR="$HOME/.claude/statusline"; SET="$HOME/.claude/settings.json"

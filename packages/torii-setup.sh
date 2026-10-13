@@ -31,6 +31,12 @@ say "App manifests for the launcher (~/apps)"
 bash "$REPO/packages/apps-sync.sh"
 
 if [[ $SKIP_SYSTEM != 1 ]]; then
+  say "Docker service"
+  if command -v docker >/dev/null 2>&1; then
+    $SUDO systemctl enable --now docker.service || echo "!!  could not enable docker.service"
+    id -nG "$USER" | grep -qw docker || $SUDO usermod -aG docker "$USER"   # takes effect at next login
+  fi
+
   say "Bluetooth service"
   if systemctl list-unit-files bluetooth.service >/dev/null 2>&1; then
     $SUDO systemctl enable --now bluetooth.service || echo "!!  could not enable bluetooth.service (no adapter here is fine)"

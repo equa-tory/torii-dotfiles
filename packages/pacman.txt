@@ -1,5 +1,6 @@
 eza
 fd
+htop
 fzf
 ffmpeg
 yt-dlp
@@ -69,3 +70,8 @@ dconf
 # shell comfort (zsh suggestions as you type, syntax colours)
 zsh-autosuggestions
 zsh-syntax-highlighting
+
+# containers (service is enabled and your user added to the docker group by torii-setup.sh)
+docker
+docker-compose
+docker-buildx
