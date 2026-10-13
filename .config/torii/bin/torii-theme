@@ -24,6 +24,7 @@ TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 THEME_DIR = STATE / "theme"
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 VERBOSE = False
+FORCE = False
 
 
 def log(msg):
@@ -143,7 +144,7 @@ def build_tokens(accent_src, tint, accent_override=None, mode="dark"):
     t["accent"] = accent
     t["accentDim"] = oklch_to_hex(aL - 0.17 if dark else aL + 0.17, aC * 0.8, aH)
     on = oklch_to_hex(0.16 if dark else 0.985, tint * 0.02, aH)
-    t["onAccent"] = on if contrast(on, accent) >= 4.5 else ("#000000" if dark else "#ffffff")
+    t["accentFg"] = on if contrast(on, accent) >= 4.5 else ("#000000" if dark else "#ffffff")
 
     def semantic(h, L=None, C=0.14):
         L = L if L is not None else (0.76 if dark else 0.52)
@@ -174,7 +175,7 @@ def build_tokens(accent_src, tint, accent_override=None, mode="dark"):
 def check_tokens(t):
     """Raise AssertionError if the readable-contrast rules are broken."""
     pairs = [("fg", "bg", 7.0), ("fgDim", "bg", 4.5), ("accent", "bg", 4.5),
-             ("onAccent", "accent", 4.5), ("accent", "surface", 3.0), ("fg", "surface2", 4.5)]
+             ("accentFg", "accent", 4.5), ("accent", "surface", 3.0), ("fg", "surface2", 4.5)]
     for a, b, need in pairs:
         got = contrast(t[a], t[b])
         assert got >= need, f"contrast {a} on {b} is {got:.2f}, need {need}"
@@ -375,6 +376,7 @@ def current():
 
 
 def apply(image, force=False):
+    force = force or FORCE
     tokens = compute(image)
     check_tokens(tokens)
     cur = current()
@@ -400,9 +402,10 @@ def step(delta):
 
 
 def main(argv):
-    global VERBOSE
-    args = [a for a in argv if a not in ("-v", "--verbose")]
-    VERBOSE = len(args) != len(argv)
+    global VERBOSE, FORCE
+    args = [a for a in argv if a not in ("-v", "--verbose", "-f", "--force")]
+    VERBOSE = any(a in ("-v", "--verbose") for a in argv)
+    FORCE = any(a in ("-f", "--force") for a in argv)
     if not args:
         print(__doc__)
         return 2

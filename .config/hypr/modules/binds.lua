@@ -14,9 +14,12 @@ browser = "helium-browser"
 
 local mainMod = "ALT" -- Sets "Windows" key as main modifier
 
-hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd(
-    "pkill waybar; waybar & pkill hyprpaper; hyprpaper &"
-))
+-- torii shell
+local qsipc = "qs -c torii ipc call "
+hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-shell reload"))
+hl.bind(mainMod .. " + SPACE",          hl.dsp.exec_cmd(qsipc .. "launcher toggle"))
+hl.bind(mainMod .. " + N",              hl.dsp.exec_cmd(qsipc .. "control toggle"))
+hl.bind(mainMod .. " + CTRL + SPACE",   hl.dsp.exec_cmd(qsipc .. "switcher toggle"))
 
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))

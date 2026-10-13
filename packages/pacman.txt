@@ -58,3 +58,6 @@ qt6ct
 brightnessctl
 bluez
 bluez-utils
+
+# testing (synthetic keypresses for shell checks)
+wtype

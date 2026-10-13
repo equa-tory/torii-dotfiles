@@ -3,7 +3,8 @@
 -------------------
 
 hl.on("hyprland.start", function () 
-  hl.exec_cmd("waybar &")
-  hl.exec_cmd("hyprpaper &")
+  -- torii shell: notch bar, control panel, launcher, wallpaper (replaces waybar + hyprpaper).
+  -- `torii-shell fallback` brings the old ones back if it ever misbehaves.
+  hl.exec_cmd("$HOME/.config/torii/bin/torii-shell start")
   hl.exec_cmd("swaync &")
 end)

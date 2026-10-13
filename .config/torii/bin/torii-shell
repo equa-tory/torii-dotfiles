@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# torii-shell start | reload | stop | fallback | mock | status
+#   start     theme restore, then the Quickshell shell (stops Waybar/hyprpaper first: one tray host only)
+#   reload    reload the running shell (starts it if it isn't running)
+#   stop      stop the shell
+#   fallback  emergency: stop the shell, bring back Waybar + hyprpaper
+#   mock      start with fake Wi-Fi / Bluetooth / audio / tray data (for the VM)
+set -u
+
+BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STATE="${TORII_STATE:-$HOME/.local/state/torii}"
+CFG=torii
+
+# `qs list` can still show an instance for a moment after it died, so check the pid
+running() {
+  local pid
+  for pid in $(qs -c "$CFG" list 2>/dev/null | awk '/Process ID/ {print $3}'); do
+    kill -0 "$pid" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+launch() {
+  pkill -x waybar 2>/dev/null; pkill -x hyprpaper 2>/dev/null
+  "$BIN/torii-theme" restore || echo "torii-shell: theme restore failed, starting with defaults" >&2
+  if command -v uwsm >/dev/null && uwsm check is-active >/dev/null 2>&1; then
+    exec uwsm app -- qs -c "$CFG"
+  fi
+  exec qs -c "$CFG"
+}
+
+case "${1:-}" in
+  start)
+    running && { echo "already running"; exit 0; }
+    launch ;;
+  reload)
+    if running; then qs -c "$CFG" ipc call shell reload; else launch; fi ;;
+  stop)
+    qs -c "$CFG" kill 2>/dev/null; exit 0 ;;
+  mock)
+    qs -c "$CFG" kill 2>/dev/null; sleep 0.5
+    TORII_MOCK=1 launch ;;
+  fallback)
+    qs -c "$CFG" kill 2>/dev/null
+    conf="$STATE/theme/hyprpaper.conf"
+    [[ -f $conf ]] || conf="$HOME/.config/hypr/hyprpaper.conf"
+    (setsid waybar >/dev/null 2>&1 &)
+    (setsid hyprpaper -c "$conf" >/dev/null 2>&1 &)
+    echo "fallback: Waybar + hyprpaper started. Back to the shell: torii-shell start" ;;
+  status)
+    running && echo running || { echo stopped; exit 1; } ;;
+  *)
+    sed -n '2,8p' "$0"; exit 2 ;;
+esac
