@@ -1,21 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DOTFILESDIR="(cd −− "(dirname -- "${BASHSOURCE[0]}")" && pwd)"
+cd ~/torii-dots
 
 echo "==> Setting up torii-dotfiles"
 
-bash "$DOTFILESDIR/packages/install.sh"
+sudo sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+sudo pacman -Syu
+bash "packages/install.sh"
 
-sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
-echo "source ~/.config/dotfiles/shellrc" >> "$DOTFILESDIR/../.zshrc"
-echo "source ~/powerlevel10k/powerlevel10k.zsh-theme" >> "$DOTFILESDIR/../.zshrc"
+mv ~/.config/hypr ~/.config/hypr.bak
+mv ~/.config/kitty ~/.config/kitty.bak
+stow .
 
 echo "source ~/.config/dotfiles/shellrc" >> ~/.zshrc
 echo "source ~/.config/powerlevel10k/powerlevel10k.zsh-theme" >> ~/.zshrc
 
-mkdir ~/.ssh
-curl https://github.com/equa-tory.keys > ~/.ssh/authorized_keys
+mkdir ~/.ssh && chmod 700 ~/.ssh
+curl https://github.com/equa-tory.keys > ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
 
 echo "==> Setup complete"
 

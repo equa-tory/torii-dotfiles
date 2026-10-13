@@ -11,7 +11,7 @@ stow
 swaync
 tmux
 ttf-jetbrains-mono-nerd
-rigrep
+ripgrep
 vim
 waybar
 zoxide
