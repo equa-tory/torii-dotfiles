@@ -205,7 +205,7 @@ alias dev='cd ~/Developer'
 # ==============================
 # MISC
 # ==============================
-alias s='sudo'
+alias s='sudo '
 #alias screen='screen -S'
 alias sc='screen'
 alias scl='screen -list'

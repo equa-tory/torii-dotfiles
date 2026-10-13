@@ -1,6 +1,8 @@
 eza
 fd
 fzf
+ffmpeg
+yt-dlp
 github-cli
 hyprpaper
 neovim
@@ -9,10 +11,12 @@ stow
 swaync
 tmux
 ttf-jetbrains-mono-nerd
-rgrep
+rigrep
 vim
 waybar
-yay
 zoxide
 zsh
 translate-shell
+steam
+nvidia-open
+#cuda
