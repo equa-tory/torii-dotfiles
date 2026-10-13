@@ -2,10 +2,25 @@
 ---- MY PROGRAMS ----
 ---------------------
  
-terminal = "kitty"
-fileManager = "dolphin"
+-- chosen in the launcher (Setup > Defaults); torii-default writes this file, the values below are the fallbacks
+local function torii_defaults()
+    local t = {}
+    local f = io.open((os.getenv("HOME") or "") .. "/.local/state/torii/defaults.env")
+    if f then
+        for line in f:lines() do
+            local k, v = line:match("^([%w_]+)=(.*)$")
+            if k then t[k] = v end
+        end
+        f:close()
+    end
+    return t
+end
+local defaults = torii_defaults()
+
+terminal = defaults.TORII_TERMINAL or "kitty"
+fileManager = defaults.TORII_FILES or "dolphin"
 menu = "hyprlauncher"
-browser = "helium-browser"
+browser = defaults.TORII_BROWSER or "helium-browser"
 
 
 ---------------------

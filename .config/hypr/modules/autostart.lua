@@ -7,4 +7,5 @@ hl.on("hyprland.start", function ()
   -- `torii-shell fallback` brings the old ones back if it ever misbehaves.
   hl.exec_cmd("$HOME/.config/torii/bin/torii-shell start")
   hl.exec_cmd("swaync &")
+  hl.exec_cmd("$HOME/.config/torii/bin/torii-nightlight apply")
 end)

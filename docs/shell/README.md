@@ -27,6 +27,7 @@ One file, hot-reloaded: `~/.config/torii/config.json`. Every key is optional.
 | `notch.shape` | `attached` | `attached` (touches the top edge) or `floating` (a pill with a gap) |
 | `notch.opacity` | `1.0` | |
 | `notch.radius` / `height` / `gap` | `16` / `34` / `6` | `gap` is for `floating` |
+| `notch.zoneTrim` | `12` | px removed from the strip the notch reserves: a smaller gap between the notch and windows |
 | `workspaces.count` | `5` | always shown per monitor; occupied/active ones beyond that are added |
 | `weather.lat` / `lon` / `refreshMin` | Moscow / `20` | Open-Meteo, no API key, Celsius |
 | `wallpaper.dir` / `transitionMs` | `~/Pictures/wallpapers` / `600` | |
@@ -59,7 +60,29 @@ Undo: `sudo rm /etc/chromium/policies/managed/torii-theme.json`.
 
 ## Launcher
 
-Type to search apps, `~/apps` folders and quicklinks. Recently used come first (`~/.local/state/torii/launcher-recent.json`).
+Opens as a single input (`mainMod+SPACE`). Everything works from the keyboard:
+
+| Key | Does |
+|---|---|
+| `↓` | show the menus (Apps, Setup, ...); `↓`/`↑`/`Tab`/`Ctrl+J`/`Ctrl+K` move |
+| `↑` on the first row | collapse back to the bare input |
+| `→` (cursor at the end) / `Enter` | open a menu or run the item (`→` on a Wi-Fi network or Bluetooth device opens its actions) |
+| `←` (cursor at the start) | go back one menu; at the top it collapses, then closes |
+| `Esc` | close (or cancel a question such as a password) |
+
+Typing searches every menu and submenu at once, with the path shown under each result (inside a menu it searches that menu).
+Quicklinks work at the top level (`v cats`, `git`). No history is kept.
+
+**Menu order** is in `~/.config/torii/menu.json`: `order` for the top level, `submenus.<id>` for a submenu (ids: `setup`,
+`configs`, `defaults`, ...), `hidden` for ids to remove. Entries not listed keep their default place after the listed ones.
+It reloads while the launcher is closed.
+
+**Setup** menu: open any Hyprland/shell/kitty/tmux/nvim/zsh config in the editor (`Configs`); choose the default
+browser, editor, files app and terminal (`Defaults`, `torii-default`; Hyprland binds and uwsm read
+`~/.local/state/torii/defaults.env`); night light (`torii-nightlight`, needs `hyprsunset`: temperature, manual or daily
+schedule); network and Bluetooth (same backends as the control panel); default input and output device.
+`~/apps` folders are listed under Apps. A `Windows app` manifest runs through Bottles:
+`{"name": "Notepad++", "bottle": "Soft", "program": "npp.exe"}`.
 
 **Quicklinks** live in `~/.config/torii/quicklinks.json` (hot-reloaded; type `quicklinks` in the launcher to edit):
 

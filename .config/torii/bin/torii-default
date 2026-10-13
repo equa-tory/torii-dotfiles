@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""torii-default list|set <browser|files|terminal|editor> [id]  -  system defaults for the launcher's Setup menu.
+
+  list <kind>        JSON: [{"id", "name", "current"}]
+  set <kind> <id>    browser: xdg-settings, files: xdg-mime (inode/directory), terminal/editor: state file only
+Hyprland binds and uwsm read ~/.local/state/torii/defaults.env (TORII_BROWSER, TORII_FILES, TORII_TERMINAL, EDITOR).
+Needs no root and touches nothing outside your home folder.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+STATE = Path(os.environ.get("TORII_STATE", HOME / ".local/state/torii"))
+ENV = STATE / "defaults.env"
+APP_DIRS = [Path("/usr/share/applications"), HOME / ".local/share/applications"]
+CATEGORY = {"browser": "WebBrowser", "files": "FileManager", "terminal": "TerminalEmulator"}
+KEY = {"browser": "TORII_BROWSER", "files": "TORII_FILES", "terminal": "TORII_TERMINAL", "editor": "EDITOR"}
+EDITORS = [("nvim", "Neovim"), ("vim", "Vim"), ("nano", "Nano"), ("micro", "Micro"), ("hx", "Helix"), ("emacs", "Emacs")]
+
+
+def read_env():
+    out = {}
+    try:
+        for line in ENV.read_text().splitlines():
+            k, _, v = line.partition("=")
+            if k and not k.startswith("#"):
+                out[k.strip()] = v.strip()
+    except OSError:
+        pass
+    return out
+
+
+def write_env(d):
+    STATE.mkdir(parents=True, exist_ok=True)
+    tmp = ENV.with_suffix(".tmp")
+    tmp.write_text("".join(f"{k}={v}\n" for k, v in sorted(d.items())))
+    os.replace(tmp, ENV)
+
+
+def desktop_entries(category):
+    found = {}
+    for d in APP_DIRS:
+        for f in sorted(d.glob("*.desktop")) if d.is_dir() else []:
+            sec, name, cats, exe, hidden = False, "", "", "", False
+            try:
+                for line in f.read_text(errors="replace").splitlines():
+                    if line.startswith("["):
+                        sec = line.strip() == "[Desktop Entry]"
+                    elif sec:
+                        k, _, v = line.partition("=")
+                        if k == "Name" and not name:
+                            name = v
+                        elif k == "Categories":
+                            cats = v
+                        elif k == "Exec" and not exe:
+                            exe = v
+                        elif k in ("NoDisplay", "Hidden") and v.lower() == "true":
+                            hidden = True
+            except OSError:
+                continue
+            if category in cats.split(";") and not hidden and name:
+                cmd = " ".join(t for t in exe.split() if not t.startswith("%"))
+                found[f.name] = {"id": f.name, "name": name, "cmd": cmd}
+    return list(found.values())
+
+
+def run(*cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def current(kind):
+    env = read_env()
+    if kind == "browser":
+        return run("xdg-settings", "get", "default-web-browser")
+    if kind == "files":
+        return run("xdg-mime", "query", "default", "inode/directory")
+    if kind == "editor":
+        return env.get("EDITOR", os.environ.get("EDITOR", "nvim"))
+    return env.get("TORII_TERMINAL_ID", "kitty.desktop")
+
+
+def listing(kind):
+    cur = current(kind)
+    if kind == "editor":
+        return [{"id": c, "name": n, "current": c == cur} for c, n in EDITORS if shutil.which(c)]
+    return [{"id": e["id"], "name": e["name"], "current": e["id"] == cur} for e in desktop_entries(CATEGORY[kind])]
+
+
+def set_default(kind, ident):
+    env = read_env()
+    if kind == "editor":
+        if not shutil.which(ident):
+            sys.exit(f"torii-default: {ident} is not installed")
+        env["EDITOR"] = ident
+    else:
+        match = next((e for e in desktop_entries(CATEGORY[kind]) if e["id"] == ident), None)
+        if not match:
+            sys.exit(f"torii-default: no {kind} named {ident}")
+        if kind == "browser":
+            subprocess.run(["xdg-settings", "set", "default-web-browser", ident], check=False)
+        elif kind == "files":
+            subprocess.run(["xdg-mime", "default", ident, "inode/directory"], check=False)
+        else:
+            env["TORII_TERMINAL_ID"] = ident
+        env[KEY[kind]] = match["cmd"]
+    write_env(env)
+
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if len(a) == 2 and a[0] == "list" and a[1] in KEY:
+        print(json.dumps(listing(a[1])))
+    elif len(a) == 3 and a[0] == "set" and a[1] in KEY:
+        set_default(a[1], a[2])
+    else:
+        print(__doc__)
+        sys.exit(2)

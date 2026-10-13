@@ -66,7 +66,7 @@ Quickshell config "torii" (~/.config/quickshell/torii) ◀── FileView watche
 docs/shell/DESIGN.md, docs/shell/README.md   NOT stowed (`^/docs` added to .stow-local-ignore)
 wallpapers/        NOT stowed (moved from Pictures/wallpapers; install.sh copies into ~/Pictures/wallpapers)
 ```
-Generated files (never in the repo): `~/.local/state/torii/{current.json, theme/*, launcher-recent.json,
+Generated files (never in the repo): `~/.local/state/torii/{current.json, theme/*,
 weather.json}` and `~/.cache/torii/palettes/<sha>.json`. It's fine for `~/.config/torii` to fold into the repo,
 because only hand-edited, tracked files live there.
 
@@ -176,7 +176,7 @@ Reload hooks:
     focused monitor only.
   - Esc reverts. Enter/Space runs `torii-theme set`.
 - **Launcher:** attached to the notch: one input with a short list below it.
-  - Fuzzy JS scorer (subsequence + word-start bonus) with a recency boost from `launcher-recent.json`.
+  - Fuzzy JS scorer (subsequence + word-start bonus).
   - Sources: DesktopEntries (system + user), mac-style apps (below), and quicklinks.
   - Launching goes through `uwsm app -- …`; URLs open via `uwsm app -- xdg-open <url>`.
   - Typing `ql` offers "Edit quicklinks", which opens the file in nvim inside kitty.
@@ -233,7 +233,7 @@ Reload hooks:
 - **P3 switcher.**
   - Accept: ←/→ previews, Esc restores, Enter themes everything. A new file dropped into the folder appears.
 - **P4 launcher + quicklinks + `~/apps`.**
-  - Accept: fuzzy search and recents ordering work. `yt cats` and `git` work. A sample `~/apps/demo/app.json`
+  - Accept: fuzzy search works. `yt cats` and `git` work. A sample `~/apps/demo/app.json`
     shows up.
 - **P5 integration.**
   - `packages/pacman.txt`: quickshell, matugen, grim, slurp, jq, imagemagick, fastfetch, adw-gtk-theme, qt6ct,

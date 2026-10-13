@@ -1,81 +1,124 @@
 import qs
 import qs.services
 import qs.widgets
-import "../widgets/fuzzy.js" as Fuzzy
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
 
-// Keyboard-first launcher: apps, ~/apps folders, quicklinks ("yt cats", "git"). Recently used first.
+// Keyboard-first launcher. Opens as just the input; Down shows the menus, Right enters / runs, Left goes back / closes.
+// Typing searches every menu and submenu at once (inside a submenu: that submenu). `yt cats` style quicklinks work at the top.
 Item {
     id: root
 
     readonly property int maxRows: 7
     readonly property real rowH: 46
-    property var results: []
+    property var path: []                 // menu nodes we are inside of
+    property var picks: []                // selected index at each level, to land back on the same row
+    property bool expanded: false
+    property var results: []              // [{ node, trail }]
     property int selected: 0
 
+    readonly property var scope: path.length ? path[path.length - 1] : null
+    readonly property bool asking: Menus.prompt !== null
+    readonly property bool showList: !asking && results.length > 0 && (expanded || input.text.trim() !== "")
+    readonly property bool showNotice: Menus.notice !== ""
+
     implicitWidth: 560
-    implicitHeight: 70 + (results.length > 0 ? Math.min(results.length, maxRows) * rowH + 14 : 0)
+    implicitHeight: 66 + (showNotice ? 26 : 0) + (showList ? Math.min(results.length, maxRows) * rowH + 14 : 0)
 
     opacity: 0
-    Component.onCompleted: { opacity = 1; Apps.refresh(); update(); input.forceActiveFocus(); }
+    Component.onCompleted: {
+        opacity = 1;
+        Apps.refresh();
+        Menus.invalidate();
+        Menus.endPrompt();
+        update(false);
+        input.forceActiveFocus();
+    }
+    Component.onDestruction: { Menus.endPrompt(); }
     Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
     Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
-    function update() {
+    function linkNode(link) {
+        return { id: "link:" + link.keyword, name: link.title, sub: link.sub, glyph: Icons.link,
+                 run: () => Apps.run({ kind: "link", url: link.url }) };
+    }
+
+    // rebuild the list; keepSel keeps the highlighted row when only the data changed
+    function update(keepSel) {
+        if (asking) { results = []; return; }
         const q = input.text.trim();
-        const all = Apps.items();
+        const prev = keepSel && results[selected] ? results[selected].node.id : null;
         let out = [];
 
         if (q === "") {
-            // nothing typed: only what you used lately, most recent first (empty on a fresh install)
-            out = all.filter(i => Apps.recents[i.key]).sort((a, b) => Apps.recents[b.key].last - Apps.recents[a.key].last);
+            out = Menus.childrenOf(scope).map(n => ({ node: n, trail: [] }));
         } else {
-            const link = Quicklinks.resolve(q);
-            if (link) out.push({ kind: "link", key: "link:" + link.keyword, name: link.title, sub: link.sub, url: link.url, icon: "" });
-            // "yt cats": that is a search, not an app lookup
-            if (link && /\s/.test(q)) { results = out; selected = 0; return; }
-
-            const scored = [];
-            for (const i of all) {
-                const s = Fuzzy.scoreFields(q, [
-                    { text: i.name, weight: 1 },
-                    { text: i.sub, weight: 0.45 },
-                    { text: i.extra, weight: 0.6 }
-                ]);
-                if (s >= 0) scored.push({ item: i, score: s + Apps.boost(i.key) });
+            if (!scope) {
+                const link = Quicklinks.resolve(q);
+                if (link) out.push({ node: linkNode(link), trail: [] });
+                if (link && /\s/.test(q)) { results = out; selected = 0; return; }   // "yt cats" is a search, not a lookup
             }
-            scored.sort((a, b) => b.score - a.score);
-            out = out.concat(scored.map(s => s.item));
-
-            if (out.length === 0) {
+            out = out.concat(Menus.search(scope, q));
+            if (!scope && out.length === 0) {
                 const g = Quicklinks.resolve("g " + q);
-                if (g) out.push({ kind: "link", key: "link:g", name: "Search the web: " + q, sub: g.sub, url: g.url, icon: "" });
+                if (g) out.push({ node: linkNode(g), trail: [] });
             }
         }
-        results = out.slice(0, 30);
-        selected = 0;
-        list.positionViewAtBeginning();
+        results = out.slice(0, 40);
+        const at = prev === null ? -1 : results.findIndex(r => r.node.id === prev);
+        selected = at >= 0 ? at : Math.min(selected, Math.max(0, results.length - 1));
+        if (!keepSel) { selected = 0; list.positionViewAtBeginning(); }
     }
 
-    function run() {
-        if (results.length === 0) return;
-        const item = results[selected];
-        Panels.close();
-        Apps.run(item);
-    }
+    Connections { target: Menus; function onRevChanged() { root.update(true); } }
+    Connections { target: Apps; function onPortableChanged() { root.update(true); } }
+    Connections { target: Quicklinks; function onLinksChanged() { root.update(true); } }
+    Connections { target: Menus; function onPromptChanged() { input.text = ""; root.update(false); } }
 
+    // ---- actions
     function move(d) {
         if (results.length === 0) return;
         selected = (selected + d + results.length) % results.length;
         list.positionViewAtIndex(selected, ListView.Contain);
     }
 
-    Connections { target: Apps; function onPortableChanged() { root.update(); } }
-    Connections { target: Quicklinks; function onLinksChanged() { root.update(); } }
+    function enter(node) {
+        picks = picks.concat([selected]);
+        path = path.concat([node]);
+        input.text = "";
+        expanded = true;
+        update(false);
+    }
 
-    // ---- search field
+    function back() {
+        const at = picks.length ? picks[picks.length - 1] : 0;
+        path = path.slice(0, -1);
+        picks = picks.slice(0, -1);
+        input.text = "";
+        update(false);
+        selected = Math.min(at, Math.max(0, results.length - 1));
+        list.positionViewAtIndex(selected, ListView.Contain);
+    }
+
+    function activate(right) {
+        if (results.length === 0) return;
+        const n = results[selected].node;
+        const menu = n.children !== undefined;
+        if (menu && (right || !n.run)) { enter(n); return; }
+        if (!n.run) return;
+        n.run();
+        if (!n.keep) Panels.close();
+    }
+
+    function submitPrompt() {
+        const p = Menus.prompt;
+        const text = p.secret ? input.text : input.text.trim();
+        Menus.endPrompt();
+        p.submit(text);
+    }
+
+    // ---- field
     Rectangle {
         id: field
         anchors { left: parent.left; right: parent.right; top: parent.top; margins: 14; topMargin: 6 }
@@ -87,9 +130,15 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: 14
             anchors.rightMargin: 14
-            spacing: 12
+            spacing: 10
 
-            Glyph { text: Icons.search; size: 17; color: Theme.accent }
+            Glyph { text: root.scope && root.scope.glyph ? root.scope.glyph : Icons.search; size: 17; color: Theme.accent }
+
+            Label {
+                visible: root.path.length > 0 && !root.asking
+                text: root.path.map(n => n.name).join(" › ") + " ›"
+                color: Theme.accent
+            }
 
             TextInput {
                 id: input
@@ -100,15 +149,38 @@ Item {
                 renderType: Text.CurveRendering
                 selectionColor: Theme.accent
                 selectedTextColor: Theme.accentFg
+                echoMode: root.asking && Menus.prompt.secret ? TextInput.Password : TextInput.Normal
                 clip: true
-                onTextChanged: root.update()
-                Keys.onDownPressed: root.move(1)
-                Keys.onUpPressed: root.move(-1)
+                onTextChanged: { if (!root.asking) { root.update(false); } }
+
+                Keys.onDownPressed: event => {
+                    if (root.asking) return;
+                    if (!root.showList) { if (root.results.length) { root.expanded = true; root.selected = 0; } }
+                    else root.move(1);
+                }
+                Keys.onUpPressed: event => {
+                    if (root.asking) return;
+                    if (input.text.trim() === "" && root.expanded && root.selected === 0) root.expanded = false;
+                    else root.move(-1);
+                }
                 Keys.onTabPressed: root.move(1)
                 Keys.onBacktabPressed: root.move(-1)
-                Keys.onReturnPressed: root.run()
-                Keys.onEnterPressed: root.run()
-                Keys.onEscapePressed: Panels.close()
+                Keys.onReturnPressed: root.asking ? root.submitPrompt() : root.activate(false)
+                Keys.onEnterPressed: root.asking ? root.submitPrompt() : root.activate(false)
+                Keys.onEscapePressed: { if (root.asking) Menus.endPrompt(); else Panels.close(); }
+                Keys.onRightPressed: event => {
+                    if (root.asking || input.cursorPosition < input.text.length) { event.accepted = false; return; }
+                    if (!root.showList) { if (input.text === "" && root.results.length) { root.expanded = true; root.selected = 0; } }
+                    else root.activate(true);
+                }
+                Keys.onLeftPressed: event => {
+                    if (input.cursorPosition > 0 || input.selectionStart !== input.selectionEnd) { event.accepted = false; return; }
+                    if (root.asking) { Menus.endPrompt(); return; }
+                    if (input.text !== "") return;
+                    if (root.path.length) root.back();
+                    else if (root.expanded) root.expanded = false;
+                    else Panels.close();
+                }
                 Keys.onPressed: event => {
                     if (event.modifiers & Qt.ControlModifier) {
                         if (event.key === Qt.Key_J || event.key === Qt.Key_N) { root.move(1); event.accepted = true; }
@@ -118,7 +190,9 @@ Item {
 
                 Label {
                     visible: !input.text.length
-                    text: "Search apps, or try  yt cats  ·  git"
+                    text: root.asking ? Menus.prompt.label
+                        : root.path.length ? "Search in " + root.scope.name
+                        : "Search apps and menus, or try  v cats  ·  git"
                     color: Theme.muted
                     font.pixelSize: parent.font.pixelSize
                 }
@@ -126,10 +200,21 @@ Item {
         }
     }
 
+    Label {
+        id: notice
+        visible: root.showNotice
+        anchors { left: parent.left; right: parent.right; top: field.bottom; topMargin: 6; leftMargin: 28; rightMargin: 28 }
+        text: Menus.notice
+        color: Theme.accent
+        font.pixelSize: Config.font.size - 2
+        elide: Text.ElideRight
+    }
+
     // ---- results
     ListView {
         id: list
-        anchors { left: parent.left; right: parent.right; top: field.bottom; topMargin: 8; leftMargin: 14; rightMargin: 14 }
+        visible: root.showList
+        anchors { left: parent.left; right: parent.right; top: root.showNotice ? notice.bottom : field.bottom; topMargin: 8; leftMargin: 14; rightMargin: 14 }
         height: Math.min(root.results.length, root.maxRows) * root.rowH
         model: root.results
         clip: true
@@ -142,15 +227,17 @@ Item {
             id: row
             required property var modelData
             required property int index
+            readonly property var node: modelData.node
             readonly property bool sel: index === root.selected
             readonly property bool hasIcon: iconImg.status === Image.Ready
+            readonly property bool isMenu: node.children !== undefined
+            readonly property string crumb: modelData.trail.length ? modelData.trail.join(" › ") : ""
 
             width: ListView.view.width
             height: root.rowH
             radius: 10
             color: sel ? Theme.surface2 : "transparent"
 
-            // accent bar on the selected row
             Rectangle {
                 visible: row.sel
                 width: 3
@@ -177,7 +264,7 @@ Item {
                         smooth: true
                         asynchronous: true
                         source: {
-                            const i = row.modelData.icon;
+                            const i = row.node.icon;
                             if (!i) return "";
                             return i.charAt(0) === "/" ? "file://" + i : Quickshell.iconPath(i, true);
                         }
@@ -187,9 +274,7 @@ Item {
                         visible: !row.hasIcon
                         size: 18
                         color: row.sel ? Theme.accent : Theme.subtle
-                        text: row.modelData.kind === "link" ? Icons.link
-                            : row.modelData.kind === "action" ? Icons.search
-                            : (row.modelData.name || "?").charAt(0).toUpperCase()
+                        text: row.node.glyph ? row.node.glyph : (row.node.name || "?").charAt(0).toUpperCase()
                     }
                 }
 
@@ -197,14 +282,15 @@ Item {
                     Layout.fillWidth: true
                     spacing: 0
                     Label {
-                        text: row.modelData.name
+                        text: row.node.name
                         color: row.sel ? Theme.fg : Theme.fgDim
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
                     Label {
-                        visible: text !== ""
-                        text: row.modelData.sub || ""
+                        readonly property string line: row.crumb !== "" ? row.crumb : (row.node.sub || "")
+                        visible: line !== ""
+                        text: line
                         color: Theme.subtle
                         font.pixelSize: Config.font.size - 3
                         elide: Text.ElideRight
@@ -213,9 +299,15 @@ Item {
                 }
 
                 Label {
-                    visible: row.sel
-                    text: "↵"
-                    color: Theme.muted
+                    visible: (row.node.badge || "") !== ""
+                    text: row.node.badge || ""
+                    color: Theme.accent
+                }
+                Glyph {
+                    visible: row.isMenu
+                    text: Icons.chevronRight
+                    size: 15
+                    color: row.sel ? Theme.fgDim : Theme.muted
                 }
             }
 
@@ -224,7 +316,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onEntered: root.selected = row.index
-                onClicked: { root.selected = row.index; root.run(); }
+                onClicked: { root.selected = row.index; root.activate(false); }
             }
         }
     }

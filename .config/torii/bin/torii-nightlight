@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""torii-nightlight  -  warm screen colour through hyprsunset (GPU gamma, no overlay window).
+
+  status                    JSON: {"on", "temp", "auto", "from", "to"}
+  on | off | toggle         switch now
+  temp <kelvin>             1000..6500, applied at once when on
+  auto <HH:MM> <HH:MM>      switch on at the first time and off at the second, every day
+  auto off                  manual only
+  apply                     restore after login (autostart runs this)
+State: ~/.local/state/torii/nightlight.json. The daily switches are transient systemd user timers.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii")) / "nightlight.json"
+DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00"}
+SELF = os.path.abspath(sys.argv[0])
+
+
+def load():
+    try:
+        return {**DEFAULT, **json.loads(STATE.read_text())}
+    except (OSError, ValueError):
+        return dict(DEFAULT)
+
+
+def save(s):
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(s))
+    os.replace(tmp, STATE)
+
+
+def sh(*cmd):
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def running():
+    return sh("pgrep", "-x", "hyprsunset").returncode == 0
+
+
+def push(s):
+    if os.environ.get("TORII_NO_HOOKS"):
+        return
+    if not running():
+        if not s["on"]:
+            return
+        subprocess.Popen(["uwsm", "app", "--", "hyprsunset"] if sh("which", "uwsm").returncode == 0 else ["hyprsunset"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        for _ in range(30):
+            if running():
+                break
+            subprocess.run(["sleep", "0.1"])
+        subprocess.run(["sleep", "0.3"])
+    if s["on"]:
+        sh("hyprctl", "hyprsunset", "temperature", str(s["temp"]))
+    else:
+        sh("hyprctl", "hyprsunset", "identity")
+
+
+def timers(s):
+    for unit in ("torii-nl-on", "torii-nl-off"):
+        sh("systemctl", "--user", "stop", unit + ".timer")
+    if os.environ.get("TORII_NO_HOOKS") or not s["auto"]:
+        return
+    for unit, when, verb in (("torii-nl-on", s["from"], "on"), ("torii-nl-off", s["to"], "off")):
+        sh("systemd-run", "--user", "--collect", f"--unit={unit}", f"--on-calendar=*-*-* {when}:00", SELF, verb)
+
+
+def in_window(s):
+    now = datetime.now().strftime("%H:%M")
+    a, b = s["from"], s["to"]
+    return (a <= now < b) if a <= b else (now >= a or now < b)
+
+
+def valid_time(t):
+    return bool(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t))
+
+
+def main(a):
+    s = load()
+    cmd = a[0] if a else "status"
+    if cmd == "status":
+        print(json.dumps(s))
+        return
+    if cmd in ("on", "off", "toggle"):
+        s["on"] = (not s["on"]) if cmd == "toggle" else cmd == "on"
+    elif cmd == "temp" and len(a) == 2 and a[1].isdigit() and 1000 <= int(a[1]) <= 6500:
+        s["temp"] = int(a[1])
+    elif cmd == "auto" and a[1:] == ["off"]:
+        s["auto"] = False
+    elif cmd == "auto" and len(a) == 3 and valid_time(a[1]) and valid_time(a[2]):
+        s.update({"auto": True, "from": a[1], "to": a[2]})
+        s["on"] = in_window(s)
+    elif cmd == "apply":
+        if s["auto"]:
+            s["on"] = in_window(s)
+    else:
+        print(__doc__)
+        sys.exit(2)
+    save(s)
+    push(s)
+    timers(s)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

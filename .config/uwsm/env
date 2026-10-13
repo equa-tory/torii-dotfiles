@@ -1,2 +1,6 @@
 # torii scripts (torii-theme, torii-shell) for Hyprland, keybinds and qs
 export PATH="$HOME/.config/torii/bin:$PATH"
+
+# defaults chosen in the launcher (Setup > Defaults): EDITOR=..., written by torii-default
+if [ -r "$HOME/.local/state/torii/defaults.env" ]; then set -a; . "$HOME/.local/state/torii/defaults.env"; set +a; fi
+export EDITOR="${EDITOR:-nvim}"

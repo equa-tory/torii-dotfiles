@@ -37,6 +37,7 @@ Singleton {
                 property int radius: 16
                 property int height: 34
                 property int gap: 6
+                property int zoneTrim: 12           // px taken off the reserved strip: smaller gap between the notch and windows
             }
             property JsonObject workspaces: JsonObject {
                 property int count: 5

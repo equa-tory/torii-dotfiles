@@ -1,0 +1,7 @@
+{
+  "order": ["apps", "trigger", "setup", "install", "remove", "learn", "todo"],
+  "hidden": [],
+  "submenus": {
+    "setup": ["configs", "defaults", "nightlight", "network", "bluetooth", "input", "output"]
+  }
+}

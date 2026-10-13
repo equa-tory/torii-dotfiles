@@ -75,3 +75,4 @@ zsh-syntax-highlighting
 docker
 docker-compose
 docker-buildx
+hyprsunset

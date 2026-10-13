@@ -28,7 +28,7 @@ PanelWindow {
     // full height: while a panel is open the whole window takes input so a click outside the panel closes it
     // (Hyprland routes pointer input only to the exclusive-keyboard layer, so a separate scrim never sees it)
     implicitHeight: screen.height
-    exclusiveZone: topGap + barH
+    exclusiveZone: Math.max(0, topGap + barH - Config.notch.zoneTrim)
     color: "transparent"
     mask: Region { item: win.panelHere ? catcher : shape }
 
