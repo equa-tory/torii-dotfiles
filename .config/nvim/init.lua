@@ -52,7 +52,7 @@ require("lazy").setup({
     "catppuccin/nvim",
     name = "catppuccin",
     priority = 1000,
-    config = function() vim.cmd.colorscheme("catppuccin-mocha") end,
+    config = function() require("torii_theme").apply() end,
   },
 
   -- Syntax highlighting

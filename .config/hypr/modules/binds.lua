@@ -141,3 +141,7 @@ hl.bind(mainMod .. " + SHIFT + F", function()
     end
     --hl.notification.create({ text = float_mode and "Float mode" or "Tile mode" })
 end)
+
+
+-- Dark / light mode (torii-theme restyles everything; dark is the default)
+hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-theme mode toggle"))

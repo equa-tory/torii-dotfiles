@@ -5,3 +5,5 @@
 ^/\.gitignore$
 ^/\.stow-local-ignore$
 \.bak$
+^/docs
+^/wallpapers

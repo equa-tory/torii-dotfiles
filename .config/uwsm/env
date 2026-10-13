@@ -1,0 +1,2 @@
+# torii scripts (torii-theme, torii-shell) for Hyprland, keybinds and qs
+export PATH="$HOME/.config/torii/bin:$PATH"

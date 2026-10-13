@@ -49,3 +49,6 @@ hl.config({
         enabled = true,
     },
 })
+
+-- torii-theme: wallpaper-driven border colours (missing file is fine)
+pcall(dofile, os.getenv("HOME") .. "/.local/state/torii/theme/hypr.lua")

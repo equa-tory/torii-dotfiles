@@ -1,0 +1,469 @@
+#!/usr/bin/env python3
+"""torii-theme: derive one token set from a wallpaper and apply it to the whole desktop.
+
+  torii-theme set <image> | next | prev | random | restore | mode [dark|light|toggle] | palette <image> | current | check [image...]
+
+Generated files go to ~/.local/state/torii (never into the repo or stow-managed dirs).
+"""
+import glob
+import hashlib
+import json
+import math
+import os
+import random
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+STATE = Path(os.environ.get("TORII_STATE", HOME / ".local/state/torii"))
+CACHE = Path(os.environ.get("TORII_CACHE", HOME / ".cache/torii"))
+CONF = Path(os.environ.get("TORII_CONFIG", HOME / ".config/torii"))
+TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
+THEME_DIR = STATE / "theme"
+IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+VERBOSE = False
+
+
+def log(msg):
+    if VERBOSE:
+        print(msg, file=sys.stderr)
+
+
+# ---------------------------------------------------------------- colour math
+def srgb_to_lin(c):
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def lin_to_srgb(c):
+    c = max(0.0, c)
+    return 12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+
+
+def hex_to_rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def rgb_to_hex(rgb):
+    return "#" + "".join(f"{round(min(1, max(0, c)) * 255):02x}" for c in rgb)
+
+
+def rgb_to_oklch(rgb):
+    r, g, b = (srgb_to_lin(c) for c in rgb)
+    l = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    m = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    s = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    L = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s
+    a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s
+    bb = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+    return L, math.hypot(a, bb), math.degrees(math.atan2(bb, a)) % 360
+
+
+def _oklch_lin(L, C, H):
+    a, b = C * math.cos(math.radians(H)), C * math.sin(math.radians(H))
+    l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
+    m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3
+    s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3
+    return (4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+            -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+            -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)
+
+
+def oklch_to_hex(L, C, H):
+    """Gamut-map by lowering chroma until the colour fits in sRGB."""
+    L = min(1.0, max(0.0, L))
+    inside = lambda c: all(-1e-4 <= v <= 1 + 1e-4 for v in _oklch_lin(L, c, H))
+    if not inside(0.0):
+        C = 0.0
+    elif not inside(C):
+        lo, hi = 0.0, C
+        for _ in range(24):
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if inside(mid) else (lo, mid)
+        C = lo
+    return rgb_to_hex(tuple(lin_to_srgb(v) for v in _oklch_lin(L, C, H)))
+
+
+def luminance(hexc):
+    r, g, b = (srgb_to_lin(c) for c in hex_to_rgb(hexc))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast(a, b):
+    la, lb = sorted((luminance(a), luminance(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+# ------------------------------------------------------------------- tokens
+def read_config():
+    try:
+        return json.loads((CONF / "config.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def build_tokens(accent_src, tint, accent_override=None, mode="dark"):
+    """accent_src: raw hex from the wallpaper. Returns the one token set."""
+    L0, C0, hue = rgb_to_oklch(hex_to_rgb(accent_src))
+    tint = min(1.0, max(0.0, tint))
+    dark = mode != "light"
+    n = lambda L, c=1.0: oklch_to_hex(L, tint * 0.03 * c, hue)
+
+    if dark:
+        t = {
+            "bg": n(0.10 * tint, 0.4) if tint else "#000000",
+            "surface": n(0.17 + 0.05 * tint), "surface2": n(0.22 + 0.05 * tint),
+            "overlay": n(0.27 + 0.04 * tint), "border": n(0.32),
+            "muted": n(0.52, 0.6), "subtle": n(0.64, 0.6), "fgDim": n(0.78, 0.5), "fg": n(0.93, 0.3),
+        }
+        lo, hi, step = 0.68, 0.82, 0.02
+    else:
+        t = {
+            "bg": n(0.985, 0.5), "surface": n(0.95), "surface2": n(0.92), "overlay": n(0.89),
+            "border": n(0.84), "muted": n(0.58, 0.6), "subtle": n(0.48, 0.6),
+            "fgDim": n(0.38, 0.5), "fg": n(0.20, 0.3),
+        }
+        lo, hi, step = 0.45, 0.62, -0.02
+
+    if accent_override:
+        accent = accent_override.lower()
+        aL, aC, aH = rgb_to_oklch(hex_to_rgb(accent))
+    else:
+        aL = min(hi, max(lo, L0))
+        aC = max(0.09, C0)
+        aH = hue
+        accent = oklch_to_hex(aL, aC, aH)
+        aL, aC, aH = rgb_to_oklch(hex_to_rgb(accent))
+    # readable on the background; nudge a hand-picked accent until it is
+    while contrast(accent, t["bg"]) < 4.5 and 0.05 < aL < 0.97:
+        aL += step
+        accent = oklch_to_hex(aL, aC, aH)
+    t["accent"] = accent
+    t["accentDim"] = oklch_to_hex(aL - 0.17 if dark else aL + 0.17, aC * 0.8, aH)
+    on = oklch_to_hex(0.16 if dark else 0.985, tint * 0.02, aH)
+    t["onAccent"] = on if contrast(on, accent) >= 4.5 else ("#000000" if dark else "#ffffff")
+
+    def semantic(h, L=None, C=0.14):
+        L = L if L is not None else (0.76 if dark else 0.52)
+        # pull the fixed hue 8 % towards the accent so everything feels like one palette
+        d = ((aH - h + 180) % 360) - 180
+        return oklch_to_hex(L, C, (h + 0.08 * d) % 360)
+
+    sem = {"red": 25, "orange": 55, "yellow": 95, "green": 145, "cyan": 200, "blue": 255, "magenta": 330}
+    for name, h in sem.items():
+        t[name] = semantic(h)
+
+    bright = lambda h: semantic(h, 0.83 if dark else 0.42, 0.15)
+    t.update({
+        "term0": t["surface"], "term1": t["red"], "term2": t["green"], "term3": t["yellow"],
+        "term4": t["blue"], "term5": t["magenta"], "term6": t["cyan"], "term7": t["fgDim"],
+        "term8": t["muted"], "term9": bright(25), "term10": bright(145),
+        "term11": bright(95), "term12": bright(255), "term13": bright(330), "term14": bright(200),
+        "term15": t["fg"],
+        # seed for the browser theme: Chromium derives its whole frame from it, so keep it tone-correct
+        "browser": oklch_to_hex(0.16 if dark else 0.95, 0.008 + tint * 0.01, aH),
+        "mode": "dark" if dark else "light",
+        "gtkTheme": "adw-gtk3-dark" if dark else "adw-gtk3",
+        "catppuccin": "mocha" if dark else "latte",
+    })
+    return t
+
+
+def check_tokens(t):
+    """Raise AssertionError if the readable-contrast rules are broken."""
+    pairs = [("fg", "bg", 7.0), ("fgDim", "bg", 4.5), ("accent", "bg", 4.5),
+             ("onAccent", "accent", 4.5), ("accent", "surface", 3.0), ("fg", "surface2", 4.5)]
+    for a, b, need in pairs:
+        got = contrast(t[a], t[b])
+        assert got >= need, f"contrast {a} on {b} is {got:.2f}, need {need}"
+
+
+# --------------------------------------------------------- palette extraction
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def extract_accent(image, digest):
+    """matugen primary (dark) for the image, cached by image hash."""
+    cache = CACHE / "palettes" / f"{digest}.json"
+    try:
+        return json.loads(cache.read_text())["primary"]
+    except (OSError, ValueError, KeyError):
+        pass
+    out = subprocess.run(
+        ["matugen", "image", str(image), "-t", "scheme-tonal-spot", "-m", "dark",
+         "--source-color-index", "0", "--json", "hex", "--dry-run", "-q"],
+        capture_output=True, text=True, timeout=60)
+    if out.returncode != 0:
+        raise SystemExit(f"matugen failed: {out.stderr.strip() or out.stdout.strip()}")
+    primary = json.loads(out.stdout)["colors"]["primary"]["dark"]["color"][:7]
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps({"primary": primary}))
+    return primary
+
+
+def override_for(image):
+    try:
+        d = json.loads((CONF / "overrides" / f"{Path(image).name}.json").read_text())
+        acc = d.get("accent")
+        return acc if acc and re.fullmatch(r"#[0-9a-fA-F]{6}", acc) else None
+    except (OSError, ValueError):
+        return None
+
+
+def get_mode():
+    try:
+        m = (STATE / "mode").read_text().strip()
+        return m if m in ("dark", "light") else "dark"
+    except OSError:
+        return "dark"
+
+
+def compute(image):
+    image = Path(image).expanduser().resolve()
+    if not image.is_file():
+        raise SystemExit(f"no such image: {image}")
+    digest = sha256_file(image)
+    tint = float(read_config().get("theme", {}).get("tint", 0.15))
+    override = override_for(image)
+    mode = get_mode()
+    key = hashlib.sha256(f"{digest}|{tint}|{override}|{mode}".encode()).hexdigest()[:16]
+    tokens = build_tokens(extract_accent(image, digest), tint, override, mode)
+    tokens.update({"wallpaper": str(image), "hash": key})
+    return tokens
+
+
+# ----------------------------------------------------------------- rendering
+PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_]+)\s*(?:\|\s*(\w+)\s*)?\}\}")
+
+
+def fmt(value, how):
+    if how is None:
+        return value
+    if how == "strip":
+        return value.lstrip("#")
+    rgb = [round(c * 255) for c in hex_to_rgb(value)]
+    if how == "rgb":
+        return ", ".join(map(str, rgb))
+    if how == "semi":
+        return ";".join(map(str, rgb))
+    if how == "qt":
+        return "#ff" + value.lstrip("#")
+    raise SystemExit(f"unknown filter {how}")
+
+
+def render(text, tokens):
+    return PLACEHOLDER.sub(lambda m: fmt(tokens[m.group(1)], m.group(2)), text)
+
+
+def write_if_changed(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if path.read_text() == data:
+            return False
+    except OSError:
+        pass
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(data)
+    os.replace(tmp, path)
+    return True
+
+
+def render_all(tokens):
+    changed = []
+    for tpl in sorted(TEMPLATES.iterdir()):
+        if tpl.is_file() and write_if_changed(THEME_DIR / tpl.name, render(tpl.read_text(), tokens)):
+            changed.append(tpl.name)
+    if write_if_changed(THEME_DIR / "tokens.json", json.dumps(tokens, indent=2) + "\n"):
+        changed.append("tokens.json")
+    return changed
+
+
+# --------------------------------------------------------------- reload hooks
+def sh(*cmd, timeout=8):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        log(f"$ {' '.join(cmd)} -> {r.returncode} {r.stderr.strip()[:200]}")
+        return r.returncode == 0
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log(f"$ {' '.join(cmd)} failed: {e}")
+        return False
+
+
+def running(name):
+    return subprocess.run(["pgrep", "-x", name], capture_output=True).returncode == 0
+
+
+def ensure_gtk_links():
+    css = THEME_DIR / "gtk.css"
+    for ver in ("gtk-3.0", "gtk-4.0"):
+        d = HOME / ".config" / ver
+        f = d / "gtk.css"
+        line = f'@import url("file://{css}");\n'
+        try:
+            if f.is_symlink():
+                continue
+            if f.exists():
+                if str(css) in f.read_text():
+                    continue
+                f.write_text(f.read_text() + "\n" + line)
+            else:
+                d.mkdir(parents=True, exist_ok=True)
+                f.write_text(line)
+        except OSError as e:
+            log(f"gtk.css: {e}")
+
+
+def ensure_qt_conf():
+    """qt6ct needs to know where the generated colour scheme lives (created once, never overwritten)."""
+    f = HOME / ".config/qt6ct/qt6ct.conf"
+    if f.exists():
+        return
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("[Appearance]\ncolor_scheme_path=%s\ncustom_palette=true\nstyle=Fusion\n"
+                     % (THEME_DIR / "qt6ct-colors.conf"))
+    except OSError as e:
+        log(f"qt6ct.conf: {e}")
+
+
+def run_hooks():
+    hypr = THEME_DIR / "hypr.lua"
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE") and hypr.exists():
+        # a leading "--" comment would be parsed by hyprctl as a flag
+        code = "\n".join(l for l in hypr.read_text().splitlines() if not l.lstrip().startswith("--"))
+        sh("hyprctl", "eval", code)
+    if running("kitty"):
+        sh("pkill", "-USR1", "-x", "kitty")
+    for sock in glob.glob(os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "nvim.*.0")):
+        sh("nvim", "--server", sock, "--remote-expr", 'luaeval("require(\'torii_theme\').reload()")')
+    if sh("tmux", "has-session"):
+        sh("tmux", "source-file", "-q", str(THEME_DIR / "tmux.conf"))
+    ensure_gtk_links()
+    ensure_qt_conf()
+    if os.environ.get("DBUS_SESSION_BUS_ADDRESS") or os.environ.get("XDG_RUNTIME_DIR"):
+        tk = json.loads((THEME_DIR / "tokens.json").read_text())
+        sh("gsettings", "set", "org.gnome.desktop.interface", "color-scheme",
+           "prefer-dark" if tk["mode"] == "dark" else "prefer-light")
+        sh("gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", tk["gtkTheme"])
+    if Path("/etc/chromium/policies/managed/torii-theme.json").exists() and running("helium"):
+        sh("helium-browser", "--refresh-platform-policy", "--no-startup-window")
+
+
+# ------------------------------------------------------------------ commands
+def wallpaper_dir():
+    d = read_config().get("wallpaper", {}).get("dir", "~/Pictures/wallpapers")
+    return Path(os.path.expanduser(d))
+
+
+def wallpapers():
+    d = wallpaper_dir()
+    return sorted(p for p in d.iterdir() if p.suffix.lower() in IMAGE_EXT) if d.is_dir() else []
+
+
+def current():
+    try:
+        return json.loads((STATE / "current.json").read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def apply(image, force=False):
+    tokens = compute(image)
+    check_tokens(tokens)
+    cur = current()
+    if not force and cur and cur.get("hash") == tokens["hash"] and (THEME_DIR / "tokens.json").exists():
+        log("unchanged")
+        return tokens, False
+    changed = render_all(tokens)
+    write_if_changed(STATE / "current.json",
+                     json.dumps({"wallpaper": tokens["wallpaper"], "hash": tokens["hash"],
+                                 "accent": tokens["accent"]}, indent=2) + "\n")
+    run_hooks()
+    log("changed: " + ", ".join(changed))
+    return tokens, True
+
+
+def step(delta):
+    imgs = wallpapers()
+    if not imgs:
+        raise SystemExit(f"no wallpapers in {wallpaper_dir()}")
+    cur = current()
+    idx = next((i for i, p in enumerate(imgs) if cur and str(p) == cur["wallpaper"]), -1)
+    return imgs[(idx + delta) % len(imgs)]
+
+
+def main(argv):
+    global VERBOSE
+    args = [a for a in argv if a not in ("-v", "--verbose")]
+    VERBOSE = len(args) != len(argv)
+    if not args:
+        print(__doc__)
+        return 2
+    cmd, rest = args[0], args[1:]
+    if cmd == "set" and rest:
+        apply(rest[0])
+    elif cmd == "next":
+        apply(step(+1))
+    elif cmd == "prev":
+        apply(step(-1))
+    elif cmd == "random":
+        imgs = wallpapers()
+        cur = current()
+        pool = [p for p in imgs if not cur or str(p) != cur["wallpaper"]] or imgs
+        if not pool:
+            raise SystemExit(f"no wallpapers in {wallpaper_dir()}")
+        apply(random.choice(pool))
+    elif cmd == "restore":
+        cur = current()
+        img = cur["wallpaper"] if cur and Path(cur["wallpaper"]).is_file() else None
+        if img is None:
+            imgs = wallpapers()
+            if not imgs:
+                raise SystemExit(f"no wallpapers in {wallpaper_dir()}")
+            img = imgs[0]
+        apply(img, force=not (THEME_DIR / "tokens.json").exists())
+    elif cmd == "mode":
+        want = rest[0] if rest else None
+        if want is None:
+            print(get_mode())
+            return 0
+        if want == "toggle":
+            want = "light" if get_mode() == "dark" else "dark"
+        if want not in ("dark", "light"):
+            raise SystemExit("usage: torii-theme mode [dark|light|toggle]")
+        STATE.mkdir(parents=True, exist_ok=True)
+        write_if_changed(STATE / "mode", want + "\n")
+        cur = current()
+        apply(cur["wallpaper"] if cur and Path(cur["wallpaper"]).is_file() else step(0))
+    elif cmd == "palette" and rest:
+        print(json.dumps(compute(rest[0]), indent=2))
+    elif cmd == "current":
+        print(json.dumps(current() or {}, indent=2))
+    elif cmd == "check":
+        imgs = [Path(a) for a in rest] or wallpapers()
+        bad = 0
+        for img in imgs:
+            for mode in ("dark", "light"):
+                for tint in (0.0, 0.15, 1.0):
+                    try:
+                        check_tokens(build_tokens(extract_accent(img, sha256_file(img)), tint, override_for(img), mode))
+                        status = "ok"
+                    except AssertionError as e:
+                        status, bad = f"FAIL {e}", bad + 1
+                    print(f"{img.name:24} {mode:5} tint={tint:<4} {status}")
+        return 1 if bad else 0
+    else:
+        print(__doc__)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
