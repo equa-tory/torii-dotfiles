@@ -14,6 +14,7 @@ Singleton {
     readonly property var workspaces: adapter.workspaces
     readonly property var weather: adapter.weather
     readonly property var wallpaper: adapter.wallpaper
+    readonly property var apps: adapter.apps
     readonly property var theme: adapter.theme
     readonly property var font: adapter.font
     readonly property string quicklinks: adapter.quicklinks
@@ -48,6 +49,9 @@ Singleton {
             property JsonObject wallpaper: JsonObject {
                 property string dir: "~/Pictures/wallpapers"
                 property int transitionMs: 600
+            }
+            property JsonObject apps: JsonObject {
+                property string dir: "~/apps"
             }
             property JsonObject theme: JsonObject {
                 property real tint: 0.15

@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""torii-apps list  -  mac-style apps for the launcher.
+
+Every folder directly inside ~/apps (apps.dir in ~/.config/torii/config.json) is an app when it holds an app.json:
+
+  ~/apps/v2rayN/app.json
+  {
+    "name": "v2rayN",                      optional, defaults to the folder name
+    "exec": "v2rayN-linux-64/v2rayN",      required: command, relative to the folder (string or list)
+    "icon": "icon.png",                    optional: file in the folder, or an icon-theme name
+    "keywords": ["vpn", "proxy"],          optional
+    "description": "Proxy client"          optional
+  }
+
+Prints a JSON array. Nothing is moved or installed: the folder stays exactly where it is.
+"""
+import json
+import os
+import sys
+from pathlib import Path
+
+
+def apps_dir():
+    try:
+        cfg = json.loads((Path.home() / ".config/torii/config.json").read_text())
+        d = cfg.get("apps", {}).get("dir", "~/apps")
+    except (OSError, ValueError):
+        d = "~/apps"
+    return Path(os.path.expanduser(d))
+
+
+def scan():
+    root = apps_dir()
+    out = []
+    if not root.is_dir():
+        return out
+    for d in sorted(p for p in root.iterdir() if p.is_dir()):
+        manifest = d / "app.json"
+        try:
+            m = json.loads(manifest.read_text())
+        except (OSError, ValueError):
+            continue
+        if not isinstance(m, dict) or not m.get("exec"):
+            continue
+        ex = m["exec"]
+        ex = " ".join(ex) if isinstance(ex, list) else str(ex)
+        icon = str(m.get("icon", ""))
+        if icon and (d / icon).is_file():
+            icon = str(d / icon)
+        out.append({
+            "name": str(m.get("name") or d.name),
+            "exec": ex,
+            "dir": str(d),
+            "icon": icon,
+            "keywords": [str(k) for k in m.get("keywords", []) if isinstance(k, (str, int))],
+            "description": str(m.get("description", "")),
+        })
+    return out
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["list"]:
+        print(json.dumps(scan()))
+    else:
+        print(__doc__)
+        sys.exit(2)

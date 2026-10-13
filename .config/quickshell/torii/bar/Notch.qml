@@ -89,10 +89,12 @@ PanelWindow {
             active: win.panelHere
             clip: true
             sourceComponent: Panels.panel === "control" ? controlPanel
-                           : Panels.panel === "switcher" ? switcherPanel : null
+                           : Panels.panel === "switcher" ? switcherPanel
+                           : Panels.panel === "launcher" ? launcherPanel : null
         }
     }
 
     Component { id: controlPanel; ControlPanel {} }
     Component { id: switcherPanel; Switcher { maxWidth: win.width - 160 } }
+    Component { id: launcherPanel; Launcher {} }
 }

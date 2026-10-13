@@ -4,5 +4,7 @@
   "weather": { "lat": 55.75, "lon": 37.62, "refreshMin": 20 },
   "wallpaper": { "dir": "~/Pictures/wallpapers", "transitionMs": 600 },
   "theme": { "tint": 0.15 },
+  "apps": { "dir": "~/apps" },
+  "quicklinks": "~/.config/torii/quicklinks.json",
   "font": { "family": "JetBrainsMono Nerd Font", "size": 13 }
 }

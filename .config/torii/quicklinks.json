@@ -1,0 +1,9 @@
+{
+  "yt":  "https://www.youtube.com/results?search_query={q}",
+  "g":   "https://www.google.com/search?q={q}",
+  "x":   "https://x.com/search?q={q}",
+  "gh":  "https://github.com/search?q={q}",
+  "git": "https://github.com/equa-tory",
+  "w":   "https://en.wikipedia.org/wiki/Special:Search?search={q}",
+  "maps": "https://www.openstreetmap.org/search?query={q}"
+}
