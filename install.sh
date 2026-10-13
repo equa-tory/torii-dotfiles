@@ -1,21 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd ~/torii-dots
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
 echo "==> Setting up torii-dotfiles"
 
 sudo sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 sudo pacman -Syu
-bash "packages/install.sh"
+bash packages/install.sh
 
-mv ~/.config/hypr ~/.config/hypr.bak
-mv ~/.config/kitty ~/.config/kitty.bak
-mv ~/.zshrc ~/.zshrc.bak
+echo "==> Installing powerlevel10k"
+[ -d ~/.local/share/powerlevel10k ] || git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.local/share/powerlevel10k
+
+echo "==> Backing up existing configs"
+for p in ~/.config/hypr ~/.config/kitty ~/.config/nvim ~/.config/tmux ~/.config/waybar ~/.config/dotfiles ~/.zshrc ~/.p10k.zsh; do
+  if [ -e "$p" ] && [ ! -L "$p" ]; then mv "$p" "$p.bak-$(date +%s)"; fi
+done
+
+echo "==> Linking dotfiles"
 stow .
 
-mkdir ~/.ssh && chmod 700 ~/.ssh
-curl https://github.com/equa-tory.keys > ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+echo "==> Authorizing SSH keys from GitHub"
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+keys="$(curl -fsSL https://github.com/equa-tory.keys)"
+while IFS= read -r key; do
+  grep -qxF "$key" ~/.ssh/authorized_keys || echo "$key" >> ~/.ssh/authorized_keys
+done <<< "$keys"
+
+echo "==> Setting zsh as default shell"
+chsh -s "$(command -v zsh)"
 
 echo "==> Setup complete"
-

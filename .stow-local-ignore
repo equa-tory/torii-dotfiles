@@ -1,1 +1,7 @@
-packages
+^/packages
+^/install\.sh
+^/README\.md
+^/\.git$
+^/\.gitignore$
+^/\.stow-local-ignore$
+\.bak$
