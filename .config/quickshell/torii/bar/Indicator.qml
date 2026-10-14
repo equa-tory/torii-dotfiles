@@ -24,11 +24,22 @@ Item {
     readonly property bool shown: hover.hovered || open
     readonly property string caption: open ? detail : text
 
-    implicitHeight: 22
-    implicitWidth: pill.width
+    // "circles" style: every activity sits on its own round backing of the notch colour
+    property real pad: 0
+    property color backing: "transparent"
+    implicitHeight: 22 + 2 * pad
+    implicitWidth: pill.width + 2 * pad
+
+    Rectangle {
+        anchors.fill: parent
+        radius: height / 2
+        color: root.backing
+    }
 
     Rectangle {
         id: pill
+        x: root.pad
+        y: root.pad
         height: 22
         radius: 11
         width: shown ? 22 + 8 + capLabel.implicitWidth + (open && closable ? 26 : 10) : 22
@@ -91,7 +102,7 @@ Item {
     }
 
     HoverHandler { id: hover }
-    readonly property bool overCross: open && closable && area.containsMouse && area.mouseX > pill.width - 28
+    readonly property bool overCross: open && closable && area.containsMouse && area.mouseX - root.pad > pill.width - 28
 
     MouseArea {
         id: area

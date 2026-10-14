@@ -200,3 +200,6 @@ hidden while do not disturb is on (`notifications.badgeInDnd`). Do not disturb a
 circle stays) and silences the pop-ups and sounds, except critical ones.
 Sounds (`torii-sound`): `sounds.reminder` / `sounds.notification` in `config.json` are file names in `~/.config/torii/sounds/`
 (drop your own there) or absolute paths; missing files fall back to the freedesktop theme. `sounds.volume` is 0–1.
+
+**Activities layout** (`config.json`): `activities.side` is `right` or `left` of the notch, `activities.style` is `pill`
+(one round pill) or `circles` (every activity on its own circle).

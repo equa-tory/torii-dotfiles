@@ -10,6 +10,8 @@ Row {
     id: root
 
     spacing: 8
+    property real pad: 0                  // circles style: padding of each activity's own round backing
+    property color backing: "transparent"
     readonly property int count: repeater.count
 
     readonly property string bin: Config.home + "/.config/torii/bin/"
@@ -44,6 +46,8 @@ Row {
             readonly property string kind: modelData.kind
             readonly property var r: modelData.r
 
+            pad: root.pad
+            backing: root.backing
             key: modelData.key
             glyph: kind === "reminder" ? Icons.timer : kind === "sudo" ? Icons.lock : kind === "rec" ? Icons.record
                  : kind === "mic" ? Icons.micOff : kind === "automove" ? Icons.folderMove : kind === "night" ? Icons.nightLight : Icons.bellOff

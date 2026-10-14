@@ -103,26 +103,31 @@ PanelWindow {
         }
     }
 
-    // what is switched on right now: its own round pill next to the notch (a lone circle sits in a circle)
+    // what is switched on right now, right or left of the notch (activities.side), in one round pill or as separate
+    // circles (activities.style)
     Rectangle {
         id: activity
+        readonly property bool circles: Config.activities.style === "circles"
         readonly property real size: win.floating ? win.barH : win.barH - 8
         readonly property real pad: (size - 22) / 2
-        x: shape.x + shape.width + 8
+        readonly property color back: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Config.notch.opacity)
+        x: Config.activities.side === "left" ? shape.x - 8 - width : shape.x + shape.width + 8
         y: win.floating ? win.topGap : 4
         height: size
-        width: acts.count > 0 ? acts.implicitWidth + 2 * pad : 0
+        width: acts.count > 0 ? (circles ? acts.implicitWidth : acts.implicitWidth + 2 * pad) : 0
         radius: size / 2
         opacity: acts.count > 0 ? 1 : 0
         visible: opacity > 0
-        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Config.notch.opacity)
+        color: circles ? "transparent" : back
 
         Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
         Behavior on opacity { NumberAnimation { duration: 160 } }
 
         Indicators {
             id: acts
-            x: activity.pad
+            x: activity.circles ? 0 : activity.pad
+            pad: activity.circles ? activity.pad : 0
+            backing: activity.circles ? activity.back : "transparent"
             anchors.verticalCenter: parent.verticalCenter
         }
     }
