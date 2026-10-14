@@ -3,6 +3,7 @@ import qs.widgets
 import qs.services
 import QtQuick
 import QtQuick.Shapes
+import QtQuick.Effects
 
 // One activity in the notch: a small circle with a glyph (and a ring that drains for timed things).
 // Hover shows what it is; click turns it off. A reminder opens on click: time left, message and a cross to cancel.
@@ -17,6 +18,9 @@ Item {
     property string detail: ""            // shown while open (reminders)
     property bool openable: false
     property bool closable: false         // cross inside the open text
+    property string image: ""             // cover shown in the circle instead of the glyph
+    property Component content: null      // custom body while open (the media controls)
+    property real contentWidth: 0
     signal activated()
     signal closed()
 
@@ -39,10 +43,10 @@ Item {
     Rectangle {
         id: pill
         x: root.pad
-        y: root.pad
-        height: 22
-        radius: 11
-        width: shown ? 22 + 8 + capLabel.implicitWidth + (open && closable ? 26 : 10) : 22
+        y: (root.implicitHeight - height) / 2
+        height: open && content ? 26 : 22
+        radius: height / 2
+        width: open && content ? 22 + 8 + contentWidth + 10 : shown ? 22 + 8 + capLabel.implicitWidth + (open && closable ? 26 : 10) : 22
         color: shown ? Theme.surface : "transparent"
         clip: true
         Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
@@ -52,6 +56,7 @@ Item {
             id: circle
             width: 22
             height: 22
+            y: (pill.height - height) / 2
 
             Shape {
                 id: ring
@@ -78,7 +83,20 @@ Item {
                     }
                 }
             }
-            Glyph { anchors.centerIn: parent; text: root.glyph; size: 11; color: root.tint }
+            Image {
+                id: cover
+                anchors.centerIn: parent
+                width: 16; height: 16
+                visible: root.image !== "" && status === Image.Ready
+                source: root.image
+                sourceSize: Qt.size(32, 32)
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                layer.enabled: true
+                layer.effect: MultiEffect { maskEnabled: true; maskSource: coverMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1 }
+            }
+            Rectangle { id: coverMask; width: 16; height: 16; radius: 8; visible: false; layer.enabled: true }
+            Glyph { anchors.centerIn: parent; visible: !cover.visible; text: root.glyph; size: 11; color: root.tint }
         }
 
         Label {
@@ -88,7 +106,16 @@ Item {
             text: root.caption
             color: Theme.fgDim
             font.pixelSize: Config.font.size - 2
-            visible: root.shown
+            visible: root.shown && !(root.open && root.content)
+        }
+
+        Loader {
+            x: 30
+            z: 10
+            width: root.contentWidth
+            height: pill.height
+            active: root.open && root.content !== null
+            sourceComponent: root.content
         }
 
         Glyph {
@@ -107,6 +134,7 @@ Item {
     MouseArea {
         id: area
         anchors.fill: parent
+        z: -1                                   // controls inside an open activity get the clicks first
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: mouse => {

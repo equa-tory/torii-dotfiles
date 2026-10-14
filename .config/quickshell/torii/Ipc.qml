@@ -30,4 +30,11 @@ Scope {
         function dnd(): void { Notifs.toggleDnd(); }
         function clear(): void { Notifs.clear(); }
     }
+    IpcHandler {
+        target: "media"
+        function toggle(): void { Media.toggle(); }
+        function next(): void { Media.next(); }
+        function previous(): void { Media.previous(); }
+        function seek(seconds: int): void { Media.seekBy(seconds); }
+    }
 }

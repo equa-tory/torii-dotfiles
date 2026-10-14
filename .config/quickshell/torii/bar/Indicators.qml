@@ -27,6 +27,7 @@ Row {
         if (Live.dnd) return [{ kind: "dnd", key: "dnd" }];       // do not disturb: nothing else is shown
         const out = [];
         for (const r of Live.reminders) out.push({ kind: "reminder", key: "r" + r.id, r: r });
+        if (Media.active) out.push({ kind: "media", key: "media" });
         if (Live.sudoOn) out.push({ kind: "sudo", key: "sudo" });
         if (Live.recording) out.push({ kind: "rec", key: "rec" });
         if (Audio.sourceMuted) out.push({ kind: "mic", key: "mic" });
@@ -35,6 +36,8 @@ Row {
         if (Live.dnd) out.push({ kind: "dnd", key: "dnd" });
         return out;
     }
+
+    Component { id: mediaBody; MediaBody {} }
 
     Repeater {
         id: repeater
@@ -50,14 +53,18 @@ Row {
             backing: root.backing
             key: modelData.key
             glyph: kind === "reminder" ? Icons.timer : kind === "sudo" ? Icons.lock : kind === "rec" ? Icons.record
-                 : kind === "mic" ? Icons.micOff : kind === "automove" ? Icons.folderMove : kind === "night" ? Icons.nightLight : Icons.bellOff
+                 : kind === "media" ? Icons.music : kind === "mic" ? Icons.micOff : kind === "automove" ? Icons.folderMove : kind === "night" ? Icons.nightLight : Icons.bellOff
             tint: kind === "rec" || kind === "mic" ? Theme.red : kind === "sudo" || kind === "night" ? Theme.yellow : kind === "dnd" ? Theme.subtle : Theme.accent
-            openable: kind === "reminder"
+            openable: kind === "reminder" || kind === "media"
+            image: kind === "media" ? Media.art : ""
+            content: kind === "media" ? mediaBody : null
+            contentWidth: 430
             closable: kind === "reminder"
-            remain: kind === "reminder" ? Math.min(1, Live.remaining(r) / Math.max(1, r.due - r.start))
+            remain: kind === "media" ? Media.progress : kind === "reminder" ? Math.min(1, Live.remaining(r) / Math.max(1, r.due - r.start))
                   : (kind === "sudo" && Live.sudoState.until > 0) ? Math.min(1, Math.max(0, Live.sudoState.until - Live.now / 1000) / Math.max(1, Live.sudoState.until - Live.sudoState.start))
                   : -1
-            text: kind === "mic" ? "Microphone muted · click to unmute"
+            text: kind === "media" ? Media.title + (Media.artist ? "  ·  " + Media.artist : "")
+                : kind === "mic" ? "Microphone muted · click to unmute"
                 : kind === "rec" ? "Recording · click to stop"
                 : kind === "automove" ? "Auto mover on · click to turn off"
                 : kind === "night" ? "Night light " + Live.night.temp + " K · click to turn off"

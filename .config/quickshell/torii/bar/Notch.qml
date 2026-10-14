@@ -1,5 +1,6 @@
 import qs
 import qs.panels
+import qs.services as Svc
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
@@ -23,7 +24,9 @@ PanelWindow {
     readonly property real bodyH: barH + panelH
 
     WlrLayershell.namespace: "torii-notch"
-    WlrLayershell.keyboardFocus: panelHere ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // an open media activity can take the keyboard (click it): Left/Right then seek
+    readonly property bool mediaOpen: Svc.Live.expanded === "media" && Svc.Media.active
+    WlrLayershell.keyboardFocus: panelHere ? WlrKeyboardFocus.Exclusive : (mediaOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
     anchors { top: true; left: true; right: true }
     // full height: while a panel is open the whole window takes input so a click outside the panel closes it
     // (Hyprland routes pointer input only to the exclusive-keyboard layer, so a separate scrim never sees it)
@@ -37,9 +40,13 @@ PanelWindow {
         id: keys
         anchors.fill: parent
         focus: true
-        Keys.onEscapePressed: Panels.close()
+        Keys.onEscapePressed: { if (win.panelHere) Panels.close(); else Svc.Live.expanded = ""; }
+        Keys.onLeftPressed: if (win.mediaOpen) Svc.Media.seekBy(-Config.media.seekSeconds)
+        Keys.onRightPressed: if (win.mediaOpen) Svc.Media.seekBy(Config.media.seekSeconds)
+        Keys.onSpacePressed: if (win.mediaOpen) Svc.Media.toggle()
     }
     onPanelHereChanged: if (panelHere) keys.forceActiveFocus()
+    onMediaOpenChanged: if (mediaOpen) keys.forceActiveFocus()
 
     Item {
         id: catcher
