@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import QtQuick
 import qs
 import qs.bar
+import qs.services
 
 ShellRoot {
     // Notch + wallpaper on every monitor (hotplug safe: Quickshell.screens updates live)
@@ -16,6 +17,7 @@ ShellRoot {
 
             Wallpaper { screen: perScreen.modelData }
             Notch { screen: perScreen.modelData }
+            NightOverlay { screen: perScreen.modelData }
         }
     }
 

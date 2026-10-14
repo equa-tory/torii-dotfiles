@@ -87,6 +87,13 @@ apply_fstab() {
       [[ ,$opts, == *",_netdev,"* ]] || opts+=",_netdev"
       [[ $opts == *x-systemd.mount-timeout=* ]] || opts+=",x-systemd.mount-timeout=10s"
     fi
+    # Without these a cifs share is owned by root: only sudo could write to it (the file auto mover failed on this)
+    if [[ $fstype == cifs ]]; then
+      [[ $opts == *uid=* ]]       || opts+=",uid=${SUDO_UID:-$(id -u)}"
+      [[ $opts == *gid=* ]]       || opts+=",gid=${SUDO_GID:-$(id -g)}"
+      [[ $opts == *file_mode=* ]] || opts+=",file_mode=0664"
+      [[ $opts == *dir_mode=* ]]  || opts+=",dir_mode=0775"
+    fi
     $SUDO mkdir -p "$mnt"
     out+="$dev  $mnt  $fstype  $opts  ${dump:-0}  ${pass:-0}"$'\n'
     echo "  add  $mnt"
@@ -105,6 +112,10 @@ apply_fstab() {
     warn "The new lines broke the fstab (parse error). Old fstab restored."; return 1
   fi
   $SUDO systemctl daemon-reload 2>/dev/null || true
+  # lines added while the system is running are not picked up until the next boot: start their automounts now
+  while read -r _ mnt _; do
+    [[ -n ${mnt:-} ]] && $SUDO systemctl start "$(systemd-escape -p --suffix=automount "$mnt")" 2>/dev/null || true
+  done <<<"$out"
   echo "  fstab updated (backup: $FSTAB.torii-bak). The disks and shares mount when first used."
 }
 apply_fstab || warn "Mounts were not added. The system boots fine without them."

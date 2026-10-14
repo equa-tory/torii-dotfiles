@@ -10,7 +10,7 @@ import QtQuick.Layouts
 Item {
     id: root
 
-    readonly property int maxRows: 7
+    readonly property int maxRows: 9
     readonly property real rowH: 46
     property var path: []                 // menu nodes we are inside of
     property var picks: []                // selected index at each level, to land back on the same row
@@ -212,11 +212,23 @@ Item {
         elide: Text.ElideRight
     }
 
+    // thin scroll bar, so a longer list is never a surprise
+    Rectangle {
+        visible: root.showList && root.results.length > root.maxRows
+        x: parent.width - 9
+        y: list.y + 4 + (list.height - 8 - height) * (list.contentHeight - list.height > 0 ? list.contentY / (list.contentHeight - list.height) : 0)
+        width: 3
+        height: Math.max(24, (list.height - 8) * list.height / Math.max(1, list.contentHeight))
+        radius: 1.5
+        color: Theme.muted
+        z: 5
+    }
+
     // ---- results
     ListView {
         id: list
         visible: root.showList
-        anchors { left: parent.left; right: parent.right; top: root.showNotice ? notice.bottom : field.bottom; topMargin: 8; leftMargin: 14; rightMargin: 14 }
+        anchors { left: parent.left; right: parent.right; top: root.showNotice ? notice.bottom : field.bottom; topMargin: 8; leftMargin: 14; rightMargin: 18 }
         height: Math.min(root.results.length, root.maxRows) * root.rowH
         model: root.results
         clip: true

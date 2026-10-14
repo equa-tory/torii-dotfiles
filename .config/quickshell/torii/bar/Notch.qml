@@ -30,7 +30,7 @@ PanelWindow {
     implicitHeight: screen.height
     exclusiveZone: Math.max(0, topGap + barH - Config.notch.zoneTrim)
     color: "transparent"
-    mask: Region { item: win.panelHere ? catcher : shape }
+    mask: Region { item: win.panelHere ? catcher : shape; regions: [ Region { item: activity } ] }
 
     // Esc closes the panel. (QML `Shortcut` segfaults in Qt 6.12 when the shell hot-reloads, so use a key handler.)
     Item {
@@ -91,6 +91,29 @@ PanelWindow {
             sourceComponent: Panels.panel === "control" ? controlPanel
                            : Panels.panel === "switcher" ? switcherPanel
                            : Panels.panel === "launcher" ? launcherPanel : null
+        }
+    }
+
+    // what is switched on right now: a second, separate pill to the right of the notch
+    NotchShape {
+        id: activity
+        readonly property real inner: acts.implicitWidth + 24
+        x: shape.x + shape.width + 8
+        y: win.topGap
+        width: acts.count > 0 ? inner + 2 * win.ear : 0
+        height: win.barH
+        opacity: acts.count > 0 ? 1 : 0
+        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Config.notch.opacity)
+        radius: Config.notch.radius
+        floating: win.floating
+
+        Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
+        Behavior on opacity { NumberAnimation { duration: 160 } }
+
+        Indicators {
+            id: acts
+            x: win.ear + 12
+            anchors.verticalCenter: parent.verticalCenter
         }
     }
 

@@ -13,6 +13,10 @@ Every folder directly inside ~/apps (apps.dir in ~/.config/torii/config.json) is
     "description": "Proxy client"          optional
   }
 
+  torii-apps list | desktop | run <folder>
+  list     JSON array for the launcher
+  desktop  write ~/.local/share/applications/torii-app-*.desktop for these apps (other launchers and xdg-open see them)
+  run      start one (used by those desktop files)
 Prints a JSON array. Nothing is moved or installed: the folder stays exactly where it is.
 """
 import json
@@ -64,9 +68,41 @@ def scan():
     return out
 
 
+def desktop_sync():
+    """Write ~/.local/share/applications/torii-app-<name>.desktop for every manifest so other launchers and
+    xdg-open see the apps too; entries of apps that are gone are removed. Returns how many exist."""
+    import re
+    target = Path.home() / ".local/share/applications"
+    target.mkdir(parents=True, exist_ok=True)
+    keep = set()
+    for a in scan():
+        slug = re.sub(r"[^a-z0-9]+", "-", a["name"].lower()).strip("-") or "app"
+        f = target / f"torii-app-{slug}.desktop"
+        keep.add(f.name)
+        icon = a["icon"] or "application-x-executable"
+        folder = Path(a["dir"]).name
+        f.write_text(
+            "[Desktop Entry]\nType=Application\nVersion=1.0\n"
+            f"Name={a['name']}\nComment={a['description'] or 'App from ~/apps'}\nIcon={icon}\n"
+            f"Path={a['dir']}\nExec={Path.home()}/.config/torii/bin/torii-apps run {folder}\nTerminal=false\n"
+            f"Keywords={';'.join(a['keywords'])};\nX-Torii-App=true\n")
+    for old in target.glob("torii-app-*.desktop"):
+        if old.name not in keep:
+            old.unlink()
+    return len(keep)
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["list"]:
         print(json.dumps(scan()))
+    elif sys.argv[1:2] == ["run"] and len(sys.argv) == 3:
+        for a in scan():
+            if Path(a["dir"]).name == sys.argv[2]:
+                os.chdir(a["dir"])
+                os.execvp("sh", ["sh", "-c", 'PATH="$PWD:$PATH"; exec ' + a["exec"]])
+        sys.exit("no app folder named " + sys.argv[2])
+    elif sys.argv[1:] == ["desktop"]:
+        print(desktop_sync())
     else:
         print(__doc__)
         sys.exit(2)

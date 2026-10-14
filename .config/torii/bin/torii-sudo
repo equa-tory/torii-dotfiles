@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# torii-sudo on 5m|boot | off | status  -  passwordless sudo for a while, switched from the launcher (Trigger > Passwordless sudo).
+# The password comes on stdin (the launcher asks for it and never stores it).
+#   on 5m    for five minutes: a root timer removes the rule
+#   on boot  until the next reboot: torii-sudo-reset.service (packages/torii-setup.sh) removes it at boot and shutdown
+#   off      remove it now (needs no password while it is on)
+# The rule is /etc/sudoers.d/90-torii-nopasswd for your user only, checked with visudo before it is installed.
+# State for the notch indicator: ~/.local/state/torii/sudo.json  {"on", "until": <epoch seconds> | 0 for "until reboot"}
+#   clear    reset that state file (autostart runs it: no rule survives a reboot)
+set -uo pipefail
+
+F=/etc/sudoers.d/90-torii-nopasswd
+STATE="${TORII_STATE:-$HOME/.local/state/torii}/sudo.json"
+mode="${1:-}"; arg="${2:-}"
+case "$mode" in
+  status) sudo -k -n true 2>/dev/null && echo true || echo false; exit 0 ;;
+  clear) mkdir -p "$(dirname "$STATE")"; echo '{"on": false}' > "$STATE"; exit 0 ;;   # after login (autostart): nothing survives a reboot
+  on|off) ;;
+  *) sed -n '2,9p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac
+
+IFS= read -r pw || pw=""
+S() { printf '%s\n' "$pw" | sudo -S -p '' "$@"; }
+if ! sudo -n true 2>/dev/null; then
+  S -v 2>/dev/null || { echo "wrong password" >&2; exit 1; }
+fi
+
+mkdir -p "$(dirname "$STATE")"
+S systemctl stop torii-sudo-expire.timer 2>/dev/null
+if [ "$mode" = off ]; then
+  S rm -f "$F"; echo '{"on": false}' > "$STATE"; exit 0
+fi
+
+tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
+printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$(id -un)" > "$tmp"
+S visudo -cq -f "$tmp" || { echo "sudoers check failed" >&2; exit 1; }
+S install -m 440 -o root -g root "$tmp" "$F" || exit 1
+if [ "$arg" = 5m ]; then
+  S systemd-run --collect --unit=torii-sudo-expire --on-active=5m /usr/bin/rm -f "$F" >/dev/null 2>&1
+  printf '{"on": true, "until": %s, "start": %s}\n' "$(( $(date +%s) + 300 ))" "$(date +%s)" > "$STATE"
+else
+  printf '{"on": true, "until": 0, "start": %s}\n' "$(date +%s)" > "$STATE"
+fi

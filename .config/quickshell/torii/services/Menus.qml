@@ -38,7 +38,7 @@ Singleton {
 
     Connections { target: Net; function onWifiNetworksChanged() { root.bump(); } function onIpChanged() { root.bump(); } function onScanningChanged() { root.bump(); } }
     Connections { target: Bt; function onDevicesChanged() { root.bump(); } function onPoweredChanged() { root.bump(); } function onScanningChanged() { root.bump(); } }
-    Connections { target: Audio; function onSinksChanged() { root.bump(); } function onSourcesChanged() { root.bump(); } }
+    Connections { target: Audio; function onSinksChanged() { root.bump(); } function onSourcesChanged() { root.bump(); } function onSourceMutedChanged() { root.bump(); } }
 
     Timer { id: noticeTimer; interval: 3500; onTriggered: root.notice = "" }
     function say(text) { notice = text; noticeTimer.restart(); }
@@ -59,16 +59,26 @@ Singleton {
     JsonFetch { id: fFiles;    command: [root.bin("torii-default"), "list", "files"];    onDataChanged: root.bump() }
     JsonFetch { id: fTerminal; command: [root.bin("torii-default"), "list", "terminal"]; onDataChanged: root.bump() }
     JsonFetch { id: fEditor;   command: [root.bin("torii-default"), "list", "editor"];   onDataChanged: root.bump() }
-    JsonFetch { id: fNight;    command: [root.bin("torii-nightlight"), "status"];         onDataChanged: root.bump() }
-    JsonFetch { id: fTrig;     command: [root.bin("torii-trigger"), "status"];            onDataChanged: root.bump() }
     JsonFetch { id: fEmoji;    command: [root.bin("torii-emoji"), "list"];
                 onDataChanged: { root.emojiNodes = (data || []).map(e => ({ id: "e:" + e.c, name: e.n, sub: e.g, glyph: e.c, run: () => app([root.bin("torii-emoji"), "copy", e.c]) }));
                     root.bump(); } }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fNight, fTrig, fEmoji, fTrans]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fTrans]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
-    Connections { target: Config; function onNotchChanged() { fTrig.stale(); } }
+    Connections { target: Config; function onNotchChanged() { root.bump(); } }
+    Connections {
+        target: Live
+        function onRemindersChanged() { root.bump(); }
+        function onAutomoveChanged() { root.bump(); }
+        function onNightChanged() { root.bump(); }
+        function onRecordingStateChanged() { root.bump(); }
+        function onSudoStateChanged() { root.bump(); }
+        function onHyprChanged() { root.bump(); }
+        function onDndChanged() { root.bump(); }
+    }
+    property string darkNow: ""             // shown at once when you toggle dark mode, until the theme catches up
+    Connections { target: Theme; function onModeChanged() { root.darkNow = ""; } }
     function invalidate() { for (const f of allFetch) f.stale(); }
 
     // ---- ordering
@@ -130,12 +140,11 @@ Singleton {
     }
 
     // ================= Trigger
-    function toggle(fetch, args, keep) { sh(args); later(fetch, 500); }
+    function toggle(args) { sh(args); }
     function human(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
 
     function triggerMenu() {
-        fTrig.ensure();
-        const t = fTrig.data || { automove: {}, hypr: {}, shape: "attached" };
+        const t = { automove: Live.automove, dnd: Live.dnd, recording: Live.recording, hypr: Live.hypr, shape: Config.notch.shape };
         const hyprBin = bin("torii-hypr");
         return { id: "trigger", name: "Trigger", glyph: Icons.flash, sub: "Capture, convert, remind, switches", children: () => [
             captureMenu(t),
@@ -147,35 +156,67 @@ Singleton {
                   const n = parseFloat(String(m).replace(",", "."));
                   if (!(n > 0)) { say("Type a number of minutes, like 25"); return; }
                   ask("Remind me about…", false, msg => {
-                      sh(["systemd-run", "--user", "--collect", "--unit=torii-remind-" + Date.now(), "--on-active=" + Math.round(n * 60) + "s",
-                          "notify-send", "-a", "torii", "-u", "critical", "Reminder", msg || "Time is up"]);
+                      sh([bin("torii-remind"), "add", String(n), msg || "Time is up"]);
                       Panels.close();
                   });
               }) },
             { id: "automove", name: "File auto mover", glyph: Icons.folderMove, keywords: "downloads move inbox photos",
-              sub: t.automove.enabled ? "Moving new files to " + (t.automove.to || "").replace(home, "~") : "Downloads → " + (t.automove.to || "").replace(home, "~"),
-              badge: t.automove.enabled ? "On" : "Off", keep: true, run: () => toggle(fTrig, [bin("torii-automove"), t.automove.enabled ? "off" : "on"]) },
-            { id: "mic", name: "Mute microphone", glyph: Audio.sourceMuted ? Icons.micOff : Icons.mic, keywords: "input mic mute",
-              badge: Audio.sourceMuted ? "Muted" : "", keep: true, run: () => { Audio.toggleSourceMute(); bump(); } },
+              sub: t.automove.enabled ? "Moving new files to " + (t.automove.to || "").replace(home, "~") : "Downloads → " + (t.automove.to || "your inbox folder").replace(home, "~"),
+              badge: t.automove.enabled ? "On" : "Off", keep: true, run: () => toggle([bin("torii-automove"), t.automove.enabled ? "off" : "on"]) },
+            { id: "mic", name: "Microphone", glyph: Audio.sourceMuted ? Icons.micOff : Icons.mic, keywords: "input mic mute unmute",
+              sub: Audio.sourceMuted ? "Muted" : "Listening", badge: Audio.sourceMuted ? "Off" : "On", keep: true, run: () => Audio.toggleSourceMute() },
             { id: "dnd", name: "Do not disturb", glyph: t.dnd ? Icons.bellOff : Icons.bell, keywords: "notifications silence",
-              sub: "Notifications", badge: t.dnd ? "On" : "Off", keep: true, run: () => toggle(fTrig, ["swaync-client", "-d", "-sw"]) },
+              sub: "Notifications", badge: t.dnd ? "On" : "Off", keep: true, run: () => toggle(["swaync-client", "-d", "-sw"]) },
             { id: "dark", name: "Dark mode", glyph: Icons.themeDark, keywords: "light theme appearance",
-              badge: Theme.mode === "dark" ? "On" : "Off", keep: true, run: () => sh([bin("torii-theme"), "mode", "toggle"]) },
+              badge: (darkNow || Theme.mode) === "dark" ? "On" : "Off", keep: true,
+              run: () => { darkNow = (darkNow || Theme.mode) === "dark" ? "light" : "dark"; sh([bin("torii-theme"), "mode", darkNow]); } },
+            sudoNode(),
             { id: "shape", name: "Menu bar shape", glyph: Icons.layout, keywords: "notch floating attached",
               sub: t.shape === "floating" ? "Floating" : "Attached", badge: t.shape === "floating" ? "Floating" : "Attached", keep: true,
-              run: () => { sh([bin("torii-config"), "set", "notch.shape", t.shape === "floating" ? '"attached"' : '"floating"']); later(fTrig, 500); } },
+              run: () => { sh([bin("torii-config"), "set", "notch.shape", t.shape === "floating" ? '"attached"' : '"floating"']); } },
             { id: "layout", name: "Workspace layout", glyph: Icons.layout, sub: t.hypr.layout || "dwindle", keywords: "tiling dwindle master scrolling", children: () =>
                 [["dwindle", "Split in halves, newest window splits the focused one"], ["master", "One big window and a stack"], ["scrolling", "Columns that scroll sideways"]].map(l => ({
                     id: l[0], name: l[0].charAt(0).toUpperCase() + l[0].slice(1), sub: l[1], badge: (t.hypr.layout || "dwindle") === l[0] ? "●" : "", keep: true,
-                    run: () => { sh([hyprBin, "layout", l[0]]); later(fTrig, 500); } })) },
+                    run: () => { sh([hyprBin, "layout", l[0]]); } })) },
             { id: "gaps", name: "Window gaps", glyph: Icons.layout, sub: (t.hypr.gaps_in ?? 8) + " / " + (t.hypr.gaps_out ?? 20), keywords: "spacing margin", children: () =>
                 [["None", 0, 0], ["Tight", 2, 5], ["Small", 4, 10], ["Default", 8, 20], ["Large", 12, 32]].map(g => ({
                     id: "g" + g[0], name: g[0], sub: g[1] + " inside, " + g[2] + " outside", badge: (t.hypr.gaps_out ?? 20) === g[2] ? "●" : "", keep: true,
-                    run: () => { sh([hyprBin, "gaps", String(g[1]), String(g[2])]); later(fTrig, 500); } })) },
+                    run: () => { sh([hyprBin, "gaps", String(g[1]), String(g[2])]); } })) },
+            { id: "appsync", name: "Add ~/apps to the app menu", glyph: Icons.apps, sub: "Makes .desktop entries for the folders in ~/apps", keywords: "generate desktop entries portable",
+              run: () => sh([bin("torii-apps"), "desktop"]) },
             { id: "speed", name: "Speed test", glyph: Icons.speed, sub: "Network or disk, result as a notification", children: () => [
                 { id: "net", name: "Network", sub: "Download, upload, latency", glyph: Icons.wifi, run: () => app([bin("torii-speed"), "net"]) },
                 { id: "disk", name: "Disk", sub: "Write and read 512 MB in your home folder", glyph: Icons.folder, run: () => app([bin("torii-speed"), "disk"]) } ] }
         ] };
+    }
+
+    // passwordless sudo: needs your password once to switch it on (never stored), off needs none while it is on
+    Process {
+        id: feeder
+        property string feed: ""
+        property var done: null
+        stdinEnabled: true
+        onStarted: { write(feed + "\n"); stdinEnabled = false; feed = ""; }
+        onExited: code => { stdinEnabled = true; if (done) done(code); }
+    }
+    function runWithInput(args, text, done) {
+        feeder.command = args; feeder.feed = text; feeder.done = done; feeder.running = true;
+    }
+    function sudoOn(arg, label) {
+        ask("Password (needed once)", true, pw => runWithInput([bin("torii-sudo"), "on", arg], pw, code => {
+            say(code === 0 ? "Passwordless sudo on " + label : "Wrong password");
+        }));
+    }
+    function sudoNode() {
+        const on = Live.sudoOn;
+        const left = Live.sudoState.until > 0 ? Math.max(0, Math.round((Live.sudoState.until - Live.now / 1000) / 60)) : -1;
+        return { id: "sudo", name: "Passwordless sudo", glyph: Icons.lock, keywords: "root password nopasswd",
+                 sub: on ? (left >= 0 ? "On, about " + left + " min left" : "On until reboot") : "For 5 minutes or until reboot",
+                 badge: on ? "On" : "", children: () => [
+            { id: "5m", name: "For 5 minutes", sub: "Switches off by itself", glyph: Icons.timer, keep: true, run: () => sudoOn("5m", "for 5 minutes") },
+            { id: "boot", name: "Until reboot", sub: "Removed at the next boot or shutdown", glyph: Icons.power, keep: true, run: () => sudoOn("boot", "until reboot") },
+            { id: "off", name: "Turn off", sub: on ? "" : "Not on right now", glyph: Icons.close, keep: true,
+              run: () => { if (!on) return; runWithInput([bin("torii-sudo"), "off"], "", code => say(code === 0 ? "Passwordless sudo off" : "Could not turn it off")); } } ] };
     }
 
     function captureMenu(t) {
@@ -268,7 +309,7 @@ Singleton {
             fetch.ensure();
             const list = (fetch.data || []).map(d => ({
                 id: d.id, name: d.name, badge: d.current ? "●" : "", keep: true,
-                run: () => { sh([bin("torii-default"), "set", kind, d.id]); later(fetch, 500); say(name + ": " + d.name); }
+                run: () => { sh([bin("torii-default"), "set", kind, d.id]); fetch.data = (fetch.data || []).map(x => Object.assign({}, x, { current: x.id === d.id })); later(fetch, 800); say(name + ": " + d.name); }
             }));
             return list.length ? list : [{ id: "none", name: "Nothing installed for this", sub: "" }];
         } };
@@ -282,15 +323,17 @@ Singleton {
             defaultsKind("terminal", "Terminal", Icons.terminal, fTerminal, "terminal") ] };
     }
 
-    // night light (hyprsunset through torii-nightlight)
-    function night(args) { sh([bin("torii-nightlight")].concat(args)); later(fNight, 700); }
+    // night light: hyprsunset (GPU) or a warm overlay drawn by the shell, through torii-nightlight
+    function night(args) { sh([bin("torii-nightlight")].concat(args)); }
     function nightMenu() {
-        fNight.ensure();
-        const s = fNight.data || { on: false, temp: 4000, auto: false, from: "20:00", to: "07:00" };
-        return { id: "nightlight", name: "Night light", glyph: Icons.nightLight, keywords: "blue light warm screen temperature",
-                 sub: s.on ? s.temp + " K" + (s.auto ? "  ·  " + s.from + " → " + s.to : "") : (s.auto ? "Auto " + s.from + " → " + s.to : "Off"),
+        const s = Live.night;
+        return { id: "nightlight", name: "Night light", glyph: Icons.nightLight, keywords: "blue light warm screen temperature overlay gpu",
+                 sub: s.on ? s.temp + " K" + (s.mode === "overlay" ? " overlay" : "") + (s.auto ? "  ·  " + s.from + " → " + s.to : "") : (s.auto ? "Auto " + s.from + " → " + s.to : "Off"),
                  children: () => [
             { id: "toggle", name: s.on ? "Turn off" : "Turn on", glyph: Icons.power, badge: s.on ? "On" : "Off", keep: true, run: () => night(["toggle"]) },
+            { id: "method", name: "Method", glyph: Icons.monitor, sub: s.mode === "overlay" ? "Screen overlay" : "GPU (hyprsunset)", children: () => [
+                { id: "gpu", name: "GPU", sub: "hyprsunset changes the colours at the display", badge: s.mode === "overlay" ? "" : "●", keep: true, run: () => night(["mode", "gpu"]) },
+                { id: "overlay", name: "Screen overlay", sub: "A warm transparent layer over every screen", badge: s.mode === "overlay" ? "●" : "", keep: true, run: () => night(["mode", "overlay"]) } ] },
             { id: "temp", name: "Temperature", glyph: Icons.tune, sub: s.temp + " K", children: () =>
                 [2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000].map(k => ({
                     id: "t" + k, name: k + " K", sub: k <= 3000 ? "very warm" : k <= 4000 ? "warm" : k <= 5000 ? "mild" : "slight", badge: s.temp === k ? "●" : "", keep: true,

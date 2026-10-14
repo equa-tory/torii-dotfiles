@@ -6,6 +6,7 @@
 #   text     drag a rectangle, read the text in it (OCR) -> clipboard
 #   qr       drag a rectangle around a QR code           -> clipboard
 #   color    pick a colour on screen                     -> clipboard (#rrggbb)
+#   reset    clear the recording flag (autostart runs it)
 set -uo pipefail
 
 pics="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"; vids="${XDG_VIDEOS_DIR:-$HOME/Videos}"
@@ -27,9 +28,14 @@ case "${1:-}" in
     need wf-recorder
     if pgrep -x wf-recorder >/dev/null; then pkill -INT -x wf-recorder; exit 0; fi
     mkdir -p "$vids"; f="$vids/$ts.mp4"
-    note "Recording started" "Run Capture > Record again to stop"
+    st="${TORII_STATE:-$HOME/.local/state/torii}/recording.json"   # the notch shows a red dot while "on" is true
+    mkdir -p "$(dirname "$st")"; printf '{"on": true, "start": %s}\n' "$(date +%s)" > "$st"
+    trap 'printf "{\"on\": false}\n" > "$st"' EXIT
+    note "Recording started" "Click the red dot in the notch to stop"
     wf-recorder -o "$(focused)" -f "$f"
     note "Recording saved" "$f" ;;
+  reset)   # after login: no recording survives a reboot
+    st="${TORII_STATE:-$HOME/.local/state/torii}/recording.json"; mkdir -p "$(dirname "$st")"; printf '{"on": false}\n' > "$st" ;;
   text)
     need grim; need slurp; need tesseract
     geo=$(zone) || exit 0; [ -n "$geo" ] || exit 0; sleep 0.2

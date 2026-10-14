@@ -110,8 +110,15 @@ hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 for i = 1, 10 do
     local key = i % 10 -- 10 maps to key 0
     hl.bind(mainMod .. " + " .. key,             hl.dsp.focus({ workspace = i}))
-    hl.bind(mainMod .. " + SHIFT + " .. key,     hl.dsp.window.move({ workspace = i }))
+    -- SHIFT+3/4/5 are the screenshot binds below (like macOS), so moving a window to workspace 3, 4, 5 is CTRL+ instead
+    local moveMods = (i >= 3 and i <= 5) and " + CTRL + " or " + SHIFT + "
+    hl.bind(mainMod .. moveMods .. key,          hl.dsp.window.move({ workspace = i }))
 end
+
+-- Screenshots and recording (torii-capture): whole screen, a zone, and start/stop screen recording
+hl.bind(mainMod .. " + SHIFT + 3", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture screen"))
+hl.bind(mainMod .. " + SHIFT + 4", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture zone"))
+hl.bind(mainMod .. " + SHIFT + 5", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture record"))
 
 
 -- Example special workspace (scratchpad)

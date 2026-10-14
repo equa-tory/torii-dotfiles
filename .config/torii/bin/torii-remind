@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""torii-remind add <minutes> <message> | cancel <id> | list | apply   -  reminders with a notification (notch ring in the shell).
+
+  add     in <minutes> (decimals fine): a transient systemd user timer shows a notification when it is due
+  cancel  forget a reminder
+  list    JSON, what the notch indicator reads from ~/.local/state/torii/reminders.json
+  apply   after login: timers do not survive a reboot, so set them up again (late ones are shown at once)
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii")) / "reminders.json"
+SELF = os.path.abspath(sys.argv[0])
+
+
+def load():
+    try:
+        return json.loads(STATE.read_text())
+    except (OSError, ValueError):
+        return []
+
+
+def save(items):
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(items))
+    os.replace(tmp, STATE)
+
+
+def arm(item):
+    wait = max(1, int(item["due"] - time.time()))
+    subprocess.run(["systemd-run", "--user", "--collect", f"--unit=torii-remind-{item['id']}", f"--on-active={wait}s", SELF, "fire", item["id"]],
+                   capture_output=True)
+
+
+def notify(msg):
+    subprocess.run(["notify-send", "-a", "torii", "-u", "critical", "Reminder", msg or "Time is up"], check=False)
+
+
+def main(a):
+    cmd = a[0] if a else "list"
+    items = load()
+    if cmd == "list":
+        print(json.dumps(items))
+    elif cmd == "add" and len(a) >= 2:
+        mins = float(a[1].replace(",", "."))
+        if mins <= 0:
+            sys.exit("minutes must be above 0")
+        now = time.time()
+        item = {"id": str(int(now * 1000)), "start": now, "due": now + mins * 60, "msg": " ".join(a[2:]).strip()}
+        items.append(item)
+        save(items)
+        arm(item)
+    elif cmd == "cancel" and len(a) == 2:
+        subprocess.run(["systemctl", "--user", "stop", f"torii-remind-{a[1]}.timer"], capture_output=True)
+        save([i for i in items if i["id"] != a[1]])
+    elif cmd == "fire" and len(a) == 2:
+        hit = [i for i in items if i["id"] == a[1]]
+        save([i for i in items if i["id"] != a[1]])
+        notify(hit[0]["msg"] if hit else "")
+    elif cmd == "apply":
+        keep = []
+        for i in items:
+            if i["due"] <= time.time():
+                notify(i["msg"])
+            else:
+                keep.append(i)
+                arm(i)
+        save(keep)
+    else:
+        print(__doc__)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

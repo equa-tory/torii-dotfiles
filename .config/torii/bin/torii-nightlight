@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """torii-nightlight  -  warm screen colour through hyprsunset (GPU gamma, no overlay window).
 
-  status                    JSON: {"on", "temp", "auto", "from", "to"}
+  status                    JSON: {"on", "temp", "auto", "from", "to", "mode"}
+  mode gpu|overlay          gpu: hyprsunset changes the colours at the display (default)
+                            overlay: the shell lays a warm transparent layer over every screen (works without GPU support)
   on | off | toggle         switch now
   temp <kelvin>             1000..6500, applied at once when on
   auto <HH:MM> <HH:MM>      switch on at the first time and off at the second, every day
@@ -18,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii")) / "nightlight.json"
-DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00"}
+DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00", "mode": "gpu"}
 SELF = os.path.abspath(sys.argv[0])
 
 
@@ -46,6 +48,10 @@ def running():
 
 def push(s):
     if os.environ.get("TORII_NO_HOOKS"):
+        return
+    if s["mode"] == "overlay":                    # the shell draws it; make sure the GPU side is neutral
+        if running():
+            sh("hyprctl", "hyprsunset", "identity")
         return
     if not running():
         if not s["on"]:
@@ -92,6 +98,8 @@ def main(a):
         s["on"] = (not s["on"]) if cmd == "toggle" else cmd == "on"
     elif cmd == "temp" and len(a) == 2 and a[1].isdigit() and 1000 <= int(a[1]) <= 6500:
         s["temp"] = int(a[1])
+    elif cmd == "mode" and len(a) == 2 and a[1] in ("gpu", "overlay"):
+        s["mode"] = a[1]
     elif cmd == "auto" and a[1:] == ["off"]:
         s["auto"] = False
     elif cmd == "auto" and len(a) == 3 and valid_time(a[1]) and valid_time(a[2]):

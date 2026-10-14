@@ -28,6 +28,7 @@ Singleton {
     function items() {
         const out = [];
         for (const e of DesktopEntries.applications.values) {
+            if (e.id.indexOf("torii-app-") === 0) continue;           // generated from ~/apps, listed below as the folder itself
             out.push({ kind: "app", key: "app:" + e.id, name: e.name, sub: e.genericName || e.comment || "",
                        extra: (e.keywords || []).join(" "), icon: e.icon, id: e.id });
         }

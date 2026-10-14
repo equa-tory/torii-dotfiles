@@ -14,6 +14,7 @@ panel, a wallpaper switcher and a launcher. A CLI (`torii-theme`) restyles the w
 | `mainMod + CTRL + SPACE` | wallpaper / theme switcher (`<` `>` preview, `Space`/`Enter` apply, `Esc` cancel) |
 | `mainMod + SHIFT + D` | dark / light |
 | `mainMod + SHIFT + R` | reload the shell |
+| `mainMod + SHIFT + 3 / 4 / 5` | screenshot, screenshot of a zone, start/stop screen recording |
 
 `Esc` or a click outside closes any panel. Panels only open on the focused monitor.
 (With `ALT`, `CTRL + ALT + SPACE` also hits the XKB layout toggle in `input.lua`; with `SUPER` there is no clash.)
@@ -90,12 +91,25 @@ It reloads while the launcher is closed.
   downloads and files that existed before you switched it on, and never creates the folder when the share is not mounted.
 - Switches: mute microphone, do not disturb (swaync), dark mode, menu bar shape (floating or attached), workspace layout
   (dwindle, master, scrolling) and window gaps (`torii-hypr`, remembered across logins).
+- Passwordless sudo (`torii-sudo`): for 5 minutes or until reboot. The launcher asks for your password once (masked, never
+  stored); the rule is `/etc/sudoers.d/90-torii-nopasswd`, checked with `visudo`. A root timer removes it after 5 minutes and
+  `torii-sudo-reset.service` (installed by `torii-setup.sh`) removes it at every boot and shutdown. Turning it off needs no password.
+- Add `~/apps` to the app menu: writes `.desktop` entries for the folders in `~/apps` so other launchers see them too.
 - Speed test: network (Cloudflare) or disk (512 MB in your home folder); the result comes as a notification.
+
+**Activity circles**: a second small pill to the right of the notch shows what is switched on right now (not background
+apps): reminders (a ring that drains; click for the time left and message, the cross cancels), muted microphone, recording,
+file auto mover, passwordless sudo (ring while the 5 minutes run), night light and do not disturb. Hover names the thing,
+click turns it off. State comes from small files in `~/.local/state/torii/` that the `torii-*` scripts write, so it follows
+changes made from a terminal too.
+
+**Keys outside the launcher**: `mainMod+SHIFT+3` screenshot of the screen, `+4` of a zone, `+5` starts/stops a recording.
+Moving a window to workspace 3, 4 or 5 is `mainMod+CTRL+3/4/5` because of that; the other workspaces keep `SHIFT`.
 
 **Setup** menu: open any Hyprland/shell/kitty/tmux/nvim/zsh config in the editor (`Configs`); choose the default
 browser, editor, files app and terminal (`Defaults`, `torii-default`; Hyprland binds and uwsm read
-`~/.local/state/torii/defaults.env`); night light (`torii-nightlight`, needs `hyprsunset`: temperature, manual or daily
-schedule); network and Bluetooth (same backends as the control panel); default input and output device.
+`~/.local/state/torii/defaults.env`); night light (`torii-nightlight`: temperature, manual or daily schedule; method `GPU` uses `hyprsunset`, `Screen overlay` lays a warm
+transparent layer over every screen, which also tints blacks slightly); network and Bluetooth (same backends as the control panel); default input and output device.
 `~/apps` folders are listed under Apps. A `Windows app` manifest runs through Bottles:
 `{"name": "Notepad++", "bottle": "Soft", "program": "npp.exe"}`.
 

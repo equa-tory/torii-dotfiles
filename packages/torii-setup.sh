@@ -31,6 +31,27 @@ say "App manifests for the launcher (~/apps)"
 bash "$REPO/packages/apps-sync.sh"
 
 if [[ $SKIP_SYSTEM != 1 ]]; then
+  say "Temporary passwordless sudo: reset at boot and shutdown (torii-sudo)"
+  unit=$(cat <<'UNIT'
+[Unit]
+Description=Remove the temporary passwordless sudo rule made by torii-sudo
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/rm -f /etc/sudoers.d/90-torii-nopasswd
+ExecStop=/usr/bin/rm -f /etc/sudoers.d/90-torii-nopasswd
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+)
+  if ! diff -q <(printf '%s\n' "$unit") /etc/systemd/system/torii-sudo-reset.service >/dev/null 2>&1; then
+    printf '%s\n' "$unit" | $SUDO tee /etc/systemd/system/torii-sudo-reset.service >/dev/null
+    $SUDO systemctl daemon-reload
+  fi
+  $SUDO systemctl enable torii-sudo-reset.service >/dev/null 2>&1 || echo "!!  could not enable torii-sudo-reset.service"
+
   say "Docker service"
   if command -v docker >/dev/null 2>&1; then
     $SUDO systemctl enable --now docker.service || echo "!!  could not enable docker.service"
