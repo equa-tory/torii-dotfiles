@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""torii-apps list  -  mac-style apps for the launcher.
+"""torii-apps list | generate | desktop | run <folder>  -  mac-style apps for the launcher.
 
-Every folder directly inside ~/apps (apps.dir in ~/.config/torii/config.json) is an app when it holds an app.json:
+Every folder directly inside ~/apps (apps.dir in ~/.config/torii/config.json) is an app. It is described by a .desktop
+file inside that folder (~/apps/v2rayN/v2rayN.desktop) or by an app.json:
 
-  ~/apps/v2rayN/app.json
-  {
-    "name": "v2rayN",                      optional, defaults to the folder name
-    "exec": "v2rayN-linux-64/v2rayN",      required: command, relative to the folder (string or list)
-    "bottle": "Games", "program": "x.exe"  instead of exec: a Windows program run by Bottles (bottles-cli)
-    "icon": "icon.png",                    optional: file in the folder, or an icon-theme name
-    "keywords": ["vpn", "proxy"],          optional
-    "description": "Proxy client"          optional
-  }
+  ~/apps/foo/app.json
+  { "name": "Foo", "exec": "bin/foo", "icon": "icon.png", "keywords": ["x"], "description": "..." }
+  { "name": "Notepad++", "bottle": "Soft", "program": "npp.exe" }      a Windows program run by Bottles
 
-  torii-apps list | desktop | run <folder>
-  list     JSON array for the launcher
-  desktop  write ~/.local/share/applications/torii-app-*.desktop for these apps (other launchers and xdg-open see them)
-  run      start one (used by those desktop files)
-Prints a JSON array. Nothing is moved or installed: the folder stays exactly where it is.
+  list      JSON array for the launcher. Folders without either file get a .desktop first (generate)
+  generate  look for the program in a folder that has no description yet (an executable named like the folder, at most two
+            levels down) and write <folder>/<program>.desktop for it, with its icon. Existing files are never touched.
+  desktop   copy these apps to ~/.local/share/applications/torii-app-*.desktop so other launchers and xdg-open see them
+  run       start one by folder name (used by those entries)
+Nothing is moved or installed: the folders stay exactly where they are.
 """
 import json
 import os
+import re
+import shlex
 import sys
 from pathlib import Path
+
+ICON_EXT = (".png", ".svg", ".xpm")
 
 
 def apps_dir():
@@ -34,44 +34,125 @@ def apps_dir():
     return Path(os.path.expanduser(d))
 
 
-def scan():
+def folders():
     root = apps_dir()
+    return sorted(p for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")) if root.is_dir() else []
+
+
+# ---------------------------------------------------------------- generate
+def is_program(p):
+    try:
+        if not p.is_file() or not os.access(p, os.X_OK) or p.suffix.lower() in (".so", ".png", ".icns", ".svg", ".json", ".txt", ".dll"):
+            return False
+        with open(p, "rb") as f:
+            head = f.read(4)
+        return head.startswith(b"\x7fELF") or head.startswith(b"#!")
+    except OSError:
+        return False
+
+
+def find_program(folder):
+    token = re.split(r"[-_ .]", folder.name.lower())[0]
+    found = []
+    for depth_glob in ("*", "*/*"):
+        for p in folder.glob(depth_glob):
+            if is_program(p) and p.name.lower().startswith(token):
+                found.append(p)
+    # the biggest one is the real program (not a helper that happens to share the prefix)
+    return max(found, key=lambda p: p.stat().st_size) if found else None
+
+
+def find_icon(folder, program):
+    stem = program.stem.lower()
+    best = None
+    for p in list(folder.glob("*")) + list(folder.glob("*/*")):
+        if p.suffix.lower() in ICON_EXT and p.stem.lower().startswith(stem[:4]):
+            if best is None or p.suffix.lower() == ".png" and best.suffix.lower() != ".png":
+                best = p
+    return str(best) if best else "application-x-executable"
+
+
+def quote(path):
+    s = str(path)
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"' if re.search(r'[\s"\'\\$`]', s) else s
+
+
+def generate():
+    made = []
+    for d in folders():
+        if (d / "app.json").is_file() or list(d.glob("*.desktop")):
+            continue
+        prog = find_program(d)
+        if not prog:
+            continue
+        out = d / (prog.stem + ".desktop")
+        out.write_text(
+            "[Desktop Entry]\nType=Application\nVersion=1.0\n"
+            f"Name={prog.stem}\nComment=App from {d.parent.name}/{d.name}\nIcon={find_icon(d, prog)}\n"
+            f"Path={prog.parent}\nExec={quote(prog)}\nTerminal=false\nCategories=Utility;\n")
+        made.append(str(out))
+    return made
+
+
+# ---------------------------------------------------------------- scan
+def read_desktop(f):
+    keys, in_entry = {}, False
+    try:
+        for line in f.read_text(errors="replace").splitlines():
+            if line.startswith("["):
+                in_entry = line.strip() == "[Desktop Entry]"
+            elif in_entry and "=" in line and not line.startswith("#"):
+                k, _, v = line.partition("=")
+                keys.setdefault(k.strip(), v.strip())
+    except OSError:
+        return None
+    if keys.get("NoDisplay", "").lower() == "true" or keys.get("Hidden", "").lower() == "true":
+        return None
+    cmd = keys.get("Exec", "")
+    cmd = re.sub(r"\s%[a-zA-Z]", "", cmd).replace("%%", "%").strip()
+    return {"name": keys.get("Name") or f.stem, "exec": cmd, "icon": keys.get("Icon", ""), "dir": keys.get("Path", ""),
+            "keywords": [k for k in keys.get("Keywords", "").split(";") if k], "description": keys.get("Comment", "")}
+
+
+def scan():
     out = []
-    if not root.is_dir():
-        return out
-    for d in sorted(p for p in root.iterdir() if p.is_dir()):
+    for d in folders():
+        entries = []
+        for f in sorted(d.glob("*.desktop")):
+            e = read_desktop(f)
+            if e and e["exec"]:
+                entries.append(e)
         manifest = d / "app.json"
-        try:
-            m = json.loads(manifest.read_text())
-        except (OSError, ValueError):
-            continue
-        if not isinstance(m, dict):
-            continue
-        if m.get("bottle") and m.get("program"):
-            ex = "bottles-cli run -b '%s' -p '%s'" % (m["bottle"], m["program"])
-        elif m.get("exec"):
-            ex = m["exec"]
-            ex = " ".join(ex) if isinstance(ex, list) else str(ex)
-        else:
-            continue
-        icon = str(m.get("icon", ""))
-        if icon and (d / icon).is_file():
-            icon = str(d / icon)
-        out.append({
-            "name": str(m.get("name") or d.name),
-            "exec": ex,
-            "dir": str(d),
-            "icon": icon,
-            "keywords": [str(k) for k in m.get("keywords", []) if isinstance(k, (str, int))],
-            "description": str(m.get("description", "")),
-        })
+        if not entries and manifest.is_file():
+            try:
+                m = json.loads(manifest.read_text())
+            except (OSError, ValueError):
+                m = None
+            if isinstance(m, dict):
+                if m.get("bottle") and m.get("program"):
+                    ex = "bottles-cli run -b '%s' -p '%s'" % (m["bottle"], m["program"])
+                elif m.get("exec"):
+                    ex = m["exec"]
+                    ex = " ".join(ex) if isinstance(ex, list) else str(ex)
+                else:
+                    ex = ""
+                if ex:
+                    icon = str(m.get("icon", ""))
+                    if icon and (d / icon).is_file():
+                        icon = str(d / icon)
+                    entries.append({"name": str(m.get("name") or d.name), "exec": ex, "icon": icon, "dir": "",
+                                    "keywords": [str(k) for k in m.get("keywords", []) if isinstance(k, (str, int))],
+                                    "description": str(m.get("description", ""))})
+        for e in entries:
+            icon = e["icon"]
+            if icon and not icon.startswith("/") and (d / icon).is_file():
+                icon = str(d / icon)
+            out.append({**e, "icon": icon, "dir": e["dir"] or str(d), "folder": d.name})
     return out
 
 
 def desktop_sync():
-    """Write ~/.local/share/applications/torii-app-<name>.desktop for every manifest so other launchers and
-    xdg-open see the apps too; entries of apps that are gone are removed. Returns how many exist."""
-    import re
+    """~/.local/share/applications/torii-app-<name>.desktop for every app; entries of apps that are gone are removed."""
     target = Path.home() / ".local/share/applications"
     target.mkdir(parents=True, exist_ok=True)
     keep = set()
@@ -79,12 +160,10 @@ def desktop_sync():
         slug = re.sub(r"[^a-z0-9]+", "-", a["name"].lower()).strip("-") or "app"
         f = target / f"torii-app-{slug}.desktop"
         keep.add(f.name)
-        icon = a["icon"] or "application-x-executable"
-        folder = Path(a["dir"]).name
         f.write_text(
             "[Desktop Entry]\nType=Application\nVersion=1.0\n"
-            f"Name={a['name']}\nComment={a['description'] or 'App from ~/apps'}\nIcon={icon}\n"
-            f"Path={a['dir']}\nExec={Path.home()}/.config/torii/bin/torii-apps run {folder}\nTerminal=false\n"
+            f"Name={a['name']}\nComment={a['description'] or 'App from ~/apps'}\nIcon={a['icon'] or 'application-x-executable'}\n"
+            f"Path={a['dir']}\nExec={Path.home()}/.config/torii/bin/torii-apps run {shlex.quote(a['folder'])} {shlex.quote(a['name'])}\nTerminal=false\n"
             f"Keywords={';'.join(a['keywords'])};\nX-Torii-App=true\n")
     for old in target.glob("torii-app-*.desktop"):
         if old.name not in keep:
@@ -93,16 +172,21 @@ def desktop_sync():
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["list"]:
+    a = sys.argv[1:]
+    if a == ["list"]:
+        generate()
         print(json.dumps(scan()))
-    elif sys.argv[1:2] == ["run"] and len(sys.argv) == 3:
-        for a in scan():
-            if Path(a["dir"]).name == sys.argv[2]:
-                os.chdir(a["dir"])
-                os.execvp("sh", ["sh", "-c", 'PATH="$PWD:$PATH"; exec ' + a["exec"]])
-        sys.exit("no app folder named " + sys.argv[2])
-    elif sys.argv[1:] == ["desktop"]:
+    elif a == ["generate"]:
+        print("\n".join(generate()))
+    elif a == ["desktop"]:
+        generate()
         print(desktop_sync())
+    elif a[:1] == ["run"] and len(a) in (2, 3):
+        for app in scan():
+            if app["folder"] == a[1] and (len(a) == 2 or app["name"] == a[2]):
+                os.chdir(app["dir"])
+                os.execvp("sh", ["sh", "-c", 'PATH="$PWD:$PATH"; exec ' + app["exec"]])
+        sys.exit("no app named " + " ".join(a[1:]))
     else:
         print(__doc__)
         sys.exit(2)

@@ -66,7 +66,8 @@ Singleton {
     property var emojiNodes: []
     readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fTrans]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
-    Connections { target: Config; function onNotchChanged() { root.bump(); } }
+    readonly property string shapeNow: Config.notch.shape
+    onShapeNowChanged: bump()
     Connections {
         target: Live
         function onRemindersChanged() { root.bump(); }
@@ -96,6 +97,22 @@ Singleton {
         // lists that come from live data (apps, networks, devices) keep their own order
         return node.sorted ? c : ordered(node.id, c);
     }
+
+    // the node chain for a list of ids, rebuilt from scratch so every node sees the current state
+    function resolve(ids) {
+        const nodes = [];
+        let list = rootNodes();
+        for (const id of ids) {
+            const n = list.find(x => x.id === id);
+            if (!n) break;
+            nodes.push(n);
+            list = childrenOf(n);
+        }
+        return nodes;
+    }
+
+    // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
+    property var memory: ({})
 
     function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), setupMenu()]); }
     function isMenu(n) { return n.children !== undefined; }
@@ -144,7 +161,7 @@ Singleton {
     function human(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
 
     function triggerMenu() {
-        const t = { automove: Live.automove, dnd: Live.dnd, recording: Live.recording, hypr: Live.hypr, shape: Config.notch.shape };
+        const t = { automove: Live.automove, dnd: Live.dnd, recording: Live.recording, hypr: Live.hypr, shape: shapeNow };
         const hyprBin = bin("torii-hypr");
         return { id: "trigger", name: "Trigger", glyph: Icons.flash, sub: "Capture, convert, remind, switches", children: () => [
             captureMenu(t),
@@ -164,7 +181,9 @@ Singleton {
               sub: t.automove.enabled ? "Moving new files to " + (t.automove.to || "").replace(home, "~") : "Downloads → " + (t.automove.to || "your inbox folder").replace(home, "~"),
               badge: t.automove.enabled ? "On" : "Off", keep: true, run: () => toggle([bin("torii-automove"), t.automove.enabled ? "off" : "on"]) },
             { id: "mic", name: "Microphone", glyph: Audio.sourceMuted ? Icons.micOff : Icons.mic, keywords: "input mic mute unmute",
-              sub: Audio.sourceMuted ? "Muted" : "Listening", badge: Audio.sourceMuted ? "Off" : "On", keep: true, run: () => Audio.toggleSourceMute() },
+              sub: !Audio.sourceNode && !Audio.mock ? "No microphone found" : Audio.sourceMuted ? "Muted" : "Listening",
+              badge: !Audio.sourceNode && !Audio.mock ? "" : Audio.sourceMuted ? "Off" : "On", keep: true,
+              run: () => { if (Audio.sourceNode || Audio.mock) Audio.toggleSourceMute(); else say("No microphone found"); } },
             { id: "dnd", name: "Do not disturb", glyph: t.dnd ? Icons.bellOff : Icons.bell, keywords: "notifications silence",
               sub: "Notifications", badge: t.dnd ? "On" : "Off", keep: true, run: () => toggle(["swaync-client", "-d", "-sw"]) },
             { id: "dark", name: "Dark mode", glyph: Icons.themeDark, keywords: "light theme appearance",

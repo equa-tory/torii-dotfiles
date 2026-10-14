@@ -12,8 +12,8 @@ Item {
 
     readonly property int maxRows: 9
     readonly property real rowH: 46
-    property var path: []                 // menu nodes we are inside of
-    property var picks: []                // selected index at each level, to land back on the same row
+    property var pathIds: []              // ids of the menus we are inside of
+    property var path: []                 // those menus as nodes, rebuilt on every update so they never go stale
     property bool expanded: false
     property var results: []              // [{ node, trail }]
     property int selected: 0
@@ -47,6 +47,8 @@ Item {
     // rebuild the list; keepSel keeps the highlighted row when only the data changed
     function update(keepSel) {
         if (asking) { results = []; return; }
+        path = Menus.resolve(pathIds);
+        if (path.length < pathIds.length) pathIds = pathIds.slice(0, path.length);
         const q = input.text.trim();
         const prev = keepSel && results[selected] ? results[selected].node.id : null;
         let out = [];
@@ -70,7 +72,20 @@ Item {
         results = out.slice(0, 40);
         const at = prev === null ? -1 : results.findIndex(r => r.node.id === prev);
         selected = at >= 0 ? at : Math.min(selected, Math.max(0, results.length - 1));
-        if (!keepSel) { selected = 0; list.positionViewAtBeginning(); }
+        if (!keepSel) {
+            // back in a menu: land on the row you were on last time
+            const want = q === "" ? Menus.memory[pathIds.join("/")] : undefined;
+            const at2 = want === undefined ? -1 : results.findIndex(r => r.node.id === want);
+            selected = at2 >= 0 ? at2 : 0;
+            list.positionViewAtIndex(selected, ListView.Contain);
+        }
+    }
+
+    function remember() {
+        if (input.text.trim() !== "" || !results[selected]) return;
+        const m = Object.assign({}, Menus.memory);
+        m[pathIds.join("/")] = results[selected].node.id;
+        Menus.memory = m;
     }
 
     Connections { target: Menus; function onRevChanged() { root.update(true); } }
@@ -83,24 +98,22 @@ Item {
         if (results.length === 0) return;
         selected = (selected + d + results.length) % results.length;
         list.positionViewAtIndex(selected, ListView.Contain);
+        remember();
     }
 
     function enter(node) {
-        picks = picks.concat([selected]);
-        path = path.concat([node]);
+        remember();
+        pathIds = pathIds.concat([node.id]);
         input.text = "";
         expanded = true;
         update(false);
     }
 
     function back() {
-        const at = picks.length ? picks[picks.length - 1] : 0;
-        path = path.slice(0, -1);
-        picks = picks.slice(0, -1);
+        remember();
+        pathIds = pathIds.slice(0, -1);
         input.text = "";
         update(false);
-        selected = Math.min(at, Math.max(0, results.length - 1));
-        list.positionViewAtIndex(selected, ListView.Contain);
     }
 
     function activate(right) {
@@ -109,6 +122,7 @@ Item {
         const menu = n.children !== undefined;
         if (menu && (right || !n.run)) { enter(n); return; }
         if (!n.run) return;
+        remember();
         n.run();
         if (!n.keep) Panels.close();
     }
@@ -137,7 +151,7 @@ Item {
             Glyph { text: root.scope && root.scope.glyph ? root.scope.glyph : Icons.search; size: 17; color: Theme.accent }
 
             Label {
-                visible: root.path.length > 0 && !root.asking
+                visible: root.pathIds.length > 0 && !root.asking
                 text: root.path.map(n => n.name).join(" › ") + " ›"
                 color: Theme.accent
             }
@@ -179,7 +193,7 @@ Item {
                     if (input.cursorPosition > 0 || input.selectionStart !== input.selectionEnd) { event.accepted = false; return; }
                     if (root.asking) { Menus.endPrompt(); return; }
                     if (input.text !== "") return;
-                    if (root.path.length) root.back();
+                    if (root.pathIds.length) root.back();
                     else if (root.expanded) root.expanded = false;
                     else Panels.close();
                 }
@@ -329,7 +343,7 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onEntered: root.selected = row.index
+                onEntered: { root.selected = row.index; root.remember(); }
                 onClicked: { root.selected = row.index; root.activate(false); }
             }
         }

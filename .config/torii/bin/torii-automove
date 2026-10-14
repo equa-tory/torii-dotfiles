@@ -113,10 +113,10 @@ def main(a):
         s = load()
         print(json.dumps({"enabled": bool(s.get("enabled")), "since": s.get("since", 0), "from": str(src), "to": str(dst)}))
     elif cmd == "on":
-        save({"enabled": True, "since": time.time()})
+        save({"enabled": True, "since": time.time(), "from": str(src), "to": str(dst)})
         unit("start")
     elif cmd == "off":
-        save({"enabled": False, "since": load().get("since", 0)})
+        save({"enabled": False, "since": load().get("since", 0), "from": str(src), "to": str(dst)})
         unit("stop")
     elif cmd == "apply":
         if load().get("enabled"):

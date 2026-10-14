@@ -110,7 +110,7 @@ Moving a window to workspace 3, 4 or 5 is `mainMod+CTRL+3/4/5` because of that; 
 browser, editor, files app and terminal (`Defaults`, `torii-default`; Hyprland binds and uwsm read
 `~/.local/state/torii/defaults.env`); night light (`torii-nightlight`: temperature, manual or daily schedule; method `GPU` uses `hyprsunset`, `Screen overlay` lays a warm
 transparent layer over every screen, which also tints blacks slightly); network and Bluetooth (same backends as the control panel); default input and output device.
-`~/apps` folders are listed under Apps. A `Windows app` manifest runs through Bottles:
+`~/apps` folders are listed under Apps: each folder is described by a `.desktop` file inside it (`~/apps/v2rayN-linux-64/v2rayN.desktop`). A folder without one gets it generated (`torii-apps generate`, run every time the launcher scans): the executable named like the folder, up to two levels down, and its icon. A `Windows app` manifest runs through Bottles:
 `{"name": "Notepad++", "bottle": "Soft", "program": "npp.exe"}`.
 
 **Quicklinks** live in `~/.config/torii/quicklinks.json` (hot-reloaded; type `quicklinks` in the launcher to edit):
@@ -155,3 +155,5 @@ Wallpapers you add go to `~/Pictures/wallpapers`, which is a real directory and 
 
 Notifications (swaync keeps running; never run two daemons), lock screen, OSD popups, per-app volume. Bluetooth pairing is
 "just works" only, because Quickshell has no PIN/passkey agent.
+
+Each menu remembers the row you were on, so going back and forward lands where you left off (kept while the shell runs, nothing is written to disk).
