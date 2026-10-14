@@ -9,7 +9,6 @@ hyprpaper
 neovim
 noto-fonts
 stow
-swaync
 tmux
 ttf-jetbrains-mono-nerd
 ripgrep
@@ -88,3 +87,4 @@ wf-recorder
 libnotify
 unicode-emoji
 noto-fonts-emoji
+sound-theme-freedesktop

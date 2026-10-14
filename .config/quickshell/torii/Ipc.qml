@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
 // qs -c torii ipc call <target> <function>
 Scope {
@@ -23,5 +24,10 @@ Scope {
     IpcHandler {
         target: "switcher"
         function toggle(): void { Panels.toggle("switcher"); }
+    }
+    IpcHandler {
+        target: "notifs"
+        function dnd(): void { Notifs.toggleDnd(); }
+        function clear(): void { Notifs.clear(); }
     }
 }

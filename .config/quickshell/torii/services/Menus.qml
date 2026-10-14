@@ -86,6 +86,7 @@ Singleton {
         function onHyprChanged() { root.bump(); }
         function onDndChanged() { root.bump(); }
     }
+    Connections { target: Notifs; function onHistoryChanged() { root.bump(); } function onUnreadChanged() { root.bump(); } function onDndChanged() { root.bump(); } }
     Connections { target: Todo; function onItemsChanged() { root.bump(); } function onSortDoneChanged() { root.bump(); } }
     property string darkNow: ""             // shown at once when you toggle dark mode, until the theme catches up
     Connections { target: Theme; function onModeChanged() { root.darkNow = ""; } }
@@ -150,7 +151,7 @@ Singleton {
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
-    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), weatherNode(), calendarNode(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()]); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()]); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
@@ -203,6 +204,18 @@ Singleton {
                  sub: Weather.available ? Math.round(Weather.temp) + "°  ·  " + Weather.describe(Weather.code) : "Forecast", keep: true,
                  run: () => Panels.open("weather") };
     }
+    function notificationsMenu() {
+        const h = Notifs.history;
+        return { id: "notifications", name: "Notifications", glyph: Notifs.dnd ? Icons.bellOff : Icons.bell, keywords: "messages alerts inbox history do not disturb",
+                 sub: h.length ? h[0].summary : "Nothing new", badge: Notifs.badgeVisible ? String(Notifs.unread) : "", sorted: true,
+                 onOpen: () => Notifs.markRead(),
+                 children: () => [
+            { id: "dnd", name: "Do not disturb", glyph: Notifs.dnd ? Icons.bellOff : Icons.bell, badge: Notifs.dnd ? "On" : "Off", keep: true, run: () => Notifs.toggleDnd() },
+            { id: "clear", name: "Clear all", glyph: Icons.trash, keep: true, run: () => Notifs.clear() } ].concat(
+                h.map(e => ({ id: "n" + e.uid, name: e.summary || e.app, glyph: Icons.bell, icon: (e.icon || "").indexOf("image:") === 0 ? undefined : (e.icon || undefined),
+                              sub: [e.app, e.body.split("\n")[0], Notifs.ago(e.time)].filter(x => x).join("  ·  "),
+                              run: () => Notifs.activate(e) }))) };
+    }
     function calendarNode() {
         return { id: "calendar", name: "Calendar", glyph: Icons.calendar, keywords: "date month day", sub: "This month", keep: true,
                  run: () => Panels.open("calendar") };
@@ -232,7 +245,7 @@ Singleton {
               badge: !Audio.sourceNode && !Audio.mock ? "" : Audio.sourceMuted ? "Off" : "On", keep: true,
               run: () => { if (Audio.sourceNode || Audio.mock) Audio.toggleSourceMute(); else say("No microphone found"); } },
             { id: "dnd", name: "Do not disturb", glyph: t.dnd ? Icons.bellOff : Icons.bell, keywords: "notifications silence",
-              sub: "Notifications", badge: t.dnd ? "On" : "Off", keep: true, run: () => toggle(["swaync-client", "-d", "-sw"]) },
+              sub: "Notifications", badge: t.dnd ? "On" : "Off", keep: true, run: () => Notifs.toggleDnd() },
             { id: "dark", name: "Dark mode", glyph: Icons.themeDark, keywords: "light theme appearance",
               badge: (darkNow || Theme.mode) === "dark" ? "On" : "Off", keep: true,
               run: () => { darkNow = (darkNow || Theme.mode) === "dark" ? "light" : "dark"; sh([bin("torii-theme"), "mode", darkNow]); } },

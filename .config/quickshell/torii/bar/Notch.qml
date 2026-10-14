@@ -82,6 +82,7 @@ PanelWindow {
                 launcher: win.panelHere && Panels.panel === "launcher"
             }
             VolumeOsd { anchors.verticalCenter: parent.verticalCenter }
+            NotifyOsd { anchors.verticalCenter: parent.verticalCenter }
             ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
         }
 

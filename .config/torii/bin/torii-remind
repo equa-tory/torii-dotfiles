@@ -39,6 +39,7 @@ def arm(item):
 
 def notify(msg):
     subprocess.run(["notify-send", "-a", "torii", "-u", "critical", "Reminder", msg or "Time is up"], check=False)
+    subprocess.run([os.path.join(os.path.dirname(os.path.abspath(__file__)), "torii-sound"), "reminder"], check=False)
 
 
 def main(a):

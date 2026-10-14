@@ -41,6 +41,7 @@ Item {
         Apps.refresh();
         Menus.invalidate();
         Menus.endPrompt();
+        if (Panels.launcherPath.length) { pathIds = Panels.launcherPath; Panels.launcherPath = []; expanded = true; }
         update(false);
         input.forceActiveFocus();
     }
@@ -173,6 +174,7 @@ Item {
 
     function enter(node, chain) {
         remember();
+        if (node.onOpen) node.onOpen();
         Menus.touch((chain || pathIds).concat([node.id]));
         pathIds = (chain || pathIds).concat([node.id]);
         input.text = "";

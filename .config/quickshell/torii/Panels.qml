@@ -11,6 +11,7 @@ Singleton {
 
     property string panel: ""        // "" | control | launcher | switcher | weather | calendar
     property string panelScreen: ""
+    property var launcherPath: []    // menu ids the launcher opens inside of next time (e.g. ["notifications"])
 
     // wallpaper shown while the switcher previews (focused monitor only), "" = the real one
     property string previewWallpaper: ""
@@ -35,6 +36,8 @@ Singleton {
         panelScreen = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";
         panel = name;
     }
+
+    function openLauncherAt(ids) { launcherPath = ids; open("launcher"); }
 
     function close() {
         panel = "";

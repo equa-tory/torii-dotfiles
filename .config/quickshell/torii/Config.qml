@@ -18,6 +18,11 @@ Singleton {
     readonly property var theme: adapter.theme
     readonly property var font: adapter.font
     readonly property var launcher: adapter.launcher
+    readonly property var notifications: adapter.notifications
+    readonly property var sounds: adapter.sounds
+    readonly property var activities: adapter.activities
+    readonly property var media: adapter.media
+    readonly property var widgets: adapter.widgets
     readonly property string quicklinks: adapter.quicklinks
 
     function expand(path) {
@@ -68,6 +73,28 @@ Singleton {
                 property bool rememberForward: true    // entering a menu again lands on the row you left there
                 property bool menuHistory: true        // menus you used before rank higher while you search
                 property string placeholder: "Search apps  ·  ↓ opens the menus"
+            }
+            property JsonObject notifications: JsonObject {
+                property real popupSeconds: 5          // how long a notification stays in the notch
+                property bool badgeInDnd: false        // show the unread count while do not disturb is on
+            }
+            property JsonObject sounds: JsonObject {
+                // a file name inside ~/.config/torii/sounds/, or an absolute path; empty or missing = silent
+                property string reminder: "reminder.oga"
+                property string notification: "notification.oga"
+                property real volume: 0.8
+            }
+            property JsonObject activities: JsonObject {
+                property string side: "right"          // right | left of the notch
+                property string style: "pill"          // pill (one round pill) | circles (one circle each)
+            }
+            property JsonObject media: JsonObject {
+                property int seekSeconds: 10           // Left/Right while the media activity is open
+            }
+            property JsonObject widgets: JsonObject {
+                // shown only while the launcher or the control panel is open: system, claude, battery
+                property var left: ["system"]
+                property var right: ["claude", "battery"]
             }
             property string quicklinks: "~/.config/torii/quicklinks.json"
         }

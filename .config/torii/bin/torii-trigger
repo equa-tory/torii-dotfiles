@@ -26,7 +26,7 @@ def js(text, default):
 def status():
     return {
         "automove": js(out(str(BIN / "torii-automove"), "status"), {"enabled": False}),
-        "dnd": out("swaync-client", "-D") == "true",
+        "dnd": js((Path.home() / ".local/state/torii/notifications.json").read_text() if (Path.home() / ".local/state/torii/notifications.json").exists() else "{}", {}).get("dnd") is True,
         "recording": subprocess.run(["pgrep", "-x", "wf-recorder"], capture_output=True).returncode == 0,
         "hypr": js(out(str(BIN / "torii-hypr"), "status"), {}),
         "shape": js(out(str(BIN / "torii-config"), "get", "notch.shape"), None) or "attached",

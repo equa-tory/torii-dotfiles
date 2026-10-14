@@ -68,7 +68,7 @@ Row {
                 else if (kind === "rec") root.run([root.bin + "torii-capture", "record"]);
                 else if (kind === "automove") root.run([root.bin + "torii-automove", "off"]);
                 else if (kind === "night") root.run([root.bin + "torii-nightlight", "off"]);
-                else if (kind === "dnd") root.run(["swaync-client", "-d", "-sw"]);
+                else if (kind === "dnd") Notifs.toggleDnd();
                 else if (kind === "sudo") root.run(["sh", "-c", "echo | " + root.bin + "torii-sudo off"]);
             }
             onClosed: { Live.expanded = ""; root.run([root.bin + "torii-remind", "cancel", r.id]); }

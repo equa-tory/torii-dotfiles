@@ -5,7 +5,7 @@ import Quickshell.Io
 import QtQuick
 
 // What is switched on right now, read from small state files that the torii-* scripts write (watched, so a change
-// shows up in the notch and in the launcher within a moment) plus swaync's do-not-disturb stream.
+// shows up in the notch and in the launcher within a moment) and the do-not-disturb switch (kept by Notifs).
 Singleton {
     id: root
 
@@ -17,7 +17,7 @@ Singleton {
     property var recordingState: ({ on: false })
     property var sudoState: ({ on: false, until: 0 })
     property var hypr: ({ layout: "dwindle", gaps_in: 8, gaps_out: 20 })
-    property bool dnd: false
+    readonly property bool dnd: Notifs.dnd          // the notification server lives in Notifs
 
     property real now: Date.now()
     property string expanded: ""                                // key of the notch indicator that is open
@@ -55,13 +55,4 @@ Singleton {
     FileView { id: fvHypr; path: root.dir + "/hypr-user.json"; watchChanges: true; printErrors: false
                onFileChanged: reload(); onLoaded: root.hypr = Object.assign({ layout: "dwindle", gaps_in: 8, gaps_out: 20 }, root.parse(text(), {})) }
 
-    // do not disturb: swaync prints one JSON line per change
-    Process {
-        id: dndWatch
-        running: true
-        command: ["stdbuf", "-oL", "swaync-client", "-s"]
-        stdout: SplitParser { onRead: line => { const j = root.parse(line, null); if (j && j.dnd !== undefined) root.dnd = j.dnd; } }
-        onExited: retry.start()
-    }
-    Timer { id: retry; interval: 10000; onTriggered: dndWatch.running = true }
 }

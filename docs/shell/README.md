@@ -93,7 +93,7 @@ It reloads while the launcher is closed.
   downloads and files that existed before you switched it on, and never creates the folder when the share is not mounted.
   A `.zip` is unzipped once (archive order) into `<to>/_/<zip name>/` (`automove.unzipDir`, relative to `to` or absolute) and the
   zip is deleted; a broken zip stays and you get a notification; every other file lands in `<to>` itself.
-- Switches: mute microphone, do not disturb (swaync), dark mode, menu bar shape (floating or attached), workspace layout
+- Switches: mute microphone, do not disturb, dark mode, menu bar shape (floating or attached), workspace layout
   (dwindle, master, scrolling) and window gaps (`torii-hypr`, remembered across logins).
 - Passwordless sudo (`torii-sudo`): for 5 minutes or until reboot. The launcher asks for your password once (masked, never
   stored); the rule is `/etc/sudoers.d/90-torii-nopasswd`, checked with `visudo`. A root timer removes it after 5 minutes and
@@ -173,7 +173,7 @@ Wallpapers you add go to `~/Pictures/wallpapers`, which is a real directory and 
 
 ## Not built (by design)
 
-Notifications (swaync keeps running; never run two daemons), lock screen, OSD popups, per-app volume. Bluetooth pairing is
+Lock screen, per-app volume. Bluetooth pairing is
 "just works" only, because Quickshell has no PIN/passkey agent.
 
 Each menu remembers the row you were on, so going back and forward lands where you left off (kept while the shell runs, nothing is written to disk).
@@ -191,3 +191,12 @@ the weather (`torii-claude-usage`, read-only: it never refreshes the token). **V
 **Terminal/prompt colours**: `torii-theme` builds a five-step gradient from the wallpaper's primary → secondary → tertiary
 colour (`ramp1`…`ramp5` in `tokens.json`); kitty's colours except red, nvim's blue/teal/green and the powerlevel10k prompt use it
 (`~/.local/state/torii/theme/p10k-colors.zsh`, picked up by open shells at the next prompt).
+
+**Notifications** are shown by the shell (it is the notification server, swaync is not started any more; remove it with
+`pacman -Rns swaync`). A new one slides open at the right end of the notch for `notifications.popupSeconds` (5): click
+runs its default action or brings the app forward, right click dismisses, hovering keeps it. The last 100 are kept in
+the launcher's Notifications menu (and the bell in the control panel opens it); the badge counts the unread ones and is
+hidden while do not disturb is on (`notifications.badgeInDnd`). Do not disturb also hides the other activities (only its own
+circle stays) and silences the pop-ups and sounds, except critical ones.
+Sounds (`torii-sound`): `sounds.reminder` / `sounds.notification` in `config.json` are file names in `~/.config/torii/sounds/`
+(drop your own there) or absolute paths; missing files fall back to the freedesktop theme. `sounds.volume` is 0–1.

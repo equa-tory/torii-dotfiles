@@ -57,6 +57,7 @@ Singleton {
     readonly property string eyedropper: g(0xF020A)
     readonly property string emoji: g(0xF01F5)
     readonly property string bell: g(0xF009C)
+    readonly property string bellRing: g(0xF009E)
     readonly property string bellOff: g(0xF009D)
     readonly property string timer: g(0xF13AB)
     readonly property string calendar: g(0xF00ED)
