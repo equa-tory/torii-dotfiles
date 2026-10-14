@@ -6,6 +6,7 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
 fi
 
 # Created by equa for 5.9.1
+bindkey -e   # emacs line editing (Ctrl+A/E, Alt+B/F); zsh would pick vi mode because EDITOR=nvim
 source ~/.config/dotfiles/shellrc
 source ~/.local/share/powerlevel10k/powerlevel10k.zsh-theme
 
@@ -28,3 +29,7 @@ for _p in /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh; do
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 for _p in /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh; do [[ -r $_p ]] && source $_p; done
 unset _p
+
+# Home/End (also what Super+Left/Right send in kitty) and word jumps with Ctrl+arrows
+bindkey '^[[H' beginning-of-line '^[OH' beginning-of-line '^[[F' end-of-line '^[OF' end-of-line
+bindkey '^[[1;5D' backward-word '^[[1;5C' forward-word

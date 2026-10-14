@@ -181,11 +181,11 @@ launcher opens), `rememberBack` / `rememberForward` switch the two row memories 
 used before rank higher while you search (never apps; the counts stay in `~/.local/state/torii/menu-usage.json`; delete the
 file or set it to `false` to reset). Lists scroll smoothly and keep a row of margin, with a soft glow on the edge you can still scroll to.
 
-**Night light fade** (`nightlight.rampMinutes`, default 30, `0` = at once): with a daily schedule the colour eases in from
+**Night light fade** (Setup › Night light › Fade, 0–300 s, default 30, `0` = at once): with a daily schedule the colour eases in from
 nothing to your temperature after the start time and eases out again before the end. Manual on/off and the slider act at once.
 
 **Claude usage**: while the launcher is open and `~/.claude/.credentials.json` exists, a ring with the 5-hour usage sits next to
 the weather (`torii-claude-usage`, read-only: it never refreshes the token). **Volume** changes show for about a second in the notch.
 **Terminal/prompt colours**: `torii-theme` builds a five-step gradient from the wallpaper's primary → secondary → tertiary
-colour (`ramp1`…`ramp5` in `tokens.json`); kitty's blue/magenta/cyan and the powerlevel10k prompt use it
+colour (`ramp1`…`ramp5` in `tokens.json`); kitty's colours except red, nvim's blue/teal/green and the powerlevel10k prompt use it
 (`~/.local/state/torii/theme/p10k-colors.zsh`, picked up by open shells at the next prompt).

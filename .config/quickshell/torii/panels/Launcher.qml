@@ -25,9 +25,14 @@ Item {
     readonly property bool asking: Menus.prompt !== null
     readonly property bool showList: !asking && results.length > 0 && (expanded || input.text.trim() !== "")
     readonly property bool showNotice: Menus.notice !== ""
+    // a menu can ask for a grid (emoji): arrows then move in two dimensions
+    readonly property bool gridMode: scope !== null && scope.grid === true
+    readonly property int cols: 10
+    readonly property real cell: 52
+    readonly property int gridRows: 6
 
     implicitWidth: 560
-    implicitHeight: 66 + (showNotice ? 26 : 0) + (showList ? Math.min(results.length, maxRows) * rowH + 14 : 0)
+    implicitHeight: 66 + (showNotice ? 26 : 0) + (showList ? (gridMode ? Math.min(Math.ceil(results.length / cols), gridRows) * cell + 40 : Math.min(results.length, maxRows) * rowH + 14) : 0)
 
     opacity: 0
     Timer { running: true; interval: 380; onTriggered: root.hintShown = true }
@@ -76,7 +81,7 @@ Item {
                 if (g) out.push({ node: linkNode(g), trail: [] });
             }
         }
-        results = out.slice(0, 40);
+        results = out.slice(0, gridMode ? 500 : 40);
         const at = prev === null ? -1 : results.findIndex(r => r.node.id === prev);
         selected = at >= 0 ? at : Math.min(selected, Math.max(0, results.length - 1));
         if (!keepSel) {
@@ -118,6 +123,7 @@ Item {
 
     // keep the selected row, and one row more on each side, in view; the list glides there
     function ensureVisible(instant) {
+        if (gridMode) { grid.positionViewAtIndex(selected, GridView.Contain); return; }
         const margin = 1;
         const maxY = Math.max(0, list.contentHeight - list.height);
         let y = list.contentY;
@@ -226,12 +232,14 @@ Item {
                 Keys.onDownPressed: event => {
                     if (root.asking) return;
                     if (!root.showList) { if (root.results.length) { root.expanded = true; root.selected = 0; } }
-                    else root.move(1);
+                    else root.move(root.gridMode ? root.cols : 1);
                 }
                 Keys.onUpPressed: event => {
                     if (root.asking) return;
-                    if (input.text.trim() === "" && root.expanded && root.selected === 0) root.expanded = false;
-                    else root.move(-1);
+                    if (root.gridMode && root.selected >= root.cols) { root.move(-root.cols); return; }
+                    if (input.text.trim() === "" && root.expanded && root.selected < (root.gridMode ? root.cols : 1)) root.expanded = false;
+                    else if (!root.gridMode) root.move(-1);
+                    else root.jump(0);
                 }
                 Keys.onTabPressed: root.move(1)
                 Keys.onBacktabPressed: root.move(-1)
@@ -239,12 +247,14 @@ Item {
                 Keys.onEnterPressed: root.asking ? root.submitPrompt() : root.activate(false)
                 Keys.onEscapePressed: { if (root.asking) Menus.endPrompt(); else Panels.close(); }
                 Keys.onRightPressed: event => {
+                    if (!root.asking && root.gridMode && root.showList) { root.move(1); return; }
                     if (!root.asking && root.selectedSlider() && root.showList) { root.adjust(1, event.modifiers & Qt.ShiftModifier); return; }
                     if (root.asking || input.cursorPosition < input.text.length) { event.accepted = false; return; }
                     if (!root.showList) { if (input.text === "" && root.results.length) { root.expanded = true; root.selected = 0; } }
                     else root.activate(true);
                 }
                 Keys.onLeftPressed: event => {
+                    if (!root.asking && root.gridMode && root.showList && root.selected > 0) { root.move(-1); return; }
                     if (!root.asking && root.selectedSlider() && root.showList) { root.adjust(-1, event.modifiers & Qt.ShiftModifier); return; }
                     if (input.cursorPosition > 0 || input.selectionStart !== input.selectionEnd) { event.accepted = false; return; }
                     if (root.asking) { Menus.endPrompt(); return; }
@@ -255,8 +265,8 @@ Item {
                 }
                 Keys.onPressed: event => {
                     if (root.showList && !root.asking) {
-                        if (event.key === Qt.Key_PageDown) { root.jump(root.selected + root.maxRows - 1); event.accepted = true; return; }
-                        if (event.key === Qt.Key_PageUp) { root.jump(root.selected - root.maxRows + 1); event.accepted = true; return; }
+                        if (event.key === Qt.Key_PageDown) { root.jump(root.selected + (root.gridMode ? root.cols * root.gridRows : root.maxRows - 1)); event.accepted = true; return; }
+                        if (event.key === Qt.Key_PageUp) { root.jump(root.selected - (root.gridMode ? root.cols * root.gridRows : root.maxRows - 1)); event.accepted = true; return; }
                         if (input.text === "" && event.key === Qt.Key_Home) { root.jump(0); event.accepted = true; return; }
                         if (input.text === "" && event.key === Qt.Key_End) { root.jump(root.results.length - 1); event.accepted = true; return; }
                     }
@@ -292,7 +302,7 @@ Item {
 
     // a soft glow at the top / bottom edge of the list when there is more to scroll to that way
     Rectangle {
-        readonly property bool more: root.showList && list.contentY > 4
+        readonly property bool more: root.showList && !root.gridMode && list.contentY > 4
         x: list.x; y: list.y; width: list.width; height: 26; z: 6
         opacity: more ? 1 : 0
         visible: opacity > 0
@@ -304,7 +314,7 @@ Item {
         }
     }
     Rectangle {
-        readonly property bool more: root.showList && list.contentHeight - list.height - list.contentY > 4
+        readonly property bool more: root.showList && !root.gridMode && list.contentHeight - list.height - list.contentY > 4
         x: list.x; y: list.y + list.height - height; width: list.width; height: 26; z: 6
         opacity: more ? 1 : 0
         visible: opacity > 0
@@ -318,7 +328,7 @@ Item {
 
     // thin scroll bar, so a longer list is never a surprise
     Rectangle {
-        visible: root.showList && root.results.length > root.maxRows
+        visible: root.showList && !root.gridMode && root.results.length > root.maxRows
         x: parent.width - 9
         y: list.y + 4 + (list.height - 8 - height) * (list.contentHeight - list.height > 0 ? list.contentY / (list.contentHeight - list.height) : 0)
         width: 3
@@ -328,10 +338,60 @@ Item {
         z: 5
     }
 
+    // ---- emoji grid
+    GridView {
+        id: grid
+        visible: root.showList && root.gridMode
+        anchors { left: parent.left; right: parent.right; top: root.showNotice ? notice.bottom : field.bottom; topMargin: 8; leftMargin: 14 + (root.width - 28 - root.cols * root.cell) / 2; rightMargin: 14 + (root.width - 28 - root.cols * root.cell) / 2 }
+        height: Math.min(Math.ceil(root.results.length / root.cols), root.gridRows) * root.cell
+        cellWidth: root.cell
+        cellHeight: root.cell
+        model: root.gridMode ? root.results : []
+        clip: true
+        interactive: false
+        boundsBehavior: Flickable.StopAtBounds
+        highlightMoveDuration: 0
+
+        delegate: Item {
+            required property var modelData
+            required property int index
+            width: root.cell
+            height: root.cell
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 3
+                radius: 10
+                color: index === root.selected ? Theme.surface2 : "transparent"
+                border.width: index === root.selected ? 1 : 0
+                border.color: Theme.accent
+            }
+            Text {
+                anchors.centerIn: parent
+                text: modelData.node.glyph
+                font.pixelSize: 26
+                renderType: Text.CurveRendering
+            }
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                onPositionChanged: root.selected = index
+                onClicked: { root.selected = index; root.activate(false); }
+            }
+        }
+    }
+    Label {
+        visible: root.showList && root.gridMode && root.results[root.selected] !== undefined
+        anchors { left: parent.left; right: parent.right; top: grid.bottom; topMargin: 6; leftMargin: 28; rightMargin: 28 }
+        text: root.results[root.selected] ? root.results[root.selected].node.name + (root.results[root.selected].node.sub ? "  ·  " + root.results[root.selected].node.sub : "") : ""
+        color: Theme.fgDim
+        font.pixelSize: Config.font.size - 1
+        elide: Text.ElideRight
+    }
+
     // ---- results
     ListView {
         id: list
-        visible: root.showList
+        visible: root.showList && !root.gridMode
         anchors { left: parent.left; right: parent.right; top: root.showNotice ? notice.bottom : field.bottom; topMargin: 8; leftMargin: 14; rightMargin: 18 }
         height: Math.min(root.results.length, root.maxRows) * root.rowH
         model: root.results

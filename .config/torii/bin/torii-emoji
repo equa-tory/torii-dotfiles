@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """torii-emoji list | copy <emoji>  -  the emoji picker's data and its action.
 
-  list         JSON [{"c": "😀", "n": "grinning face", "g": "Smileys & Emotion"}] from the unicode-emoji package
+  list         JSON [{"c": "😀", "n": "grinning face", "g": "Smileys & Emotion"}] from the unicode-emoji package,
+               the ones you used last first (group "Recent")
   copy <e>     put it on the clipboard and type it into the window that has focus
 """
 import json
@@ -13,6 +14,7 @@ import time
 from pathlib import Path
 
 SRC = Path("/usr/share/unicode/emoji/emoji-test.txt")
+RECENT = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii")) / "emoji-recent.json"
 CACHE = Path(os.environ.get("TORII_CACHE", Path.home() / ".cache/torii")) / "emoji.json"
 
 
@@ -27,16 +29,36 @@ def build():
     return out
 
 
-def listing():
+def base():
     try:
         if CACHE.stat().st_mtime > SRC.stat().st_mtime:
-            return CACHE.read_text()
-    except OSError:
+            return json.loads(CACHE.read_text())
+    except (OSError, ValueError):
         pass
-    data = json.dumps(build(), ensure_ascii=False)
+    items = build()
     CACHE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE.write_text(data, encoding="utf-8")
-    return data
+    CACHE.write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+    return items
+
+
+def recents():
+    try:
+        return [c for c in json.loads(RECENT.read_text()) if isinstance(c, str)]
+    except (OSError, ValueError):
+        return []
+
+
+def remember(c):
+    RECENT.parent.mkdir(parents=True, exist_ok=True)
+    RECENT.write_text(json.dumps(([c] + [x for x in recents() if x != c])[:40], ensure_ascii=False))
+
+
+def listing():
+    items = base()
+    by = {e["c"]: e for e in items}
+    first = [{**by[c], "g": "Recent"} for c in recents() if c in by]
+    seen = {e["c"] for e in first}
+    return json.dumps(first + [e for e in items if e["c"] not in seen], ensure_ascii=False)
 
 
 if __name__ == "__main__":
@@ -44,6 +66,7 @@ if __name__ == "__main__":
     if a == ["list"]:
         print(listing())
     elif len(a) == 2 and a[0] == "copy":
+        remember(a[1])
         subprocess.run(["wl-copy", a[1]], check=False)
         time.sleep(0.25)                         # focus returns to the previous window when the launcher closes
         subprocess.run(["wtype", a[1]], check=False)

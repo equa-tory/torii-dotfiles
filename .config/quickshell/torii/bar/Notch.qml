@@ -89,8 +89,9 @@ PanelWindow {
             id: panelLoader
             x: win.ear
             y: win.barH
-            width: win.bodyW
-            height: win.panelH
+            // follow the body as it grows or shrinks, so a panel's content never draws outside the black shape
+            width: Math.min(win.bodyW, shape.width - 2 * win.ear)
+            height: Math.min(win.panelH, Math.max(0, shape.height - win.barH))
             active: win.panelHere
             clip: true
             sourceComponent: Panels.panel === "control" ? controlPanel

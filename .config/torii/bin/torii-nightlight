@@ -10,9 +10,10 @@
   auto <HH:MM> <HH:MM>      switch on at the first time and off at the second, every day
   auto off                  manual only
   apply                     restore after login (autostart runs this)
-  tick                      one step of the slow fade (a timer runs it every minute while the colour is moving)
-In auto mode the colour fades in over `nightlight.rampMinutes` (config.json, default 30, 0 = at once) when the window starts
-and fades out the same way before it ends. Manual on/off and the temperature slider act at once.
+  fade <seconds>            how long the automatic fade takes (default 30, 0 = at once)
+  tick                      the fade-out before the end of the window (a timer starts it)
+In auto mode the colour fades in over the fade time when the window starts and fades out the same way before it
+ends (about two steps a second). Manual on/off and the temperature slider act at once.
 State: ~/.local/state/torii/nightlight.json. The daily switches are transient systemd user timers.
 """
 import json
@@ -20,11 +21,12 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
 STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii")) / "nightlight.json"
-DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00", "mode": "gpu"}
+DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00", "mode": "gpu", "fade": 30}
 SELF = os.path.abspath(sys.argv[0])
 
 
@@ -50,17 +52,18 @@ def running():
     return sh("pgrep", "-x", "hyprsunset").returncode == 0
 
 
-SHADER = STATE.with_name("nightlight.frag")
+SHADERS = [STATE.with_name("nightlight-a.frag"), STATE.with_name("nightlight-b.frag")]
+PIDFILE = STATE.with_name("nightlight.pid")
 
 
-def shader_text(kelvin):
+def shader_text(kelvin, strength=None):
     """Multiplies the picture by a warm colour (what real night modes do): white becomes a calm dark amber-red."""
     import math
     t = kelvin / 100.0
     g = max(0.0, min(1.0, (99.4708025861 * math.log(t) - 161.1195681661) / 255)) if t > 1 else 0.0
     b = 1.0 if t >= 66 else (0.0 if t <= 19 else max(0.0, min(1.0, (138.5177312231 * math.log(t - 10) - 305.0447927307) / 255)))
     r, g, b = 0.80, 0.80 * g ** 2.4, 0.70 * b ** 3.0
-    f = max(0.0, min(1.0, (6500 - kelvin) / 1500.0))     # no change at 6500 K, the full colour from 5000 K down
+    f = max(0.0, min(1.0, (6500 - kelvin) / 1500.0)) if strength is None else strength   # fade: 0 = no change, 1 = full
     r, g, b = 1 + (r - 1) * f, 1 + (g - 1) * f, 1 + (b - 1) * f
     return ("#version 300 es\nprecision highp float;\nin vec2 v_texcoord;\nuniform sampler2D tex;\n"
             "layout(location = 0) out vec4 fragColor;\nvoid main() {\n    vec4 c = texture(tex, v_texcoord);\n"
@@ -69,13 +72,6 @@ def shader_text(kelvin):
 
 def set_shader(path):
     sh("hyprctl", "eval", 'hl.config({decoration={screen_shader="%s"}})' % path)
-
-
-def ramp_minutes():
-    try:
-        return int(json.loads((Path.home() / ".config/torii/config.json").read_text()).get("nightlight", {}).get("rampMinutes", 30))
-    except (OSError, ValueError, TypeError):
-        return 30
 
 
 def window(s, now):
@@ -95,24 +91,23 @@ def window(s, now):
 
 
 def ramp_state(s, now=None):
-    """(effective kelvin, seconds until the next tick is needed or None). Inside an auto window the colour eases in over
-    rampMinutes after the start and eases out before the end; manual use is always the full temperature."""
-    from datetime import timedelta
+    """(effective kelvin, seconds until the next step). Inside an auto window the colour eases in over `fade` seconds
+    after the start and eases out before the end; manual use is always the full temperature. A short wait (< 5 s)
+    means the colour is still moving."""
     now = now or datetime.now()
     if not s["on"]:
         return 6500, None
-    m = ramp_minutes()
-    w = window(s, now) if s["auto"] and m > 0 else None
+    dur = float(s["fade"])
+    w = window(s, now) if s["auto"] and dur > 0 else None
     if not w:
         return s["temp"], None
-    dur = m * 60.0
     f_in = (now - w[0]).total_seconds() / dur
     f_out = (w[1] - now).total_seconds() / dur
     f = max(0.0, min(1.0, min(f_in, f_out)))
     eff = round(6500 + (s["temp"] - 6500) * f)
     if f < 1:
-        return eff, 60
-    return eff, max(30, int((w[1] - now).total_seconds() - dur))       # the plateau: wake up when the way back begins
+        return eff, max(0.4, dur / 50)
+    return eff, max(5, int((w[1] - now).total_seconds() - dur))       # the plateau: wake up when the way back begins
 
 
 def arm_tick(seconds):
@@ -131,10 +126,13 @@ def push(s):
         if running():
             sh("hyprctl", "hyprsunset", "identity")
         if s["on"]:
-            tmp = SHADER.with_suffix(".tmp")
-            tmp.write_text(shader_text(eff))
-            os.replace(tmp, SHADER)
-            set_shader(str(SHADER))
+            # two files in turn: Hyprland only reloads a shader when the path changes
+            target = SHADERS[int(datetime.now().timestamp() * 2) % 2]
+            strength = max(0.0, min(1.0, (6500 - eff) / max(1.0, 6500 - s["temp"])))
+            tmp = target.with_suffix(".tmp")
+            tmp.write_text(shader_text(s["temp"], strength))
+            os.replace(tmp, target)
+            set_shader(str(target))
         else:
             set_shader("")
         return
@@ -164,7 +162,7 @@ def timers(s):
     if os.environ.get("TORII_NO_HOOKS") or not s["auto"]:
         return
     for unit, when, verb in (("torii-nl-on", s["from"], "on"), ("torii-nl-off", s["to"], "off")):
-        sh("systemd-run", "--user", "--collect", f"--unit={unit}", f"--on-calendar=*-*-* {when}:00", SELF, verb)
+        sh("systemd-run", "--user", "--collect", "--timer-property=AccuracySec=1s", f"--unit={unit}", f"--on-calendar=*-*-* {when}:00", SELF, verb)
 
 
 def in_window(s):
@@ -187,6 +185,8 @@ def main(a):
         s["on"] = (not s["on"]) if cmd == "toggle" else cmd == "on"
     elif cmd == "temp" and len(a) == 2 and a[1].isdigit() and 1000 <= int(a[1]) <= 6500:
         s["temp"] = int(a[1])
+    elif cmd == "fade" and len(a) == 2 and a[1].isdigit() and int(a[1]) <= 3600:
+        s["fade"] = int(a[1])
     elif cmd == "mode" and len(a) == 2 and a[1] in ("gpu", "filter", "overlay"):
         s["mode"] = a[1]
     elif cmd == "auto" and a[1:] == ["off"]:
@@ -203,12 +203,33 @@ def main(a):
     else:
         print(__doc__)
         sys.exit(2)
+    stop_fade()
     s["eff"], wait = ramp_state(s)
     save(s)
     push(s)
+    if wait is not None and wait < 5 and not os.environ.get("TORII_NO_HOOKS"):
+        PIDFILE.write_text(str(os.getpid()))
+        while wait is not None and wait < 5:
+            time.sleep(wait)
+            s = load()
+            s["eff"], wait = ramp_state(s)
+            save(s)
+            push(s)
+        PIDFILE.unlink(missing_ok=True)
     arm_tick(wait)
     if cmd != "tick":
         timers(s)
+
+
+def stop_fade():
+    """A newer command takes over from a fade that is still running."""
+    try:
+        pid = int(PIDFILE.read_text())
+        if pid != os.getpid() and b"torii-nightlight" in Path(f"/proc/{pid}/cmdline").read_bytes():
+            os.kill(pid, 15)
+        PIDFILE.unlink(missing_ok=True)
+    except (OSError, ValueError):
+        pass
 
 
 if __name__ == "__main__":

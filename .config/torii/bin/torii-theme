@@ -177,11 +177,13 @@ def build_tokens(accent_src, tint, accent_override=None, mode="dark", others=Non
         return oklch_to_hex(L, max(0.09, c1 + (c2 - c1) * u), (h1 + dh * u) % 360)
     for i in range(5):
         t[f"ramp{i + 1}"] = ramp(i / 4)
+        r = rgb_to_oklch(hex_to_rgb(t[f"ramp{i + 1}"]))
+        t[f"rampb{i + 1}"] = oklch_to_hex(min(0.95, r[0] + 0.07) if dark else max(0.3, r[0] - 0.08), r[1], r[2])
     t.update({
-        "term0": t["surface"], "term1": t["red"], "term2": t["green"], "term3": t["yellow"],
-        "term4": t["ramp1"], "term5": t["ramp5"], "term6": t["ramp3"], "term7": t["fgDim"],
-        "term8": t["muted"], "term9": bright(25), "term10": bright(145),
-        "term11": bright(95), "term12": t["ramp2"], "term13": t["ramp4"], "term14": t["ramp3"],
+        "term0": t["surface"], "term1": t["red"], "term2": t["ramp5"], "term3": t["ramp3"],
+        "term4": t["ramp1"], "term5": t["ramp4"], "term6": t["ramp2"], "term7": t["fgDim"],
+        "term8": t["muted"], "term9": bright(25), "term10": t["rampb5"],
+        "term11": t["rampb3"], "term12": t["rampb1"], "term13": t["rampb4"], "term14": t["rampb2"],
         "term15": t["fg"],
         # seed for the browser theme: Chromium derives its whole frame from it, so keep it tone-correct
         "browser": oklch_to_hex(0.16 if dark else 0.95, 0.008 + tint * 0.01, aH),
@@ -266,7 +268,7 @@ def compute(image):
     tint = float(read_config().get("theme", {}).get("tint", 0.15))
     override = override_for(image)
     mode = get_mode()
-    key = hashlib.sha256(f"v3|{digest}|{tint}|{override}|{mode}".encode()).hexdigest()[:16]
+    key = hashlib.sha256(f"v4|{digest}|{tint}|{override}|{mode}".encode()).hexdigest()[:16]
     prim, others = palette_args(image, digest)
     tokens = build_tokens(prim, tint, override, mode, others)
     tokens.update({"wallpaper": str(image), "hash": key})

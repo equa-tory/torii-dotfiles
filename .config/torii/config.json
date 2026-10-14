@@ -39,8 +39,5 @@
     "rememberForward": false,
     "menuHistory": true,
     "placeholder": "Search apps  \u00b7  \u2193 opens the menus"
-  },
-  "nightlight": {
-    "rampMinutes": 30
   }
 }

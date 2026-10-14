@@ -203,7 +203,7 @@ Singleton {
         return { id: "trigger", name: "Trigger", glyph: Icons.flash, sub: "Capture, convert, remind, switches", children: () => [
             captureMenu(t),
             transcodeMenu(),
-            { id: "emoji", name: "Emoji", glyph: Icons.emoji, sub: "Copy and type an emoji", noSearch: true, sorted: true,
+            { id: "emoji", name: "Emoji", glyph: Icons.emoji, sub: "Copy and type an emoji", noSearch: true, sorted: true, grid: true,
               children: () => { fEmoji.ensure(); return emojiNodes; } },
             { id: "reminder", name: "Reminder", glyph: Icons.timer, keywords: "timer alarm notify cancel stop", keep: true,
               sub: Live.reminders.length ? Live.reminders.length + " active  ·  → to see or stop them" : "In some minutes, with a message",
@@ -521,6 +521,9 @@ Singleton {
                 { id: "overlay", name: "Screen overlay", sub: "A transparent warm layer over every screen, it can only blend", badge: s.mode === "overlay" ? "●" : "", keep: true, run: () => night(["mode", "overlay"]) } ] },
             { id: "temp", name: "Temperature", glyph: Icons.tune, keywords: "kelvin warm slider",
               slider: { min: 2000, max: 6500, step: 100, value: s.temp, unit: " K", decimals: 0 }, onSlide: v => night(["temp", String(v)]) },
+            { id: "fade", name: "Fade", glyph: Icons.tune, keywords: "ramp seconds duration slow",
+              sub: "How long it takes to fade in or out on a schedule",
+              slider: { min: 0, max: 300, step: 5, value: s.fade === undefined ? 30 : s.fade, unit: " s", decimals: 0 }, onSlide: v => night(["fade", String(v)]) },
             { id: "schedule", name: "Schedule", glyph: Icons.nightLight, sub: s.auto ? s.from + " → " + s.to : "Manual", children: () => [
                 { id: "manual", name: "Manual", sub: "Only when you switch it", badge: s.auto ? "" : "●", keep: true, run: () => night(["auto", "off"]) },
                 { id: "auto", name: "Evening to morning", sub: "20:00 → 07:00", badge: s.auto && s.from === "20:00" && s.to === "07:00" ? "●" : "", keep: true, run: () => night(["auto", "20:00", "07:00"]) },

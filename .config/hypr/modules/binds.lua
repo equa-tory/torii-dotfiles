@@ -99,8 +99,19 @@ end
 
 
 -- Move focus with mainMod + arrow keys
-hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
-hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
+-- mac style: in a terminal mainMod + left/right jump to the start/end of the line (Home/End), elsewhere they move focus
+local function arrow(dir, key)
+    return function()
+        local w = hl.get_active_window()
+        if w and w.class == "kitty" then
+            hl.dispatch(hl.dsp.send_shortcut({ mods = "", key = key }))
+        else
+            hl.dispatch(hl.dsp.focus({ direction = dir }))
+        end
+    end
+end
+hl.bind(mainMod .. " + left",  arrow("left", "Home"))
+hl.bind(mainMod .. " + right", arrow("right", "End"))
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 
