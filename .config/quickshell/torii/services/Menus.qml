@@ -62,9 +62,16 @@ Singleton {
     JsonFetch { id: fEmoji;    command: [root.bin("torii-emoji"), "list"];
                 onDataChanged: { root.emojiNodes = (data || []).map(e => ({ id: "e:" + e.c, name: e.n, sub: e.g, glyph: e.c, run: () => app([root.bin("torii-emoji"), "copy", e.c]) }));
                     root.bump(); } }
+    JsonFetch { id: fGit;      command: [root.bin("torii-install"), "git-status"];        onDataChanged: root.bump() }
+    JsonFetch { id: fWeb;      command: [root.bin("torii-apps"), "webapp", "list"];       onDataChanged: root.bump() }
+    JsonFetch { id: fTui;      command: [root.bin("torii-apps"), "tui", "list"];          onDataChanged: root.bump() }
+    JsonFetch { id: fLearnHypr; command: [root.bin("torii-learn"), "list", "hypr"];       onDataChanged: root.bump() }
+    JsonFetch { id: fLearnTmux; command: [root.bin("torii-learn"), "list", "tmux"];       onDataChanged: root.bump() }
+    JsonFetch { id: fLearnNvim; command: [root.bin("torii-learn"), "list", "nvim"];       onDataChanged: root.bump() }
+    JsonFetch { id: fNotes;    command: [root.bin("torii-learn"), "files"];               onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fTrans]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fTrans, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
@@ -78,6 +85,7 @@ Singleton {
         function onHyprChanged() { root.bump(); }
         function onDndChanged() { root.bump(); }
     }
+    Connections { target: Todo; function onItemsChanged() { root.bump(); } function onSortDoneChanged() { root.bump(); } }
     property string darkNow: ""             // shown at once when you toggle dark mode, until the theme catches up
     Connections { target: Theme; function onModeChanged() { root.darkNow = ""; } }
     function invalidate() { for (const f of allFetch) f.stale(); }
@@ -114,20 +122,21 @@ Singleton {
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
-    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), setupMenu()]); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()]); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
-    function search(scope, query) {
+    // each result carries `chain`: ids of every menu above it, so entering a menu found by search opens that very menu
+    function search(scope, query, baseChain) {
         const q = query.trim().toLowerCase();
         const entries = [];
-        function walk(node, trail, depth) {
+        function walk(node, trail, chain, depth) {
             for (const c of childrenOf(node)) {
-                entries.push({ node: c, trail: trail });
-                if (isMenu(c) && !c.noSearch && depth < 4) walk(c, c.flat ? trail : trail.concat(c.name), depth + 1);
+                entries.push({ node: c, trail: trail, chain: chain });
+                if (isMenu(c) && !c.noSearch && depth < 4) walk(c, c.flat ? trail : trail.concat(c.name), chain.concat([c.id]), depth + 1);
             }
         }
-        walk(scope, scope ? [scope.name] : [], 0);
+        walk(scope, scope ? [scope.name] : [], baseChain || [], 0);
         const scored = [];
         for (const e of entries) {
             const s = Fuzzy.scoreFields(q, [
@@ -287,6 +296,116 @@ Singleton {
         return list.map(z => ({ id: z[0], name: z[1], glyph: Icons.tune, sub: f.name + " → " + fmt, run: () => app([bin("torii-transcode"), "run", f.path, fmt, z[0]]) }));
     }
 
+
+    // ================= Install / Remove
+    function floatTerm(title, args) { app(["kitty", "--class", "torii-float", "--title", title].concat(args)); }
+
+    function installMenu() {
+        return { id: "install", name: "Install", glyph: Icons.download, sub: "Packages, web apps, terminal apps, updates", keywords: "add package pacman aur yay web app tui update",
+                 children: () => {
+            fGit.ensure();
+            const g = fGit.data || {};
+            const gitBadge = g.dirty ? "● changes" : (g.behind ? "↓ " + g.behind : "") + (g.behind && g.ahead ? "  " : "") + (g.ahead ? "↑ " + g.ahead : "");
+            return [
+                { id: "pacman", name: "Package", sub: "Search the repositories (Tab picks several)", glyph: Icons.download, keywords: "pacman install software",
+                  run: () => floatTerm("Install", [bin("torii-install"), "pacman"]) },
+                { id: "aur", name: "AUR package", sub: "Search the AUR with yay", glyph: Icons.download, keywords: "yay install software",
+                  run: () => floatTerm("Install from the AUR", [bin("torii-install"), "aur"]) },
+                { id: "webapp", name: "Web app", sub: "A website in its own window (Helium)", glyph: Icons.web, keywords: "website pwa chromium helium", keep: true,
+                  run: () => ask("Name of the web app", false, name => {
+                      if (!name) return;
+                      ask("Address of " + name + " (https://…)", false, url => {
+                          if (!url) return;
+                          sh([bin("torii-apps"), "webapp", "add", name, url]); later(fWeb, 1500);
+                          say(name + " added, it is in Apps in a moment");
+                      });
+                  }) },
+                { id: "tui", name: "Terminal app", sub: "A command in a terminal window, e.g. ssh to a server", glyph: Icons.terminal, keywords: "tui command ssh", keep: true,
+                  run: () => ask("Name of the terminal app", false, name => {
+                      if (!name) return;
+                      ask("Command to run for " + name, false, cmd => {
+                          if (!cmd) return;
+                          sh([bin("torii-apps"), "tui", "add", name, cmd]); later(fTui, 800);
+                          say(name + " added, it is in Apps");
+                      });
+                  }) },
+                { id: "update", name: "Update system", sub: "pacman and AUR upgrade", glyph: Icons.update, keywords: "upgrade yay pacman -Syu",
+                  run: () => floatTerm("Update", [bin("torii-install"), "update"]) },
+                { id: "dotfiles", name: "Update torii configs", glyph: Icons.git, keywords: "dotfiles git pull push sync",
+                  sub: g.error ? "No remote to compare with" : g.dirty ? "Local changes: commit and push" : g.behind ? "Pull " + g.behind + " new commits" : g.ahead ? "Push " + g.ahead + " commits" : "Up to date",
+                  badge: gitBadge, run: () => floatTerm("Torii configs", [bin("torii-install"), "git-sync"]) }
+            ];
+        } };
+    }
+
+    function removeMenu() {
+        return { id: "remove", name: "Remove", glyph: Icons.trash, sub: "Packages, web apps, terminal apps", keywords: "uninstall delete",
+                 children: () => {
+            fWeb.ensure(); fTui.ensure();
+            const mk = (fetch, kind, label) => (fetch.data || []).map(w => ({
+                id: kind + ":" + w.name, name: w.name, sub: label + "  ·  " + (w.url || w.command || ""), glyph: kind === "webapp" ? Icons.web : Icons.terminal, keep: true,
+                run: () => {
+                    sh([bin("torii-apps"), kind, "remove", w.name]);
+                    fetch.data = (fetch.data || []).filter(x => x.name !== w.name);
+                    say("Removed " + w.name);
+                } }));
+            return [
+                { id: "package", name: "Package", sub: "Pick installed packages to remove (Tab picks several)", glyph: Icons.trash, keywords: "pacman uninstall software",
+                  run: () => floatTerm("Remove", [bin("torii-install"), "remove"]) },
+                { id: "webapp", name: "Web app", sub: (fWeb.data || []).length + " added", glyph: Icons.web, keywords: "website",
+                  children: () => { const l = mk(fWeb, "webapp", "Web app"); return l.length ? l : [{ id: "none", name: "No web apps yet", sub: "Install > Web app" }]; } },
+                { id: "tui", name: "Terminal app", sub: (fTui.data || []).length + " added", glyph: Icons.terminal, keywords: "tui command",
+                  children: () => { const l = mk(fTui, "tui", "Terminal app"); return l.length ? l : [{ id: "none", name: "No terminal apps yet", sub: "Install > Terminal app" }]; } }
+            ];
+        } };
+    }
+
+    // ================= Learn
+    function learnMenu() {
+        const keysMenu = (id, name, fetch, hint) => ({ id: id, name: name, glyph: Icons.keyboard2, sub: hint, sorted: true, children: () => {
+            fetch.ensure();
+            const l = (fetch.data || []).map((e, i) => ({ id: id + i, name: e.keys, sub: e.desc, keywords: e.desc, glyph: Icons.keyboard }));
+            return l.length ? l : [{ id: "none", name: "Nothing found", sub: "No shortcuts in that config" }];
+        } });
+        return { id: "learn", name: "Learn", glyph: Icons.book, sub: "Your keyboard shortcuts and notes", keywords: "shortcuts keybindings cheatsheet help",
+                 children: () => {
+            fNotes.ensure();
+            const notes = (fNotes.data || []).map(n => ({ id: "note:" + n.path, name: n.name, sub: "Note  ·  " + n.path.replace(home, "~"), glyph: Icons.book,
+                                                         run: () => floatTerm(n.name, ["sh", "-c", 'exec "${EDITOR:-nvim}" -R "$1"', "sh", n.path]) }));
+            return [keysMenu("lhypr", "Hyprland", fLearnHypr, "binds.lua"), keysMenu("ltmux", "tmux", fLearnTmux, "tmux.conf"), keysMenu("lnvim", "Neovim", fLearnNvim, "init.lua and plugins")].concat(notes);
+        } };
+    }
+
+    // ================= Todo
+    function todoMenu() {
+        return { id: "todo", name: "Todo", glyph: Icons.checklist, sub: Todo.openCount + " open", keywords: "tasks list checklist",
+                 children: () => {
+            const out = [{ id: "add", name: "Add…", glyph: Icons.plus, keep: true, run: () => ask("New todo", false, t => { Todo.add(t); }) }];
+            for (const i of Todo.shown) {
+                out.push({ id: "t" + i.id, name: i.text, glyph: i.done ? Icons.todoDone : Icons.todoOpen, badge: i.done ? "done" : "", keep: true,
+                           run: () => Todo.toggle(i.id),
+                           children: () => [
+                               { id: "toggle", name: i.done ? "Mark as open" : "Mark as done", glyph: Icons.check, keep: true, run: () => Todo.toggle(i.id) },
+                               { id: "edit", name: "Edit…", glyph: Icons.pencil, keep: true, run: () => ask("Change “" + i.text + "” to", false, t => Todo.edit(i.id, t)) },
+                               { id: "remove", name: "Remove", glyph: Icons.trash, keep: true, run: () => Todo.remove(i.id) } ] });
+            }
+            if (Todo.items.some(i => i.done)) out.push({ id: "clear", name: "Clear finished", glyph: Icons.trash, keep: true, run: () => Todo.clearDone() });
+            out.push({ id: "sort", name: "Finished at the bottom", glyph: Icons.tune, badge: Todo.sortDone ? "On" : "Off", keep: true, run: () => Todo.setSortDone(!Todo.sortDone) });
+            return out;
+        } };
+    }
+
+    // ================= System (last)
+    function confirm(label, args) { ask(label + "?  Enter to confirm, Esc to cancel", false, () => sh(args)); }
+    function systemMenu() {
+        return { id: "system", name: "System", glyph: Icons.poweroff, sub: "Shut down, restart, log out, sleep", keywords: "power shutdown poweroff reboot restart logout suspend",
+                 children: () => [
+            { id: "poweroff", name: "Shut down", glyph: Icons.poweroff, keep: true, run: () => confirm("Shut down", ["systemctl", "poweroff"]) },
+            { id: "reboot", name: "Reboot", glyph: Icons.restart, keep: true, run: () => confirm("Reboot", ["systemctl", "reboot"]) },
+            { id: "logout", name: "Log out", glyph: Icons.logout, keep: true, run: () => confirm("Log out", ["sh", "-c", "uwsm stop || hyprctl dispatch 'hl.dsp.exit()'"]) },
+            { id: "suspend", name: "Sleep", glyph: Icons.sleep, keep: true, run: () => confirm("Suspend", ["systemctl", "suspend"]) } ] };
+    }
+
     // ================= Apps
     function appsMenu() {
         return { id: "apps", name: "Apps", glyph: Icons.apps, sub: "Everything installed", sorted: true, flat: true,
@@ -350,9 +469,10 @@ Singleton {
                  sub: s.on ? s.temp + " K" + (s.mode === "overlay" ? " overlay" : "") + (s.auto ? "  ·  " + s.from + " → " + s.to : "") : (s.auto ? "Auto " + s.from + " → " + s.to : "Off"),
                  children: () => [
             { id: "toggle", name: s.on ? "Turn off" : "Turn on", glyph: Icons.power, badge: s.on ? "On" : "Off", keep: true, run: () => night(["toggle"]) },
-            { id: "method", name: "Method", glyph: Icons.monitor, sub: s.mode === "overlay" ? "Screen overlay" : "GPU (hyprsunset)", children: () => [
-                { id: "gpu", name: "GPU", sub: "hyprsunset changes the colours at the display", badge: s.mode === "overlay" ? "" : "●", keep: true, run: () => night(["mode", "gpu"]) },
-                { id: "overlay", name: "Screen overlay", sub: "A warm transparent layer over every screen", badge: s.mode === "overlay" ? "●" : "", keep: true, run: () => night(["mode", "overlay"]) } ] },
+            { id: "method", name: "Method", glyph: Icons.monitor, sub: s.mode === "overlay" ? "Screen overlay" : s.mode === "filter" ? "Screen filter" : "GPU (hyprsunset)", children: () => [
+                { id: "gpu", name: "GPU", sub: "hyprsunset changes the colours at the display", badge: s.mode === "gpu" ? "●" : "", keep: true, run: () => night(["mode", "gpu"]) },
+                { id: "filter", name: "Screen filter", sub: "A shader on the whole screen: a calm dark red, works on any GPU", badge: s.mode === "filter" ? "●" : "", keep: true, run: () => night(["mode", "filter"]) },
+                { id: "overlay", name: "Screen overlay", sub: "A transparent warm layer over every screen, it can only blend", badge: s.mode === "overlay" ? "●" : "", keep: true, run: () => night(["mode", "overlay"]) } ] },
             { id: "temp", name: "Temperature", glyph: Icons.tune, sub: s.temp + " K", children: () =>
                 [2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000].map(k => ({
                     id: "t" + k, name: k + " K", sub: k <= 3000 ? "very warm" : k <= 4000 ? "warm" : k <= 5000 ? "mild" : "slight", badge: s.temp === k ? "●" : "", keep: true,

@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""torii-learn list <hypr|tmux|nvim> | files  -  your current keyboard shortcuts, read from the config files themselves.
+
+  list hypr   ~/.config/hypr/modules/binds.lua   (mainMod is replaced by its real value)
+  list tmux   ~/.config/tmux/tmux.conf           (prefix is taken from `set -g prefix`)
+  list nvim   ~/.config/nvim/**/*.lua            (vim.keymap.set and lazy.nvim `keys` entries; <leader> shown as its key)
+  files       your own notes: ~/.config/torii/learn/*.md
+Prints JSON [{"keys": "ALT + SHIFT + R", "desc": "..."}]. Nothing is cached: edit a config and it is current next time.
+"""
+import json
+import re
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+
+
+def hypr():
+    f = HOME / ".config/hypr/modules/binds.lua"
+    text = f.read_text(errors="replace") if f.exists() else ""
+    m = re.search(r'local\s+mainMod\s*=\s*"([^"]+)"', text)
+    main = m.group(1) if m else "SUPER"
+    out, comment = [], ""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        st = line.strip()
+        if st.startswith("--") and not st.startswith("--hl"):
+            comment = st.lstrip("- ").strip()
+            continue
+        mm = re.match(r"\s*hl\.bind\(\s*(.+?)\s*,\s*(hl\.dsp\..*|function.*)$", line)
+        if mm and not st.startswith("--"):
+            keys = []
+            for part in re.split(r"\s*\.\.\s*", mm.group(1)):
+                part = part.strip()
+                if part == "mainMod":
+                    keys.append(main)
+                elif part[:1] in "\"'":
+                    keys.append(part.strip("\"'"))
+                else:
+                    keys.append("N")
+            k = re.sub(r"\s*\+\s*", " + ", " ".join(keys).strip()).strip(" +")
+            k = re.sub(r"\s+", " ", k)
+            action = mm.group(2)
+            if action.startswith("function"):
+                body = "\n".join(lines[i + 1:i + 14]).split("\nend)")[0]
+                if "fullscreen" in body:
+                    desc = "toggle " + ("maximize" if "maximized" in body else "fullscreen")
+                elif "float_mode" in body:
+                    desc = "toggle float mode (new windows float)"
+                elif "send_shortcut" in body:
+                    desc = "mac-style shortcut (copy, paste, …)"
+                else:
+                    desc = "custom action"
+                desc = comment or desc
+            else:
+                desc = describe(action)
+            out.append({"keys": k, "desc": comment if comment and not comment.startswith("Example") else desc})
+        if st:
+            comment = "" if not st.startswith("--") else comment
+    if re.search(r"for\s+i\s*=\s*1\s*,\s*10", text):
+        out.append({"keys": f"{main} + 1 … 0", "desc": "go to workspace 1 … 10"})
+        out.append({"keys": f"{main} + SHIFT + 1 … 0", "desc": "move the window to workspace 1 … 10"})
+    seen, uniq = set(), []
+    for e in out:
+        if e["keys"] not in seen:
+            seen.add(e["keys"])
+            uniq.append(e)
+    return uniq
+
+
+def describe(action):
+    a = re.sub(r"\)+\s*(,\s*\{.*)?$", "", action)
+    a = a.replace("hl.dsp.", "")
+    m = re.match(r'exec_cmd\((.*)', a)
+    if m:
+        cmd = m.group(1).replace("qsipc ..", "qs ipc call").replace('"', "").replace("$HOME", "~").strip()
+        return "run " + (cmd if cmd not in ("terminal", "browser", "fileManager") else {"terminal": "the terminal", "browser": "the browser", "fileManager": "the file manager"}[cmd])
+    m = re.match(r"(\w+(?:\.\w+)*)\((.*)", a)
+    if m:
+        name, arg = m.group(1).replace(".", " ").replace("_", " "), m.group(2)
+        arg = re.sub(r"[{}=\"]", " ", arg)
+        arg = re.sub(r"\b(direction|workspace|action|mode)\b", "", arg)
+        return (name + " " + re.sub(r"\s+", " ", arg)).strip()
+    return a
+
+
+def tmux():
+    import shlex
+    f = HOME / ".config/tmux/tmux.conf"
+    out, prefix, comment = [], "C-b", ""
+    for line in (f.read_text(errors="replace").splitlines() if f.exists() else []):
+        st = line.strip()
+        m = re.match(r"set(?:-option)?\s+-g\s+prefix\s+(\S+)", st)
+        if m:
+            prefix = m.group(1)
+        if st.startswith("#"):
+            comment = st.lstrip("# ").strip()
+            continue
+        if re.match(r"(bind-key|bind)\s", st):
+            try:
+                tok = shlex.split(st, comments=False)[1:]
+            except ValueError:
+                continue
+            note, table, root, i = "", "", False, 0
+            while i < len(tok) and tok[i].startswith("-"):
+                if tok[i] == "-N":
+                    note = tok[i + 1]; i += 2
+                elif tok[i] == "-T":
+                    table = tok[i + 1]; i += 2
+                else:
+                    root = root or "n" in tok[i][1:]; i += 1
+            if i >= len(tok):
+                continue
+            key, cmd = tok[i], " ".join(tok[i + 1:])
+            if table:
+                keys = f"{key}   [{table.replace('copy-mode-vi', 'copy mode')}]"
+            elif root:
+                keys = key
+            else:
+                keys = f"{prefix} then {key}"
+            out.append({"keys": keys, "desc": note or comment or cmd})
+        if st:
+            comment = ""
+    return out
+
+
+def nvim():
+    root = HOME / ".config/nvim"
+    out = []
+    leader = " "
+    files = sorted(root.rglob("*.lua")) if root.is_dir() else []
+    for f in files:
+        text = f.read_text(errors="replace")
+        m = re.search(r'vim\.g\.mapleader\s*=\s*"(.*?)"', text)
+        if m:
+            leader = m.group(1)
+    names = {" ": "Space", "\\": "\\", ",": ","}
+    lead = names.get(leader, leader)
+    for f in files:
+        for line in f.read_text(errors="replace").splitlines():
+            st = line.strip()
+            if st.startswith("--"):
+                continue
+            m = re.search(r'vim\.keymap\.set\(\s*(?:\{([^}]*)\}|"([^"]*)")\s*,\s*"([^"]*)"\s*,\s*(.*)', st)
+            if m:
+                modes = re.sub(r'["\s]', "", m.group(1) or m.group(2))
+                rhs = m.group(4)
+                d = re.search(r'desc\s*=\s*"([^"]*)"', rhs)
+                desc = d.group(1) if d else re.sub(r",?\s*\{.*$|\)\s*$", "", rhs).strip().strip('"')
+                out.append({"keys": m.group(3).replace("<leader>", lead + " ").replace("<Leader>", lead + " ") + (f"   [{modes}]" if modes not in ("n", "") else ""), "desc": desc})
+                continue
+            m = re.match(r'\{\s*"([^"]+)"\s*,.*desc\s*=\s*"([^"]*)"', st)
+            if m:
+                out.append({"keys": m.group(1).replace("<leader>", lead + " "), "desc": m.group(2)})
+    return out
+
+
+def files():
+    d = HOME / ".config/torii/learn"
+    return [{"name": p.stem.replace("-", " ").replace("_", " "), "path": str(p)} for p in sorted(d.glob("*.md"))] if d.is_dir() else []
+
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if a == ["files"]:
+        print(json.dumps(files()))
+    elif len(a) == 2 and a[0] == "list" and a[1] in ("hypr", "tmux", "nvim"):
+        print(json.dumps({"hypr": hypr, "tmux": tmux, "nvim": nvim}[a[1]](), ensure_ascii=False))
+    else:
+        print(__doc__)
+        sys.exit(2)

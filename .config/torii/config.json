@@ -1,11 +1,36 @@
 {
-  "notch": { "shape": "floating", "opacity": 1.0, "radius": 16, "height": 34, "gap": 6 },
-  "workspaces": { "count": 4 },
-  "weather": { "lat": 55.75, "lon": 37.62, "refreshMin": 20 },
-  "wallpaper": { "dir": "~/Pictures/wallpapers", "transitionMs": 600 },
-  "theme": { "tint": 0.15 },
-  "apps": { "dir": "~/apps" },
+  "notch": {
+    "shape": "floating",
+    "opacity": 1.0,
+    "radius": 16,
+    "height": 34,
+    "gap": 6
+  },
+  "workspaces": {
+    "count": 4
+  },
+  "weather": {
+    "lat": 55.75,
+    "lon": 37.62,
+    "refreshMin": 20
+  },
+  "wallpaper": {
+    "dir": "~/Pictures/wallpapers",
+    "transitionMs": 600
+  },
+  "theme": {
+    "tint": 0.15
+  },
+  "apps": {
+    "dir": "~/apps"
+  },
   "quicklinks": "~/.config/torii/quicklinks.json",
-  "font": { "family": "JetBrainsMono Nerd Font", "size": 13 },
-  "automove": { "from": "~/Downloads", "to": "/mnt/mass/Media_MASS/Photo/inbox" }
+  "font": {
+    "family": "JetBrainsMono Nerd Font",
+    "size": 13
+  },
+  "automove": {
+    "from": "~/Downloads",
+    "to": "/mnt/mass/Media_MASS/Photo/inbox"
+  }
 }

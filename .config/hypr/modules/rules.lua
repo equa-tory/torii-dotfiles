@@ -29,3 +29,13 @@ hl.window_rule({
 
     no_focus = true,
 })
+
+-- Small terminal windows opened by the launcher (Install, Remove, Update, Learn notes)
+hl.window_rule({
+    name  = "torii-float",
+    match = { class = "^torii-float$" },
+
+    float  = true,
+    center = true,
+    size   = { 960, 620 },
+})

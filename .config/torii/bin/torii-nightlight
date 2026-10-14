@@ -2,8 +2,9 @@
 """torii-nightlight  -  warm screen colour through hyprsunset (GPU gamma, no overlay window).
 
   status                    JSON: {"on", "temp", "auto", "from", "to", "mode"}
-  mode gpu|overlay          gpu: hyprsunset changes the colours at the display (default)
-                            overlay: the shell lays a warm transparent layer over every screen (works without GPU support)
+  mode gpu|filter|overlay   gpu: hyprsunset changes the colours at the display (default)
+                            filter: a Hyprland screen shader multiplies the picture by a warm colour (true dark red-amber, any GPU)
+                            overlay: the shell lays a warm transparent layer over every screen (simplest, but it can only blend)
   on | off | toggle         switch now
   temp <kelvin>             1000..6500, applied at once when on
   auto <HH:MM> <HH:MM>      switch on at the first time and off at the second, every day
@@ -46,8 +47,40 @@ def running():
     return sh("pgrep", "-x", "hyprsunset").returncode == 0
 
 
+SHADER = STATE.with_name("nightlight.frag")
+
+
+def shader_text(kelvin):
+    """Multiplies the picture by a warm colour (what real night modes do): white becomes a calm dark amber-red."""
+    import math
+    t = kelvin / 100.0
+    g = max(0.0, min(1.0, (99.4708025861 * math.log(t) - 161.1195681661) / 255)) if t > 1 else 0.0
+    b = 1.0 if t >= 66 else (0.0 if t <= 19 else max(0.0, min(1.0, (138.5177312231 * math.log(t - 10) - 305.0447927307) / 255)))
+    r, g, b = 0.80, 0.80 * g ** 2.4, 0.70 * b ** 3.0
+    return ("#version 300 es\nprecision highp float;\nin vec2 v_texcoord;\nuniform sampler2D tex;\n"
+            "layout(location = 0) out vec4 fragColor;\nvoid main() {\n    vec4 c = texture(tex, v_texcoord);\n"
+            f"    fragColor = vec4(c.rgb * vec3({r:.3f}, {g:.3f}, {b:.3f}), c.a);\n}}\n")
+
+
+def set_shader(path):
+    sh("hyprctl", "eval", 'hl.config({decoration={screen_shader="%s"}})' % path)
+
+
 def push(s):
     if os.environ.get("TORII_NO_HOOKS"):
+        return
+    if s["mode"] != "filter":
+        set_shader("")                            # nothing else may keep a shader on the screen
+    if s["mode"] == "filter":
+        if running():
+            sh("hyprctl", "hyprsunset", "identity")
+        if s["on"]:
+            tmp = SHADER.with_suffix(".tmp")
+            tmp.write_text(shader_text(s["temp"]))
+            os.replace(tmp, SHADER)
+            set_shader(str(SHADER))
+        else:
+            set_shader("")
         return
     if s["mode"] == "overlay":                    # the shell draws it; make sure the GPU side is neutral
         if running():
@@ -98,7 +131,7 @@ def main(a):
         s["on"] = (not s["on"]) if cmd == "toggle" else cmd == "on"
     elif cmd == "temp" and len(a) == 2 and a[1].isdigit() and 1000 <= int(a[1]) <= 6500:
         s["temp"] = int(a[1])
-    elif cmd == "mode" and len(a) == 2 and a[1] in ("gpu", "overlay"):
+    elif cmd == "mode" and len(a) == 2 and a[1] in ("gpu", "filter", "overlay"):
         s["mode"] = a[1]
     elif cmd == "auto" and a[1:] == ["off"]:
         s["auto"] = False

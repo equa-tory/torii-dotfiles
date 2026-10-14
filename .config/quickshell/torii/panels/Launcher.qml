@@ -63,7 +63,7 @@ Item {
                 if (link) out.push({ node: linkNode(link), trail: [] });
                 if (link && /\s/.test(q)) { results = out; selected = 0; return; }   // "yt cats" is a search, not a lookup
             }
-            out = out.concat(Menus.search(scope, q));
+            out = out.concat(Menus.search(scope, q, pathIds));
             if (!scope && out.length === 0) {
                 const g = Quicklinks.resolve("g " + q);
                 if (g) out.push({ node: linkNode(g), trail: [] });
@@ -101,9 +101,9 @@ Item {
         remember();
     }
 
-    function enter(node) {
+    function enter(node, chain) {
         remember();
-        pathIds = pathIds.concat([node.id]);
+        pathIds = (chain || pathIds).concat([node.id]);
         input.text = "";
         expanded = true;
         update(false);
@@ -120,7 +120,7 @@ Item {
         if (results.length === 0) return;
         const n = results[selected].node;
         const menu = n.children !== undefined;
-        if (menu && (right || !n.run)) { enter(n); return; }
+        if (menu && (right || !n.run)) { enter(n, results[selected].chain); return; }
         if (!n.run) return;
         remember();
         n.run();
@@ -343,7 +343,7 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onEntered: { root.selected = row.index; root.remember(); }
+                onPositionChanged: { if (root.selected !== row.index) { root.selected = row.index; root.remember(); } }
                 onClicked: { root.selected = row.index; root.activate(false); }
             }
         }

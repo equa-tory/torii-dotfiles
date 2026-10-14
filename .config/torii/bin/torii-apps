@@ -13,6 +13,10 @@ file inside that folder (~/apps/v2rayN/v2rayN.desktop) or by an app.json:
             levels down) and write <folder>/<program>.desktop for it, with its icon. Existing files are never touched.
   desktop   copy these apps to ~/.local/share/applications/torii-app-*.desktop so other launchers and xdg-open see them
   run       start one by folder name (used by those entries)
+  webapp add <name> <url> | remove <name> | list | sync    web apps: a Helium window without browser chrome (--app=URL)
+  tui add <name> <command> | remove <name> | list | sync   terminal programs as apps (e.g. dorm = ssh 192.168.1.50)
+            Both lists live in ~/.local/state/torii/{webapps,tuis}.json (private data, not in the dotfiles repo; the
+            home-server sync carries them). `sync` rewrites the .desktop files from those lists.
 Nothing is moved or installed: the folders stay exactly where they are.
 """
 import json
@@ -171,8 +175,109 @@ def desktop_sync():
     return len(keep)
 
 
+# ---------------------------------------------------------------- web apps and terminal apps
+STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii"))
+
+
+def slug(name):
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "app"
+
+
+def load_list(name):
+    try:
+        data = json.loads((STATE / name).read_text())
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def save_list(name, items):
+    STATE.mkdir(parents=True, exist_ok=True)
+    tmp = (STATE / name).with_suffix(".tmp")
+    tmp.write_text(json.dumps(items, indent=2) + "\n")
+    os.replace(tmp, STATE / name)
+
+
+def favicon(url, name):
+    """Site icon next to the other user icons; the theme's web icon when it cannot be fetched."""
+    import subprocess
+    from urllib.parse import urlparse
+    host = urlparse(url if "://" in url else "https://" + url).netloc
+    dest = Path.home() / ".local/share/icons/torii-web" / f"{slug(name)}.png"
+    if dest.is_file():
+        return str(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(["curl", "-fsSL", "-m", "8", "-o", str(dest), f"https://www.google.com/s2/favicons?domain={host}&sz=128"],
+                       capture_output=True)
+    if r.returncode != 0 or not dest.is_file() or dest.stat().st_size < 100:
+        dest.unlink(missing_ok=True)
+        return "web-browser"
+    return str(dest)
+
+
+def sync_web():
+    target = Path.home() / ".local/share/applications"
+    target.mkdir(parents=True, exist_ok=True)
+    keep = set()
+    for w in load_list("webapps.json"):
+        url = w["url"] if "://" in w["url"] else "https://" + w["url"]
+        f = target / f"torii-web-{slug(w['name'])}.desktop"
+        keep.add(f.name)
+        f.write_text("[Desktop Entry]\nType=Application\nVersion=1.0\n"
+                     f"Name={w['name']}\nComment=Web app\nIcon={favicon(url, w['name'])}\n"
+                     f"Exec=helium-browser --app={url}\nTerminal=false\nCategories=Network;\nStartupWMClass=helium-{slug(w['name'])}\n"
+                     "X-Torii-Web=true\n")
+    for old in target.glob("torii-web-*.desktop"):
+        if old.name not in keep:
+            old.unlink()
+
+
+def sync_tui():
+    root = apps_dir()
+    keep = set()
+    for t in load_list("tuis.json"):
+        d = root / slug(t["name"])
+        d.mkdir(parents=True, exist_ok=True)
+        f = d / f"{slug(t['name'])}.desktop"
+        keep.add(f)
+        run = d / "run.sh"
+        run.write_text("#!/bin/sh\n" + t["command"] + "\nprintf '\\n[done, Enter to close] '\nread _\n")
+        run.chmod(0o755)
+        f.write_text("[Desktop Entry]\nType=Application\nVersion=1.0\n"
+                     f"Name={t['name']}\nComment=Terminal app: {t['command']}\nIcon=utilities-terminal\n"
+                     f"Exec=kitty --title {shlex.quote(t['name'])} {run}\nTerminal=false\nX-Torii-Tui=true\n")
+    for old in root.glob("*/*.desktop") if root.is_dir() else []:
+        if "X-Torii-Tui=true" in old.read_text(errors="replace") and old not in keep:
+            old.unlink()
+            (old.parent / "run.sh").unlink(missing_ok=True)
+            try:
+                old.parent.rmdir()
+            except OSError:
+                pass
+
+
+def lists(kind, a):
+    name = {"webapp": "webapps.json", "tui": "tuis.json"}[kind]
+    key = "url" if kind == "webapp" else "command"
+    items = load_list(name)
+    if a[:1] == ["list"]:
+        print(json.dumps(items))
+        return
+    if a[:1] == ["add"] and len(a) >= 3:
+        items = [i for i in items if i["name"].lower() != a[1].lower()] + [{"name": a[1], key: " ".join(a[2:])}]
+        save_list(name, items)
+    elif a[:1] == ["remove"] and len(a) == 2:
+        save_list(name, [i for i in items if i["name"].lower() != a[1].lower()])
+    elif a[:1] != ["sync"]:
+        sys.exit(__doc__)
+    (sync_web if kind == "webapp" else sync_tui)()
+
+
 if __name__ == "__main__":
     a = sys.argv[1:]
+    if a[:1] in (["webapp"], ["tui"]):
+        lists(a[0], a[1:])
+        sys.exit(0)
     if a == ["list"]:
         generate()
         print(json.dumps(scan()))

@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# torii-install pacman|aur|remove|update|git-status|git-sync   -  what the launcher's Install and Remove menus run.
+#
+#   pacman      fzf over the repository packages (Tab selects several, Enter installs) -> added to packages/pacman.txt
+#   aur         the same for the AUR through yay                                       -> added to packages/aur.txt
+#   remove      fzf over the packages you installed on purpose (Tab, Enter removes)    -> dropped from both lists
+#   update      full system update (yay, or pacman when there is no yay)
+#   git-status  JSON {"behind", "ahead", "dirty"} for the dotfiles repo (fetches first)
+#   git-sync    behind: pull; local changes: commit and push; ahead: push (then re-link with stow)
+# Installing and removing keeps packages/*.txt in step, so ./install.sh brings the same set back on a new machine.
+set -uo pipefail
+
+cfg="$(readlink -f "$HOME/.config/torii" 2>/dev/null || true)"                       # <repo>/.config/torii
+REPO="${TORII_REPO:-$( [ -n "$cfg" ] && dirname "$(dirname "$cfg")" || echo "$HOME/torii-dotfiles" )}"
+PAC="$REPO/packages/pacman.txt"; AUR="$REPO/packages/aur.txt"
+pause() { printf '\n%s ' "${1:-Press Enter to close}"; read -r _; }
+say() { printf '\n==> %s\n' "$*"; }
+in_list() { grep -qxF "$2" "$1" 2>/dev/null; }
+add_line() { in_list "$1" "$2" && return; [ -s "$1" ] && [ -n "$(tail -c1 "$1")" ] && echo >> "$1"; echo "$2" >> "$1"; }
+del_line() { local esc; esc=$(printf '%s' "$2" | sed 's/[][\.*^$/]/\\&/g'); sed -i "/^${esc}\$/d" "$1"; }
+need() { command -v "$1" >/dev/null 2>&1 || { echo "$1 is not installed"; pause; exit 1; }; }
+pick() {   # pick <prompt> <preview command with {}>   reads the list on stdin
+  fzf --multi --layout=reverse --border=none --prompt="$1 > " --header="Tab selects more, Enter confirms, Esc cancels" \
+      --preview="$2" --preview-window=right:55%:wrap --color=bg+:#202020,pointer:#e8975a,prompt:#e8975a
+}
+
+case "${1:-}" in
+  pacman)
+    need fzf
+    sel=$(pacman -Slq | sort -u | pick "install" 'pacman -Si {}') || exit 0
+    [ -n "$sel" ] || exit 0
+    say "Installing: $(echo $sel)"
+    # shellcheck disable=SC2086
+    if sudo pacman -S --needed $sel; then
+      for p in $sel; do in_list "$AUR" "$p" || add_line "$PAC" "$p"; done
+      say "Added to packages/pacman.txt"
+    fi
+    pause ;;
+  aur)
+    need fzf; need yay
+    sel=$(yay -Slqa | sort -u | pick "aur" 'yay -Si {}') || exit 0
+    [ -n "$sel" ] || exit 0
+    say "Installing from the AUR: $(echo $sel)"
+    # shellcheck disable=SC2086
+    if yay -S --needed $sel; then
+      for p in $sel; do add_line "$AUR" "$p"; done
+      say "Added to packages/aur.txt"
+    fi
+    pause ;;
+  remove)
+    need fzf
+    sel=$(pacman -Qqe | pick "remove" 'pacman -Qi {}') || exit 0
+    [ -n "$sel" ] || exit 0
+    say "Removing: $(echo $sel)"
+    for p in $sel; do
+      if in_list "$AUR" "$p" && command -v yay >/dev/null; then yay -Rns "$p" && del_line "$AUR" "$p"
+      else sudo pacman -Rns "$p" && { del_line "$PAC" "$p"; del_line "$AUR" "$p"; }; fi
+    done
+    pause ;;
+  update)
+    say "Updating the system"
+    if command -v yay >/dev/null; then yay -Syu; else sudo pacman -Syu; fi
+    pause ;;
+  git-status)
+    git -C "$REPO" fetch --quiet 2>/dev/null
+    up=$(git -C "$REPO" rev-parse --abbrev-ref '@{u}' 2>/dev/null) || { echo '{"behind":0,"ahead":0,"dirty":false,"error":"no upstream"}'; exit 0; }
+    read -r ahead behind < <(git -C "$REPO" rev-list --left-right --count "HEAD...$up")
+    dirty=false; [ -n "$(git -C "$REPO" status --porcelain)" ] && dirty=true
+    printf '{"behind": %s, "ahead": %s, "dirty": %s}\n' "$behind" "$ahead" "$dirty" ;;
+  git-sync)
+    cd "$REPO" || exit 1
+    say "Fetching"
+    git fetch --quiet
+    if [ -n "$(git status --porcelain)" ]; then
+      say "Local changes: committing"
+      git add -A && git commit -q -m "Update configs from $(uname -n)" || { pause; exit 1; }
+    fi
+    read -r ahead behind < <(git rev-list --left-right --count "HEAD...$(git rev-parse --abbrev-ref '@{u}')")
+    if [ "$behind" -gt 0 ]; then say "Pulling $behind new commits"; git pull --rebase --autostash || { echo "Pull failed, nothing was pushed."; pause; exit 1; }; fi
+    if [ "$(git rev-list --count '@{u}..HEAD')" -gt 0 ]; then say "Pushing"; git push || { pause; exit 1; }; fi
+    # only when this checkout is the one that ~/.config is linked to
+    if command -v stow >/dev/null && [ "$(readlink -f "$HOME/.config/torii")" = "$(readlink -f "$REPO/.config/torii")" ]; then
+      say "Linking new files"; stow . 2>&1 | tail -3
+    fi
+    say "Dotfiles are in sync"
+    pause ;;
+  *) sed -n '2,12p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac

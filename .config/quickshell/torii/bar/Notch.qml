@@ -94,25 +94,26 @@ PanelWindow {
         }
     }
 
-    // what is switched on right now: a second, separate pill to the right of the notch
-    NotchShape {
+    // what is switched on right now: its own round pill next to the notch (a lone circle sits in a circle)
+    Rectangle {
         id: activity
-        readonly property real inner: acts.implicitWidth + 24
+        readonly property real size: win.floating ? win.barH : win.barH - 8
+        readonly property real pad: (size - 22) / 2
         x: shape.x + shape.width + 8
-        y: win.topGap
-        width: acts.count > 0 ? inner + 2 * win.ear : 0
-        height: win.barH
+        y: win.floating ? win.topGap : 4
+        height: size
+        width: acts.count > 0 ? acts.implicitWidth + 2 * pad : 0
+        radius: size / 2
         opacity: acts.count > 0 ? 1 : 0
+        visible: opacity > 0
         color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Config.notch.opacity)
-        radius: Config.notch.radius
-        floating: win.floating
 
         Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
         Behavior on opacity { NumberAnimation { duration: 160 } }
 
         Indicators {
             id: acts
-            x: win.ear + 12
+            x: activity.pad
             anchors.verticalCenter: parent.verticalCenter
         }
     }
