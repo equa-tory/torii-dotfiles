@@ -105,8 +105,8 @@ def read_config():
         return {}
 
 
-def build_tokens(accent_src, tint, accent_override=None, mode="dark"):
-    """accent_src: raw hex from the wallpaper. Returns the one token set."""
+def build_tokens(accent_src, tint, accent_override=None, mode="dark", others=None):
+    """accent_src: raw hex from the wallpaper, others: its secondary/tertiary. Returns the one token set."""
     L0, C0, hue = rgb_to_oklch(hex_to_rgb(accent_src))
     tint = min(1.0, max(0.0, tint))
     dark = mode != "light"
@@ -157,11 +157,31 @@ def build_tokens(accent_src, tint, accent_override=None, mode="dark"):
         t[name] = semantic(h)
 
     bright = lambda h: semantic(h, 0.83 if dark else 0.42, 0.15)
+
+    # a five-step gradient accent -> secondary -> tertiary for the prompt and the terminal's blue/magenta/cyan
+    stops = [accent] + [c for c in (others or []) if c]
+    if len(stops) < 3:                      # no wallpaper palette: walk the hue around the accent
+        stops = [accent, oklch_to_hex(aL, aC, (aH + 40) % 360), oklch_to_hex(aL, aC, (aH + 80) % 360)]
+    lch = [rgb_to_oklch(hex_to_rgb(c)) for c in stops[:3]]
+    # tonal schemes keep all three close together: make sure the gradient spans at least ~60 degrees
+    span = abs(((lch[2][2] - lch[0][2] + 180) % 360) - 180)
+    if span < 60:
+        sign = 1 if ((lch[2][2] - lch[0][2] + 180) % 360) - 180 >= 0 else -1
+        lch[1] = (lch[1][0], lch[1][1], (lch[0][2] + sign * 30) % 360)
+        lch[2] = (lch[2][0], lch[2][1], (lch[0][2] + sign * 60) % 360)
+    def ramp(f):
+        i = min(1, int(f * 2)); u = f * 2 - i
+        (l1, c1, h1), (l2, c2, h2) = lch[i], lch[i + 1]
+        dh = ((h2 - h1 + 180) % 360) - 180
+        L = min(max(lo, hi), max(min(lo, hi), l1 + (l2 - l1) * u))
+        return oklch_to_hex(L, max(0.09, c1 + (c2 - c1) * u), (h1 + dh * u) % 360)
+    for i in range(5):
+        t[f"ramp{i + 1}"] = ramp(i / 4)
     t.update({
         "term0": t["surface"], "term1": t["red"], "term2": t["green"], "term3": t["yellow"],
-        "term4": t["blue"], "term5": t["magenta"], "term6": t["cyan"], "term7": t["fgDim"],
+        "term4": t["ramp1"], "term5": t["ramp5"], "term6": t["ramp3"], "term7": t["fgDim"],
         "term8": t["muted"], "term9": bright(25), "term10": bright(145),
-        "term11": bright(95), "term12": bright(255), "term13": bright(330), "term14": bright(200),
+        "term11": bright(95), "term12": t["ramp2"], "term13": t["ramp4"], "term14": t["ramp3"],
         "term15": t["fg"],
         # seed for the browser theme: Chromium derives its whole frame from it, so keep it tone-correct
         "browser": oklch_to_hex(0.16 if dark else 0.95, 0.008 + tint * 0.01, aH),
@@ -190,12 +210,14 @@ def sha256_file(path):
     return h.hexdigest()
 
 
-def extract_accent(image, digest):
-    """matugen primary (dark) for the image, cached by image hash."""
+def extract_palette(image, digest):
+    """matugen primary/secondary/tertiary (dark) for the image, cached by image hash."""
     cache = CACHE / "palettes" / f"{digest}.json"
     try:
-        return json.loads(cache.read_text())["primary"]
-    except (OSError, ValueError, KeyError):
+        d = json.loads(cache.read_text())
+        if d.get("secondary") and d.get("tertiary"):
+            return d
+    except (OSError, ValueError):
         pass
     out = subprocess.run(
         ["matugen", "image", str(image), "-t", "scheme-tonal-spot", "-m", "dark",
@@ -203,10 +225,20 @@ def extract_accent(image, digest):
         capture_output=True, text=True, timeout=60)
     if out.returncode != 0:
         raise SystemExit(f"matugen failed: {out.stderr.strip() or out.stdout.strip()}")
-    primary = json.loads(out.stdout)["colors"]["primary"]["dark"]["color"][:7]
+    cols = json.loads(out.stdout)["colors"]
+    d = {k: cols[k]["dark"]["color"][:7] for k in ("primary", "secondary", "tertiary")}
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps({"primary": primary}))
-    return primary
+    cache.write_text(json.dumps(d))
+    return d
+
+
+def extract_accent(image, digest):
+    return extract_palette(image, digest)["primary"]
+
+
+def palette_args(image, digest):
+    p = extract_palette(image, digest)
+    return p["primary"], [p["secondary"], p["tertiary"]]
 
 
 def override_for(image):
@@ -234,8 +266,9 @@ def compute(image):
     tint = float(read_config().get("theme", {}).get("tint", 0.15))
     override = override_for(image)
     mode = get_mode()
-    key = hashlib.sha256(f"{digest}|{tint}|{override}|{mode}".encode()).hexdigest()[:16]
-    tokens = build_tokens(extract_accent(image, digest), tint, override, mode)
+    key = hashlib.sha256(f"v3|{digest}|{tint}|{override}|{mode}".encode()).hexdigest()[:16]
+    prim, others = palette_args(image, digest)
+    tokens = build_tokens(prim, tint, override, mode, others)
     tokens.update({"wallpaper": str(image), "hash": key})
     return tokens
 
@@ -458,7 +491,8 @@ def main(argv):
             for mode in ("dark", "light"):
                 for tint in (0.0, 0.15, 1.0):
                     try:
-                        check_tokens(build_tokens(extract_accent(img, sha256_file(img)), tint, override_for(img), mode))
+                        prim, others = palette_args(img, sha256_file(img))
+                        check_tokens(build_tokens(prim, tint, override_for(img), mode, others))
                         status = "ok"
                     except AssertionError as e:
                         status, bad = f"FAIL {e}", bad + 1

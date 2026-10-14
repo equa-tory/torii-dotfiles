@@ -1,6 +1,6 @@
 {
   "notch": {
-    "shape": "attached",
+    "shape": "floating",
     "opacity": 1.0,
     "radius": 16,
     "height": 34,
@@ -10,8 +10,9 @@
     "count": 4
   },
   "weather": {
-    "lat": 55.75,
-    "lon": 37.62,
+    "location": "",
+    "lat": 0,
+    "lon": 0,
     "refreshMin": 20
   },
   "wallpaper": {
@@ -33,6 +34,13 @@
     "from": "~/Downloads",
     "to": "/mnt/mass/Media_MASS/Photo/inbox"
   },
-  "launcher": { "rememberBack": true, "rememberForward": true, "menuHistory": true, "placeholder": "Search apps  ·  ↓ opens the menus" },
-  "nightlight": { "rampMinutes": 30 }
+  "launcher": {
+    "rememberBack": true,
+    "rememberForward": false,
+    "menuHistory": true,
+    "placeholder": "Search apps  \u00b7  \u2193 opens the menus"
+  },
+  "nightlight": {
+    "rampMinutes": 30
+  }
 }

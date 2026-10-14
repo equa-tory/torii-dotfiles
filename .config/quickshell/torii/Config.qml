@@ -44,8 +44,9 @@ Singleton {
                 property int count: 5
             }
             property JsonObject weather: JsonObject {
-                property real lat: 55.75
-                property real lon: 37.62
+                property string location: ""     // city name; empty = the one in the system timezone
+                property real lat: 0               // set both to pin exact coordinates (0 = automatic)
+                property real lon: 0
                 property int refreshMin: 20
             }
             property JsonObject wallpaper: JsonObject {

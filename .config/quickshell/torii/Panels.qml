@@ -3,12 +3,13 @@ import Quickshell
 import Quickshell.Hyprland
 import QtQuick
 import qs
+import qs.services
 
 // Which panel is open, and on which monitor. Only the focused monitor ever opens one.
 Singleton {
     id: root
 
-    property string panel: ""        // "" | control | launcher | switcher
+    property string panel: ""        // "" | control | launcher | switcher | weather
     property string panelScreen: ""
 
     // wallpaper shown while the switcher previews (focused monitor only), "" = the real one
@@ -27,6 +28,8 @@ Singleton {
         running: root.pendingWallpaper !== ""
         onTriggered: root.pendingWallpaper = ""
     }
+
+    Binding { target: ClaudeUsage; property: "watching"; value: root.panel === "launcher" }
 
     function open(name) {
         panelScreen = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";

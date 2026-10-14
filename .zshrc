@@ -12,6 +12,17 @@ source ~/.local/share/powerlevel10k/powerlevel10k.zsh-theme
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
+# prompt colours follow the wallpaper (torii-theme); open shells pick up a new wallpaper at the next prompt
+_torii_p10k=~/.local/state/torii/theme/p10k-colors.zsh
+[[ -r $_torii_p10k ]] && source $_torii_p10k
+_torii_p10k_sync() {
+  local m; m=$(stat -c %Y $_torii_p10k 2>/dev/null) || return
+  [[ $m == $_torii_p10k_m ]] && return
+  [[ -n $_torii_p10k_m ]] && { source $_torii_p10k; (( $+functions[p10k] )) && p10k reload }
+  _torii_p10k_m=$m
+}
+precmd_functions+=(_torii_p10k_sync)
+
 # suggestions as you type (grey, accept with right arrow) and command colours; syntax-highlighting must be last
 for _p in /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh; do [[ -r $_p ]] && source $_p; done
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)

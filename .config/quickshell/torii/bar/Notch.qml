@@ -76,7 +76,12 @@ PanelWindow {
 
             Workspaces { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
             Clock { anchors.verticalCenter: parent.verticalCenter }
-            Weather { anchors.verticalCenter: parent.verticalCenter }
+            Weather {
+                anchors.verticalCenter: parent.verticalCenter
+                open: win.panelHere && Panels.panel === "weather"
+                launcher: win.panelHere && Panels.panel === "launcher"
+            }
+            VolumeOsd { anchors.verticalCenter: parent.verticalCenter }
             ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
         }
 
@@ -90,6 +95,7 @@ PanelWindow {
             clip: true
             sourceComponent: Panels.panel === "control" ? controlPanel
                            : Panels.panel === "switcher" ? switcherPanel
+                           : Panels.panel === "weather" ? weatherPanel
                            : Panels.panel === "launcher" ? launcherPanel : null
         }
     }
@@ -120,5 +126,6 @@ PanelWindow {
 
     Component { id: controlPanel; ControlPanel {} }
     Component { id: switcherPanel; Switcher { maxWidth: win.width - 160 } }
+    Component { id: weatherPanel; WeatherPanel {} }
     Component { id: launcherPanel; Launcher {} }
 }
