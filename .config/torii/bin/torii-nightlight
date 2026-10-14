@@ -10,6 +10,9 @@
   auto <HH:MM> <HH:MM>      switch on at the first time and off at the second, every day
   auto off                  manual only
   apply                     restore after login (autostart runs this)
+  tick                      one step of the slow fade (a timer runs it every minute while the colour is moving)
+In auto mode the colour fades in over `nightlight.rampMinutes` (config.json, default 30, 0 = at once) when the window starts
+and fades out the same way before it ends. Manual on/off and the temperature slider act at once.
 State: ~/.local/state/torii/nightlight.json. The daily switches are transient systemd user timers.
 """
 import json
@@ -57,6 +60,8 @@ def shader_text(kelvin):
     g = max(0.0, min(1.0, (99.4708025861 * math.log(t) - 161.1195681661) / 255)) if t > 1 else 0.0
     b = 1.0 if t >= 66 else (0.0 if t <= 19 else max(0.0, min(1.0, (138.5177312231 * math.log(t - 10) - 305.0447927307) / 255)))
     r, g, b = 0.80, 0.80 * g ** 2.4, 0.70 * b ** 3.0
+    f = max(0.0, min(1.0, (6500 - kelvin) / 1500.0))     # no change at 6500 K, the full colour from 5000 K down
+    r, g, b = 1 + (r - 1) * f, 1 + (g - 1) * f, 1 + (b - 1) * f
     return ("#version 300 es\nprecision highp float;\nin vec2 v_texcoord;\nuniform sampler2D tex;\n"
             "layout(location = 0) out vec4 fragColor;\nvoid main() {\n    vec4 c = texture(tex, v_texcoord);\n"
             f"    fragColor = vec4(c.rgb * vec3({r:.3f}, {g:.3f}, {b:.3f}), c.a);\n}}\n")
@@ -66,9 +71,60 @@ def set_shader(path):
     sh("hyprctl", "eval", 'hl.config({decoration={screen_shader="%s"}})' % path)
 
 
+def ramp_minutes():
+    try:
+        return int(json.loads((Path.home() / ".config/torii/config.json").read_text()).get("nightlight", {}).get("rampMinutes", 30))
+    except (OSError, ValueError, TypeError):
+        return 30
+
+
+def window(s, now):
+    """(start, end) datetimes of the auto window that contains `now`, or None."""
+    from datetime import timedelta
+    ah, am = map(int, s["from"].split(":"))
+    bh, bm = map(int, s["to"].split(":"))
+    day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    a, b = day + timedelta(hours=ah, minutes=am), day + timedelta(hours=bh, minutes=bm)
+    if a <= b:
+        return (a, b) if a <= now < b else None
+    if now >= a:
+        return a, b + timedelta(days=1)
+    if now < b:
+        return a - timedelta(days=1), b
+    return None
+
+
+def ramp_state(s, now=None):
+    """(effective kelvin, seconds until the next tick is needed or None). Inside an auto window the colour eases in over
+    rampMinutes after the start and eases out before the end; manual use is always the full temperature."""
+    from datetime import timedelta
+    now = now or datetime.now()
+    if not s["on"]:
+        return 6500, None
+    m = ramp_minutes()
+    w = window(s, now) if s["auto"] and m > 0 else None
+    if not w:
+        return s["temp"], None
+    dur = m * 60.0
+    f_in = (now - w[0]).total_seconds() / dur
+    f_out = (w[1] - now).total_seconds() / dur
+    f = max(0.0, min(1.0, min(f_in, f_out)))
+    eff = round(6500 + (s["temp"] - 6500) * f)
+    if f < 1:
+        return eff, 60
+    return eff, max(30, int((w[1] - now).total_seconds() - dur))       # the plateau: wake up when the way back begins
+
+
+def arm_tick(seconds):
+    sh("systemctl", "--user", "stop", "torii-nl-tick.timer")
+    if seconds and not os.environ.get("TORII_NO_HOOKS"):
+        sh("systemd-run", "--user", "--collect", "--unit=torii-nl-tick", f"--on-active={int(seconds)}s", SELF, "tick")
+
+
 def push(s):
     if os.environ.get("TORII_NO_HOOKS"):
         return
+    eff = s.get("eff", s["temp"])
     if s["mode"] != "filter":
         set_shader("")                            # nothing else may keep a shader on the screen
     if s["mode"] == "filter":
@@ -76,7 +132,7 @@ def push(s):
             sh("hyprctl", "hyprsunset", "identity")
         if s["on"]:
             tmp = SHADER.with_suffix(".tmp")
-            tmp.write_text(shader_text(s["temp"]))
+            tmp.write_text(shader_text(eff))
             os.replace(tmp, SHADER)
             set_shader(str(SHADER))
         else:
@@ -97,7 +153,7 @@ def push(s):
             subprocess.run(["sleep", "0.1"])
         subprocess.run(["sleep", "0.3"])
     if s["on"]:
-        sh("hyprctl", "hyprsunset", "temperature", str(s["temp"]))
+        sh("hyprctl", "hyprsunset", "temperature", str(min(6500, eff)))
     else:
         sh("hyprctl", "hyprsunset", "identity")
 
@@ -141,12 +197,18 @@ def main(a):
     elif cmd == "apply":
         if s["auto"]:
             s["on"] = in_window(s)
+    elif cmd == "tick":
+        if s["auto"] and not in_window(s):
+            s["on"] = False
     else:
         print(__doc__)
         sys.exit(2)
+    s["eff"], wait = ramp_state(s)
     save(s)
     push(s)
-    timers(s)
+    arm_tick(wait)
+    if cmd != "tick":
+        timers(s)
 
 
 if __name__ == "__main__":

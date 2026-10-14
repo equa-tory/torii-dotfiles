@@ -17,6 +17,7 @@ Singleton {
     readonly property var apps: adapter.apps
     readonly property var theme: adapter.theme
     readonly property var font: adapter.font
+    readonly property var launcher: adapter.launcher
     readonly property string quicklinks: adapter.quicklinks
 
     function expand(path) {
@@ -60,6 +61,12 @@ Singleton {
             property JsonObject font: JsonObject {
                 property string family: "JetBrainsMono Nerd Font"
                 property int size: 13
+            }
+            property JsonObject launcher: JsonObject {
+                property bool rememberBack: true       // going back lands on the row you came from
+                property bool rememberForward: true    // entering a menu again lands on the row you left there
+                property bool menuHistory: true        // menus you used before rank higher while you search
+                property string placeholder: "Search apps  ·  ↓ opens the menus"
             }
             property string quicklinks: "~/.config/torii/quicklinks.json"
         }

@@ -2,6 +2,6 @@
   "order": ["apps", "trigger", "setup", "install", "remove", "learn", "todo", "system"],
   "hidden": [],
   "submenus": {
-    "setup": ["configs", "defaults", "nightlight", "network", "bluetooth", "input", "output"]
+    "setup": ["configs", "defaults", "nightlight", "network", "bluetooth", "input", "output", "mouse"]
   }
 }

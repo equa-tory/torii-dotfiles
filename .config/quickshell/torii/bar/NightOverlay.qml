@@ -10,11 +10,11 @@ PanelWindow {
     id: win
 
     readonly property bool active: Live.nightOn && Live.night.mode === "overlay"
-    readonly property real kelvin: Live.night.temp
+    readonly property real kelvin: Live.night.eff !== undefined ? Live.night.eff : Live.night.temp
 
     // 6500 K = no tint; lower = a deeper, darker red-orange layer (it dims a little, like a real night mode)
     readonly property real warmth: Math.max(0, Math.min(1, (6500 - kelvin) / 4500))
-    readonly property real strength: warmth <= 0 ? 0 : 0.16 + 0.44 * warmth
+    readonly property real strength: 0.65 * warmth
     readonly property color warm: Qt.rgba(0.30, 0.05 * (1 - warmth) + 0.02, 0.0, 1)
 
     visible: active || fade.running

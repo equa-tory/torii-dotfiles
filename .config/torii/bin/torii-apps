@@ -221,11 +221,13 @@ def sync_web():
     keep = set()
     for w in load_list("webapps.json"):
         url = w["url"] if "://" in w["url"] else "https://" + w["url"]
+        from urllib.parse import urlparse
+        u = urlparse(url)
         f = target / f"torii-web-{slug(w['name'])}.desktop"
         keep.add(f.name)
         f.write_text("[Desktop Entry]\nType=Application\nVersion=1.0\n"
                      f"Name={w['name']}\nComment=Web app\nIcon={favicon(url, w['name'])}\n"
-                     f"Exec=helium-browser --app={url}\nTerminal=false\nCategories=Network;\nStartupWMClass=helium-{slug(w['name'])}\n"
+                     f"Exec=helium-browser --app={url}\nTerminal=false\nCategories=Network;\nStartupWMClass=chrome-{u.netloc}_{(u.path or '/').replace('/', '_')}-Default\n"
                      "X-Torii-Web=true\n")
     for old in target.glob("torii-web-*.desktop"):
         if old.name not in keep:

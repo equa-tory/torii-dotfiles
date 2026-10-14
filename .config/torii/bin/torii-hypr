@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""torii-hypr layout <dwindle|master|scrolling> | gaps <inner> <outer> | status | apply
+"""torii-hypr layout <dwindle|master|scrolling> | gaps <inner> <outer> | sensitivity <-1..1> | status | apply
 
 Runtime choices made from the launcher. They are kept in ~/.local/state/torii/hypr-user.json, applied to the running
 Hyprland at once and re-applied at every start through hypr-user.lua (hyprland.lua loads it last).
@@ -23,12 +23,17 @@ def load():
 
 
 def lua(s):
+    inp = ""
+    if "sens" in s:
+        inp = ", input={sensitivity=%s}" % float(s["sens"])
     parts = []
     if "layout" in s:
         parts.append(f'layout="{s["layout"]}"')
     if "gaps_in" in s:
         parts.append(f'gaps_in={int(s["gaps_in"])}, gaps_out={int(s["gaps_out"])}')
-    return "hl.config({general={%s}})\n" % ", ".join(parts) if parts else "-- nothing chosen yet\n"
+    if not parts and not inp:
+        return "-- nothing chosen yet\n"
+    return "hl.config({%s%s})\n" % ("general={%s}" % ", ".join(parts) if parts else "", inp if parts else inp.lstrip(", "))
 
 
 def save(s):
@@ -44,16 +49,27 @@ def apply(s):
         subprocess.run(["hyprctl", "eval", lua(s).strip()], capture_output=True)
 
 
+def live_sensitivity():
+    try:
+        out = subprocess.run(["hyprctl", "getoption", "input:sensitivity", "-j"], capture_output=True, text=True, timeout=3).stdout
+        return float(json.loads(out).get("float", 0.0))
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0.0
+
+
 def main(a):
     s = load()
     if a[:1] == ["status"]:
-        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20}
+        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20, "sens": live_sensitivity()}
         print(json.dumps({**cur, **s}))
         return
     if a[:1] == ["layout"] and len(a) == 2 and a[1] in LAYOUTS:
         s["layout"] = a[1]
     elif a[:1] == ["gaps"] and len(a) == 3 and a[1].isdigit() and a[2].isdigit():
         s["gaps_in"], s["gaps_out"] = int(a[1]), int(a[2])
+    elif a[:1] == ["sensitivity"] and len(a) == 2:
+        v = max(-1.0, min(1.0, round(float(a[1]), 2)))
+        s["sens"] = v
     elif a[:1] == ["apply"]:
         apply(s)
         return

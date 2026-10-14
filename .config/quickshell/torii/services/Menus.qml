@@ -69,9 +69,10 @@ Singleton {
     JsonFetch { id: fLearnTmux; command: [root.bin("torii-learn"), "list", "tmux"];       onDataChanged: root.bump() }
     JsonFetch { id: fLearnNvim; command: [root.bin("torii-learn"), "list", "nvim"];       onDataChanged: root.bump() }
     JsonFetch { id: fNotes;    command: [root.bin("torii-learn"), "files"];               onDataChanged: root.bump() }
+    JsonFetch { id: fHypr;     command: [root.bin("torii-hypr"), "status"];                onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fTrans, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fTrans, fHypr, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
@@ -119,6 +120,33 @@ Singleton {
         return nodes;
     }
 
+    // ---- menu history: what you opened before ranks higher while you search (never touches apps, never leaves the machine)
+    property var usage: ({})
+    FileView {
+        id: usageFile
+        path: Config.stateDir + "/menu-usage.json"
+        printErrors: false
+        onLoaded: { try { root.usage = JSON.parse(text()); } catch (e) { root.usage = {}; } }
+    }
+    function touch(keys) {
+        if (!Config.launcher.menuHistory || !keys.length || keys[0] === "apps") return;
+        const u = Object.assign({}, usage);
+        const now = Date.now();
+        for (let i = 1; i <= keys.length; i++) {
+            const k = keys.slice(0, i).join("/");
+            const cur = u[k] || { n: 0, t: 0 };
+            u[k] = { n: cur.n + (i === keys.length ? 1 : 0.4), t: now };       // the menus above it count a little too
+        }
+        usage = u;
+        usageFile.setText(JSON.stringify(u));
+    }
+    function boost(chain, id) {
+        if (!Config.launcher.menuHistory) return 0;
+        const r = usage[chain.concat([id]).join("/")];
+        if (!r) return 0;
+        return 45 * Math.exp(-(Date.now() - r.t) / (7 * 86400000)) + Math.min(r.n, 12) * 5;
+    }
+
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
@@ -145,7 +173,7 @@ Singleton {
                 { text: e.node.keywords || "", weight: 0.6 },
                 { text: e.node.sub || "", weight: 0.3 }
             ]);
-            if (s >= 0) scored.push({ e: e, s: s - (isMenu(e.node) && !e.node.flat ? 0 : 0) });
+            if (s >= 0) scored.push({ e: e, s: s + boost(e.chain, e.node.id) });
         }
         scored.sort((a, b) => b.s - a.s);
         return scored.map(x => x.e);
@@ -177,15 +205,14 @@ Singleton {
             transcodeMenu(),
             { id: "emoji", name: "Emoji", glyph: Icons.emoji, sub: "Copy and type an emoji", noSearch: true, sorted: true,
               children: () => { fEmoji.ensure(); return emojiNodes; } },
-            { id: "reminder", name: "Reminder", glyph: Icons.timer, sub: "In some minutes, with a message", keywords: "timer alarm notify", keep: true,
-              run: () => ask("Remind me in (minutes)", false, m => {
-                  const n = parseFloat(String(m).replace(",", "."));
-                  if (!(n > 0)) { say("Type a number of minutes, like 25"); return; }
-                  ask("Remind me about…", false, msg => {
-                      sh([bin("torii-remind"), "add", String(n), msg || "Time is up"]);
-                      Panels.close();
-                  });
-              }) },
+            { id: "reminder", name: "Reminder", glyph: Icons.timer, keywords: "timer alarm notify cancel stop", keep: true,
+              sub: Live.reminders.length ? Live.reminders.length + " active  ·  → to see or stop them" : "In some minutes, with a message",
+              badge: Live.reminders.length ? String(Live.reminders.length) : "",
+              run: () => newReminder(),
+              children: () => [{ id: "new", name: "New reminder…", glyph: Icons.plus, keep: true, run: () => newReminder() }].concat(
+                  Live.reminders.map(r => ({ id: "r" + r.id, name: r.msg || "Reminder", glyph: Icons.timer, keep: true,
+                      sub: Math.max(1, Math.round(Live.remaining(r) / 60)) + " min left  ·  Enter stops it",
+                      run: () => sh([bin("torii-remind"), "cancel", r.id]) }))) },
             { id: "automove", name: "File auto mover", glyph: Icons.folderMove, keywords: "downloads move inbox photos",
               sub: t.automove.enabled ? "Moving new files to " + (t.automove.to || "").replace(home, "~") : "Downloads → " + (t.automove.to || "your inbox folder").replace(home, "~"),
               badge: t.automove.enabled ? "On" : "Off", keep: true, run: () => toggle([bin("torii-automove"), t.automove.enabled ? "off" : "on"]) },
@@ -245,6 +272,17 @@ Singleton {
             { id: "boot", name: "Until reboot", sub: "Removed at the next boot or shutdown", glyph: Icons.power, keep: true, run: () => sudoOn("boot", "until reboot") },
             { id: "off", name: "Turn off", sub: on ? "" : "Not on right now", glyph: Icons.close, keep: true,
               run: () => { if (!on) return; runWithInput([bin("torii-sudo"), "off"], "", code => say(code === 0 ? "Passwordless sudo off" : "Could not turn it off")); } } ] };
+    }
+
+    function newReminder() {
+        ask("Remind me in (minutes)", false, m => {
+            const n = parseFloat(String(m).replace(",", "."));
+            if (!(n > 0)) { say("Type a number of minutes, like 25"); return; }
+            ask("Remind me about…", false, msg => {
+                sh([bin("torii-remind"), "add", String(n), msg || "Time is up"]);
+                Panels.close();
+            });
+        });
     }
 
     function captureMenu(t) {
@@ -417,7 +455,15 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output")] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+    }
+
+    function mouseNode() {
+        fHypr.ensure();
+        const cur = Live.hypr.sens !== undefined ? Live.hypr.sens : (fHypr.data && fHypr.data.sens !== undefined ? fHypr.data.sens : 0);
+        return { id: "mouse", name: "Mouse sensitivity", glyph: Icons.mouse, keywords: "pointer speed cursor",
+                 slider: { min: -1, max: 1, step: 0.05, value: cur, unit: "", decimals: 2 },
+                 onSlide: v => sh([bin("torii-hypr"), "sensitivity", String(v)]) };
     }
 
     function file(id, name, path, sub) {
@@ -473,10 +519,8 @@ Singleton {
                 { id: "gpu", name: "GPU", sub: "hyprsunset changes the colours at the display", badge: s.mode === "gpu" ? "●" : "", keep: true, run: () => night(["mode", "gpu"]) },
                 { id: "filter", name: "Screen filter", sub: "A shader on the whole screen: a calm dark red, works on any GPU", badge: s.mode === "filter" ? "●" : "", keep: true, run: () => night(["mode", "filter"]) },
                 { id: "overlay", name: "Screen overlay", sub: "A transparent warm layer over every screen, it can only blend", badge: s.mode === "overlay" ? "●" : "", keep: true, run: () => night(["mode", "overlay"]) } ] },
-            { id: "temp", name: "Temperature", glyph: Icons.tune, sub: s.temp + " K", children: () =>
-                [2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000].map(k => ({
-                    id: "t" + k, name: k + " K", sub: k <= 3000 ? "very warm" : k <= 4000 ? "warm" : k <= 5000 ? "mild" : "slight", badge: s.temp === k ? "●" : "", keep: true,
-                    run: () => night(["temp", String(k)]) })) },
+            { id: "temp", name: "Temperature", glyph: Icons.tune, keywords: "kelvin warm slider",
+              slider: { min: 2000, max: 6500, step: 100, value: s.temp, unit: " K", decimals: 0 }, onSlide: v => night(["temp", String(v)]) },
             { id: "schedule", name: "Schedule", glyph: Icons.nightLight, sub: s.auto ? s.from + " → " + s.to : "Manual", children: () => [
                 { id: "manual", name: "Manual", sub: "Only when you switch it", badge: s.auto ? "" : "●", keep: true, run: () => night(["auto", "off"]) },
                 { id: "auto", name: "Evening to morning", sub: "20:00 → 07:00", badge: s.auto && s.from === "20:00" && s.to === "07:00" ? "●" : "", keep: true, run: () => night(["auto", "20:00", "07:00"]) },

@@ -43,9 +43,12 @@ Item {
             height: 22
 
             Shape {
+                id: ring
                 anchors.fill: parent
                 layer.enabled: true
                 layer.samples: 4
+                // repaint when the theme colour changes (a cached layer could otherwise keep the old colour)
+                Connections { target: root; function onTintChanged() { ring.layer.enabled = false; ring.layer.enabled = true; } }
                 ShapePath {
                     strokeColor: Theme.surface2
                     strokeWidth: 2

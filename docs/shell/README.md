@@ -69,6 +69,8 @@ Opens as a single input (`mainMod+SPACE`). Everything works from the keyboard:
 | `↑` on the first row | collapse back to the bare input |
 | `→` (cursor at the end) / `Enter` | open a menu or run the item (`→` on a Wi-Fi network or Bluetooth device opens its actions) |
 | `←` (cursor at the start) | go back one menu; at the top it collapses, then closes |
+| `Page Down` / `Page Up` | jump a page; `Home` / `End` (empty field) the first / last row |
+| `←` / `→` on a slider row | change it (`Shift` = bigger steps): night light temperature, mouse sensitivity (Setup) |
 | `Esc` | close (or cancel a question such as a password) |
 
 Typing searches every menu and submenu at once, with the path shown under each result (inside a menu it searches that menu).
@@ -168,3 +170,11 @@ Notifications (swaync keeps running; never run two daemons), lock screen, OSD po
 "just works" only, because Quickshell has no PIN/passkey agent.
 
 Each menu remembers the row you were on, so going back and forward lands where you left off (kept while the shell runs, nothing is written to disk).
+
+**Launcher settings** (`launcher` in `config.json`): `placeholder` is the hint in the empty field (it fades in a moment after the
+launcher opens), `rememberBack` / `rememberForward` switch the two row memories above, `menuHistory` lets menus and items you
+used before rank higher while you search (never apps; the counts stay in `~/.local/state/torii/menu-usage.json`; delete the
+file or set it to `false` to reset). Lists scroll smoothly and keep a row of margin, with a soft glow on the edge you can still scroll to.
+
+**Night light fade** (`nightlight.rampMinutes`, default 30, `0` = at once): with a daily schedule the colour eases in from
+nothing to your temperature after the start time and eases out again before the end. Manual on/off and the slider act at once.
