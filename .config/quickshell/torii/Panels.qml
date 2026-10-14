@@ -9,7 +9,7 @@ import qs.services
 Singleton {
     id: root
 
-    property string panel: ""        // "" | control | launcher | switcher | weather
+    property string panel: ""        // "" | control | launcher | switcher | weather | calendar
     property string panelScreen: ""
 
     // wallpaper shown while the switcher previews (focused monitor only), "" = the real one

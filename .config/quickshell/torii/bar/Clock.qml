@@ -3,7 +3,7 @@ import Quickshell
 import QtQuick
 import qs.widgets
 
-// Click swaps the time for the date inline, then swaps back after a few seconds.
+// Left click opens the calendar; right click swaps the time for the date inline, then back after a few seconds.
 Item {
     id: root
 
@@ -39,7 +39,8 @@ Item {
     MouseArea {
         anchors.fill: parent
         anchors.margins: -4
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.showDate = !root.showDate
+        onClicked: mouse => { if (mouse.button === Qt.RightButton) root.showDate = !root.showDate; else Panels.toggle("calendar"); }
     }
 }

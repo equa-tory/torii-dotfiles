@@ -27,7 +27,7 @@ browser = defaults.TORII_BROWSER or "helium-browser"
 ---- KEYBINDINGS ----
 ---------------------
 
-local mainMod = "ALT" -- Sets "Windows" key as main modifier
+local mainMod = "ALT" -- main modifier (Alt everywhere; the Super key is left free)
 
 -- torii shell
 local qsipc = "qs -c torii ipc call "

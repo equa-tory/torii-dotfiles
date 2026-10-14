@@ -5,7 +5,7 @@ panel, a wallpaper switcher and a launcher. A CLI (`torii-theme`) restyles the w
 
 ## Keys
 
-`mainMod` is `ALT` in `.config/hypr/modules/binds.lua` (change it to `SUPER` on real hardware).
+`mainMod` is `ALT` in `.config/hypr/modules/binds.lua`, on every machine (the Super key is left free).
 
 | Key | Does |
 |---|---|
@@ -17,7 +17,7 @@ panel, a wallpaper switcher and a launcher. A CLI (`torii-theme`) restyles the w
 | `mainMod + SHIFT + Q / W / E` | screenshot, screenshot of a zone, start/stop screen recording |
 
 `Esc` or a click outside closes any panel. Panels only open on the focused monitor.
-(With `ALT`, `CTRL + ALT + SPACE` also hits the XKB layout toggle in `input.lua`; with `SUPER` there is no clash.)
+(`CTRL + ALT + SPACE` also hits the XKB layout toggle in `input.lua`.)
 
 ## Config
 

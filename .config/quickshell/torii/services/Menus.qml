@@ -150,7 +150,7 @@ Singleton {
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
-    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()]); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), weatherNode(), calendarNode(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()]); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
@@ -196,6 +196,17 @@ Singleton {
     // ================= Trigger
     function toggle(args) { sh(args); }
     function human(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+
+    // panels that open in place of the launcher
+    function weatherNode() {
+        return { id: "weather", name: "Weather", glyph: Weather.glyph, keywords: "forecast rain temperature wind",
+                 sub: Weather.available ? Math.round(Weather.temp) + "°  ·  " + Weather.describe(Weather.code) : "Forecast", keep: true,
+                 run: () => Panels.open("weather") };
+    }
+    function calendarNode() {
+        return { id: "calendar", name: "Calendar", glyph: Icons.calendar, keywords: "date month day", sub: "This month", keep: true,
+                 run: () => Panels.open("calendar") };
+    }
 
     function triggerMenu() {
         const t = { automove: Live.automove, dnd: Live.dnd, recording: Live.recording, hypr: Live.hypr, shape: shapeNow };

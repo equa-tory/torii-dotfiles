@@ -22,6 +22,7 @@ Row {
 
     // only the identity of the entries lives here, so the list is rebuilt when something switches, not every second
     readonly property var entries: {
+        if (Live.dnd) return [{ kind: "dnd", key: "dnd" }];       // do not disturb: nothing else is shown
         const out = [];
         for (const r of Live.reminders) out.push({ kind: "reminder", key: "r" + r.id, r: r });
         if (Live.sudoOn) out.push({ kind: "sudo", key: "sudo" });

@@ -48,6 +48,13 @@ Item {
     Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
     Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
+    // right click: one menu back, then collapse
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onClicked: { if (root.asking) Menus.endPrompt(); else if (root.pathIds.length) root.back(); else if (root.expanded) root.expanded = false; }
+    }
+
     // a quicklink icon of a single character is a font glyph, anything longer is an icon name or an image path
     function glyphOf(i) { return i && i.length <= 2 && String.fromCodePoint(i.codePointAt(0)) === i ? i : ""; }
 
@@ -57,7 +64,13 @@ Item {
     }
 
     // rebuild the list; keepSel keeps the highlighted row when only the data changed
+    // while a slider is being dragged the rows must not be rebuilt (the mouse grab would be lost)
+    property bool dragging: false
+    property bool dirty: false
+    onDraggingChanged: if (!dragging && dirty) { dirty = false; update(true); }
+
     function update(keepSel) {
+        if (dragging) { dirty = true; return; }
         if (asking) { results = []; return; }
         path = Menus.resolve(pathIds);
         if (path.length < pathIds.length) pathIds = pathIds.slice(0, path.length);
@@ -142,16 +155,17 @@ Item {
     function sliderValue(n) { return pending && pending.id === n.id ? pending.value : n.slider.value; }
     function sliderText(n) { const v = sliderValue(n); return v.toFixed(n.slider.decimals || 0) + (n.slider.unit || ""); }
     function selectedSlider() { return results[selected] && results[selected].node.slider ? results[selected].node : null; }
-    function adjust(dir, big) {
-        const n = selectedSlider();
-        if (!n) return;
+    function setSlider(n, v) {
         const sl = n.slider;
-        let v = sliderValue(n) + dir * sl.step * (big ? 5 : 1);
         v = Math.max(sl.min, Math.min(sl.max, Math.round(v / sl.step) * sl.step));
         v = Number(v.toFixed(sl.decimals || 0));
         pending = { id: n.id, value: v };
         commit.node = n; commit.value = v; commit.restart();
         clearPending.restart();
+    }
+    function adjust(dir, big) {
+        const n = selectedSlider();
+        if (n) setSlider(n, sliderValue(n) + dir * n.slider.step * (big ? 5 : 1));
     }
     Timer { id: commit; interval: 130; property var node: null; property real value: 0
            onTriggered: if (node) node.onSlide(value) }
@@ -466,6 +480,7 @@ Item {
                         Layout.fillWidth: true
                     }
                     Item {
+                        id: sliderBar
                         visible: row.node.slider !== undefined
                         Layout.fillWidth: true
                         Layout.preferredHeight: 10
@@ -508,11 +523,25 @@ Item {
             }
 
             MouseArea {
+                id: rowMouse
                 anchors.fill: parent
                 hoverEnabled: true
+                preventStealing: row.node.slider !== undefined
                 cursorShape: Qt.PointingHandCursor
-                onPositionChanged: { if (root.selected !== row.index) { root.selected = row.index; root.remember(); } }
-                onClicked: { root.selected = row.index; root.activate(false); }
+                // a slider row is dragged: press or move along the bar sets the value
+                function drag(mx) {
+                    const x = sliderBar.mapFromItem(rowMouse, mx, 0).x;
+                    const sl = row.node.slider;
+                    root.setSlider(row.node, sl.min + (sl.max - sl.min) * Math.max(0, Math.min(1, x / sliderBar.width)));
+                }
+                onPressed: mouse => { root.selected = row.index; if (row.node.slider) { root.dragging = true; drag(mouse.x); } }
+                onReleased: root.dragging = false
+                onCanceled: root.dragging = false
+                onPositionChanged: mouse => {
+                    if (pressed && row.node.slider) drag(mouse.x);
+                    else if (root.selected !== row.index) { root.selected = row.index; root.remember(); }
+                }
+                onClicked: { root.selected = row.index; if (!row.node.slider) root.activate(false); }
             }
         }
     }

@@ -59,6 +59,7 @@ Singleton {
     readonly property string bell: g(0xF009C)
     readonly property string bellOff: g(0xF009D)
     readonly property string timer: g(0xF13AB)
+    readonly property string calendar: g(0xF00ED)
     readonly property string themeDark: g(0xF050E)
     readonly property string layout: g(0xF056E)
     readonly property string speed: g(0xF04C5)
