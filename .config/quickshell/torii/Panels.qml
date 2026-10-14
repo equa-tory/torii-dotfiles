@@ -30,7 +30,10 @@ Singleton {
         onTriggered: root.pendingWallpaper = ""
     }
 
-    Binding { target: ClaudeUsage; property: "watching"; value: root.panel === "launcher" }
+    // the widgets around the notch only run while the launcher or the control panel is open
+    readonly property bool widgetsOn: panel === "launcher" || panel === "control"
+    Binding { target: ClaudeUsage; property: "watching"; value: root.widgetsOn }
+    Binding { target: Sys; property: "watching"; value: root.widgetsOn }
 
     function open(name) {
         panelScreen = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";

@@ -208,3 +208,9 @@ Sounds (`torii-sound`): `sounds.reminder` / `sounds.notification` in `config.jso
 ring that fills with the track. Click it: title, artist and album (click them to bring the player forward), previous /
 play / next, a seek bar you can drag, wheel or Left/Right (`media.seekSeconds`, default 10) to seek. Also from a key bind:
 `qs -c torii ipc call media toggle|next|previous|seek 10`.
+
+**Widgets** (`widgets.left` / `widgets.right` in `config.json`, or Setup › Widgets): they only take room while the launcher or the
+control panel is open. `system` (CPU, RAM, GPU, VRAM and temperatures, `torii-sys stats`; click: the process list),
+`claude` (usage ring), `battery` (only if the machine has one). **Processes** (launcher root, `torii-sys procs`): sort by
+CPU / RAM / GPU with the first row, type to filter by name or pid, Enter asks `y` (stop) or `9` (force kill). The session,
+the shell, Hyprland, systemd, D-Bus, PipeWire and v2rayN are never listed.

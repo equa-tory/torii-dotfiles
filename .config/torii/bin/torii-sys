@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""torii-sys stats | procs  -  numbers for the shell's system widget and its Processes menu (JSON on stdout).
+
+  stats   {"cpu": %, "ram": %, "vram": % or null, "cpuTemp": C or null, "gpuTemp": C or null, "gpu": % or null}
+  procs   every process (the shell sorts and filters them): [{"pid", "name", "cpu", "mem", "gpu"}]  (gpu: % of the GPU's shaders, NVIDIA only)
+Missing sensors come out as null, so the widget just leaves them out.
+"""
+import glob
+import json
+import os
+import subprocess
+import sys
+import time
+
+
+def cpu_percent():
+    def read():
+        f = open("/proc/stat").readline().split()[1:]
+        v = list(map(int, f))
+        return sum(v), v[3] + v[4]
+    t1, i1 = read()
+    time.sleep(0.25)
+    t2, i2 = read()
+    return round(100.0 * (1 - (i2 - i1) / max(1, t2 - t1)), 1)
+
+
+def ram_percent():
+    m = {}
+    for line in open("/proc/meminfo"):
+        k, v = line.split(":")
+        m[k] = int(v.split()[0])
+    return round(100.0 * (1 - m["MemAvailable"] / m["MemTotal"]), 1)
+
+
+def hwmon(names):
+    for d in glob.glob("/sys/class/hwmon/hwmon*"):
+        try:
+            if open(d + "/name").read().strip() in names:
+                for f in sorted(glob.glob(d + "/temp*_input")):
+                    return round(int(open(f).read()) / 1000.0)
+        except (OSError, ValueError):
+            pass
+    return None
+
+
+def run(*cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def gpu():
+    out = run("nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu", "--format=csv,noheader,nounits").strip()
+    if out:
+        try:
+            u, used, total, t = [float(x) for x in out.splitlines()[0].split(",")]
+            return {"gpu": u, "vram": round(100 * used / max(1, total), 1), "gpuTemp": round(t)}
+        except ValueError:
+            pass
+    for card in glob.glob("/sys/class/drm/card[0-9]/device"):            # amdgpu
+        try:
+            used, total = int(open(card + "/mem_info_vram_used").read()), int(open(card + "/mem_info_vram_total").read())
+            busy = int(open(card + "/gpu_busy_percent").read())
+            t = None
+            for f in glob.glob(card + "/hwmon/hwmon*/temp1_input"):
+                t = round(int(open(f).read()) / 1000.0)
+            return {"gpu": busy, "vram": round(100 * used / max(1, total), 1), "gpuTemp": t}
+        except (OSError, ValueError):
+            pass
+    return {"gpu": None, "vram": None, "gpuTemp": None}
+
+
+def stats():
+    g = gpu()
+    return {"cpu": cpu_percent(), "ram": ram_percent(), "vram": g["vram"], "gpu": g["gpu"], "gpuTemp": g["gpuTemp"],
+            "cpuTemp": hwmon(("k10temp", "coretemp", "zenpower", "cpu_thermal"))}
+
+
+def procs():
+    sm = {}
+    for line in run("nvidia-smi", "pmon", "-c", "1").splitlines():
+        p = line.split()
+        if len(p) > 4 and p[1].isdigit() and p[3].isdigit():
+            sm[int(p[1])] = int(p[3])
+    rows = []
+    for line in run("ps", "-eo", "pid=,%cpu=,%mem=,comm=").splitlines():
+        p = line.split(None, 3)
+        if len(p) == 4 and p[0].isdigit() and int(p[0]) != os.getpid():
+            rows.append({"pid": int(p[0]), "name": p[3].strip(), "cpu": float(p[1]), "mem": float(p[2]), "gpu": sm.get(int(p[0]), 0)})
+    out = rows
+    return out
+
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if a == ["stats"]:
+        print(json.dumps(stats()))
+    elif a == ["procs"]:
+        print(json.dumps(procs()))
+    else:
+        print(__doc__)
+        sys.exit(2)

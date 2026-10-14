@@ -62,6 +62,7 @@ Singleton {
     JsonFetch { id: fEmoji;    command: [root.bin("torii-emoji"), "list"];
                 onDataChanged: { root.emojiNodes = (data || []).map(e => ({ id: "e:" + e.c, name: e.n, sub: e.g, glyph: e.c, run: () => app([root.bin("torii-emoji"), "copy", e.c]) }));
                     root.bump(); } }
+    JsonFetch { id: fProcs;    command: [root.bin("torii-sys"), "procs"];             onDataChanged: root.bump() }
     JsonFetch { id: fGit;      command: [root.bin("torii-install"), "git-status"];        onDataChanged: root.bump() }
     JsonFetch { id: fWeb;      command: [root.bin("torii-apps"), "webapp", "list"];       onDataChanged: root.bump() }
     JsonFetch { id: fTui;      command: [root.bin("torii-apps"), "tui", "list"];          onDataChanged: root.bump() }
@@ -72,7 +73,7 @@ Singleton {
     JsonFetch { id: fHypr;     command: [root.bin("torii-hypr"), "status"];                onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fTrans, fHypr, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fTrans, fHypr, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
@@ -86,6 +87,7 @@ Singleton {
         function onHyprChanged() { root.bump(); }
         function onDndChanged() { root.bump(); }
     }
+    Connections { target: Config.widgets; function onLeftChanged() { root.bump(); } function onRightChanged() { root.bump(); } }
     Connections { target: Notifs; function onHistoryChanged() { root.bump(); } function onUnreadChanged() { root.bump(); } function onDndChanged() { root.bump(); } }
     Connections { target: Todo; function onItemsChanged() { root.bump(); } function onSortDoneChanged() { root.bump(); } }
     property string darkNow: ""             // shown at once when you toggle dark mode, until the theme catches up
@@ -151,7 +153,7 @@ Singleton {
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
-    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()]); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), processesMenu(), weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()]); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
@@ -197,6 +199,55 @@ Singleton {
     // ================= Trigger
     function toggle(args) { sh(args); }
     function human(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+
+    // ---- processes: sorted by CPU / RAM / GPU, typing filters by name, Enter asks before it kills
+    property string procSort: "cpu"
+    readonly property var procLabels: ({ cpu: "CPU", mem: "RAM", gpu: "GPU" })
+    // never offered: the session itself, the shell, the compositor, and v2rayN
+    readonly property var procProtected: /^(systemd.*|init|uwsm.*|Hyprland|hyprland.*|qs|quickshell|dbus.*|pipewire.*|wireplumber|v2rayN.*|sshd|login|Xwayland)$/
+    function processesMenu() {
+        return { id: "processes", name: "Processes", glyph: Icons.chip, keywords: "kill task manager top htop cpu ram gpu memory usage",
+                 sub: "Sorted by " + procLabels[procSort], sorted: true,
+                 onOpen: () => fProcs.refresh(),
+                 children: () => {
+            fProcs.ensure();
+            const key = procSort;
+            const rows = (fProcs.data || []).filter(p => !procProtected.test(p.name) && (key !== "gpu" || p.gpu > 0))
+                .sort((a, b) => b[key] - a[key]).slice(0, 300);
+            const hasGpu = (fProcs.data || []).some(p => p.gpu > 0);
+            const next = key === "cpu" ? "mem" : key === "mem" ? (hasGpu ? "gpu" : "cpu") : "cpu";
+            return [{ id: "sort", name: "Sort by " + procLabels[key], glyph: Icons.tune, sub: "Enter: sort by " + procLabels[next] + "  ·  refreshes the list", keep: true,
+                      run: () => { procSort = next; fProcs.refresh(); bump(); } }].concat(rows.map(p => ({
+                id: "p" + p.pid, name: p.name + "  " + p.pid, glyph: Icons.chip, keep: true,
+                sub: "pid " + p.pid,
+                badge: key === "gpu" ? p.gpu + "% gpu" : key === "mem" ? p.mem.toFixed(1) + "% ram" : p.cpu.toFixed(1) + "% cpu",
+                run: () => ask("Stop " + p.name + " (" + p.pid + ")?  y = stop, 9 = force, Esc cancels", false, a => {
+                    const t = a.trim().toLowerCase();
+                    if (t === "y") { sh(["kill", String(p.pid)]); say("Stopped " + p.name); }
+                    else if (t === "9") { sh(["kill", "-9", String(p.pid)]); say("Killed " + p.name); }
+                    else say("Left " + p.name + " alone");
+                    fProcs.refresh();
+                }) })));
+        } };
+    }
+
+    // ---- widgets around the notch (shown while the launcher or the control panel is open)
+    function widgetsMenu() {
+        const names = { system: "System load", claude: "Claude usage", battery: "Battery" };
+        const left = Config.widgets.left || [], right = Config.widgets.right || [];
+        const place = id => left.indexOf(id) >= 0 ? "Left" : right.indexOf(id) >= 0 ? "Right" : "Off";
+        const put = (id, side) => {
+            const l = left.filter(x => x !== id), r = right.filter(x => x !== id);
+            if (side === "Left") l.push(id); else if (side === "Right") r.push(id);
+            sh(["sh", "-c", bin("torii-config") + " set widgets.left '" + JSON.stringify(l) + "' && " + bin("torii-config") + " set widgets.right '" + JSON.stringify(r) + "'"]);
+        };
+        return { id: "widgets", name: "Widgets", glyph: Icons.apps, keywords: "notch system battery claude cpu left right hide",
+                 sub: "What shows around the notch while the launcher is open",
+                 children: () => Object.keys(names).map(id => ({
+                    id: id, name: names[id], sub: id === "battery" ? "Only on a laptop" : id === "claude" ? "Needs a signed-in Claude Code" : "CPU, RAM, GPU, temperatures",
+                    badge: place(id), children: () => ["Left", "Right", "Off"].map(side => ({
+                        id: side.toLowerCase(), name: side, badge: place(id) === side ? "●" : "", keep: true, run: () => put(id, side) })) })) };
+    }
 
     // panels that open in place of the launcher
     function weatherNode() {
@@ -479,7 +530,7 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
     }
 
     function mouseNode() {

@@ -1,7 +1,7 @@
 {
-  "order": ["apps", "trigger", "weather", "calendar", "setup", "install", "remove", "learn", "todo", "system"],
+  "order": ["apps", "trigger", "processes", "weather", "calendar", "setup", "install", "remove", "learn", "todo", "system"],
   "hidden": [],
   "submenus": {
-    "setup": ["configs", "defaults", "nightlight", "network", "bluetooth", "input", "output", "mouse"]
+    "setup": ["configs", "defaults", "nightlight", "widgets", "network", "bluetooth", "input", "output", "mouse"]
   }
 }

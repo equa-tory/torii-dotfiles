@@ -15,6 +15,7 @@ PanelWindow {
     readonly property real barH: Config.notch.height
     readonly property real topGap: floating ? Config.notch.gap : 0
     readonly property real ear: floating ? 0 : Config.notch.radius
+    readonly property bool widgetsShown: panelHere && (Panels.panel === "launcher" || Panels.panel === "control")
     readonly property bool panelHere: Panels.panel !== "" && Panels.panelScreen === screen.name
 
     readonly property real contentW: row.implicitWidth + 36
@@ -81,13 +82,14 @@ PanelWindow {
             height: win.barH
             spacing: 16
 
+            WidgetSlot { names: Config.widgets.left; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
             Workspaces { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
             Clock { anchors.verticalCenter: parent.verticalCenter }
             Weather {
                 anchors.verticalCenter: parent.verticalCenter
                 open: win.panelHere && Panels.panel === "weather"
-                launcher: win.panelHere && Panels.panel === "launcher"
             }
+            WidgetSlot { names: Config.widgets.right; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
             VolumeOsd { anchors.verticalCenter: parent.verticalCenter }
             NotifyOsd { anchors.verticalCenter: parent.verticalCenter }
             ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
