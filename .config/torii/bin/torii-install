@@ -71,6 +71,11 @@ case "${1:-}" in
     cd "$REPO" || exit 1
     say "Fetching"
     git fetch --quiet
+    say "What will happen"
+    git status --short | head -15
+    git status -sb | head -1
+    printf '\nCommit local changes, pull, and push to the remote? [y/N] '
+    read -r yn; case "$yn" in y|Y) ;; *) echo "Nothing was changed."; pause; exit 0 ;; esac
     if [ -n "$(git status --porcelain)" ]; then
       say "Local changes: committing"
       git add -A && git commit -q -m "Update configs from $(uname -n)" || { pause; exit 1; }

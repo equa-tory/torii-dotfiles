@@ -105,10 +105,22 @@ changes made from a terminal too.
 
 **Keys outside the launcher**: `mainMod+SHIFT+Q` screenshot of the screen, `+W` of a zone, `+E` starts/stops a recording (set in `binds.lua`).
 
+**Install / Remove** (`torii-install`, `torii-apps`): packages open a small floating terminal with fzf (Tab picks several, Enter
+installs or removes) and keep `packages/pacman.txt` and `packages/aur.txt` in step, so `./install.sh` brings the same set back.
+Web apps (a Helium `--app=` window with the site's icon) and terminal apps (a command in a terminal, e.g. `dorm` = an ssh
+command) are asked for in the launcher; their lists live in `~/.local/state/torii/{webapps,tuis}.json` (private, synced to the
+home server by `private-push.sh`, restored by `personal.sh`). `Update system` runs the full upgrade. `Update torii configs` shows
+`↓`/`↑` for commits to pull or push and `● changes` for local edits; it asks `[y/N]`, then commits, pulls and pushes.
+
+**Learn**: Hyprland, tmux and Neovim shortcuts read from your own config files (`torii-learn`), plus your notes in
+`~/.config/torii/learn/*.md` (opened read-only). **Todo**: add, toggle done, edit, remove, and optionally finished items at the
+bottom; stored in `~/.local/state/torii/todo.json`. **System** (last): shut down, reboot, log out, sleep, each asks to confirm.
+
 **Setup** menu: open any Hyprland/shell/kitty/tmux/nvim/zsh config in the editor (`Configs`); choose the default
 browser, editor, files app and terminal (`Defaults`, `torii-default`; Hyprland binds and uwsm read
-`~/.local/state/torii/defaults.env`); night light (`torii-nightlight`: temperature, manual or daily schedule; method `GPU` uses `hyprsunset`, `Screen overlay` lays a warm
-transparent layer over every screen, which also tints blacks slightly); network and Bluetooth (same backends as the control panel); default input and output device.
+`~/.local/state/torii/defaults.env`); night light (`torii-nightlight`: temperature, manual or daily schedule; method `GPU` uses `hyprsunset`; `Screen filter` is a Hyprland screen shader that multiplies the picture by a warm colour (a calm
+dark red, works on any GPU, the best choice on NVIDIA); `Screen overlay` lays a warm transparent layer over every screen, which can only blend and
+tints blacks); network and Bluetooth (same backends as the control panel); default input and output device.
 `~/apps` folders are listed under Apps: each folder is described by a `.desktop` file inside it (`~/apps/v2rayN-linux-64/v2rayN.desktop`). A folder without one gets it generated (`torii-apps generate`, run every time the launcher scans): the executable named like the folder, up to two levels down, and its icon. A `Windows app` manifest runs through Bottles:
 `{"name": "Notepad++", "bottle": "Soft", "program": "npp.exe"}`.
 

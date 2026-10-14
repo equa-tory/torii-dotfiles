@@ -2,6 +2,7 @@
 # Push private data TO the home server, the reverse of personal.sh (which pulls it):
 #   Helium browser profile (cookies, extensions, settings)   ~/.config/net.imput.helium
 #   LocalSend settings (alias, port, key)                    ~/.local/share/org.localsend.localsend_app
+#   your web apps and terminal apps (private addresses)      ~/.local/state/torii/{webapps,tuis}.json
 # They go to ~/torii-private/home/ on the server, never into the public repo. This only READS the local profile.
 #   bash packages/private-push.sh [--dry-run]
 # Close Helium first for a consistent copy. Options (environment): PRIVATE_DST=user@host:path/
@@ -22,7 +23,7 @@ fi
 case $ONLY in
   localsend) paths=(.local/share/org.localsend.localsend_app) ;;
   helium)    paths=(.config/net.imput.helium) ;;
-  *)         paths=(.config/net.imput.helium .local/share/org.localsend.localsend_app) ;;
+  *)         paths=(.config/net.imput.helium .local/share/org.localsend.localsend_app .local/state/torii/webapps.json .local/state/torii/tuis.json) ;;
 esac
 cd "$HOME"
 for p in "${paths[@]}"; do
