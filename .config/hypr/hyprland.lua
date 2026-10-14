@@ -12,3 +12,5 @@ require("modules.rules")
 
 -- layout / gaps chosen in the launcher (Trigger menu), written by torii-hypr
 pcall(dofile, os.getenv("HOME") .. "/.local/state/torii/hypr-user.lua")
+-- per-app window rules chosen in the launcher (Setup > App rules), written by torii-rules
+pcall(dofile, os.getenv("HOME") .. "/.local/state/torii/hypr-rules.lua")

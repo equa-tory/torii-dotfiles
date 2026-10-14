@@ -63,6 +63,8 @@ Singleton {
                 onDataChanged: { root.emojiNodes = (data || []).map(e => ({ id: "e:" + e.c, name: e.n, sub: e.g, glyph: e.c, run: () => app([root.bin("torii-emoji"), "copy", e.c]) }));
                     root.bump(); } }
     JsonFetch { id: fProcs;    command: [root.bin("torii-sys"), "procs"];             onDataChanged: root.bump() }
+    JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: root.bump() }
+    JsonFetch { id: fWins;     command: [root.bin("torii-rules"), "windows"];         onDataChanged: root.bump() }
     JsonFetch { id: fGit;      command: [root.bin("torii-install"), "git-status"];        onDataChanged: root.bump() }
     JsonFetch { id: fWeb;      command: [root.bin("torii-apps"), "webapp", "list"];       onDataChanged: root.bump() }
     JsonFetch { id: fTui;      command: [root.bin("torii-apps"), "tui", "list"];          onDataChanged: root.bump() }
@@ -73,7 +75,7 @@ Singleton {
     JsonFetch { id: fHypr;     command: [root.bin("torii-hypr"), "status"];                onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fTrans, fHypr, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fRules, fWins, fTrans, fHypr, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
@@ -229,6 +231,45 @@ Singleton {
                     fProcs.refresh();
                 }) })));
         } };
+    }
+
+    // ---- app rules: what happens when a window of an app opens (workspace, in the background, floating)
+    Timer { id: rulesRefresh; interval: 400; onTriggered: fRules.refresh() }
+    function rule(args) { sh([bin("torii-rules")].concat(args)); rulesRefresh.restart(); }
+    function ruleSummary(r) {
+        const p = [];
+        if (r.workspace) p.push("workspace " + r.workspace + (r.silent ? " (background)" : ""));
+        if (r.float) p.push("floating");
+        return p.length ? p.join("  ·  ") : "No effect yet";
+    }
+    function rulesMenu() {
+        const rules = fRules.data || [];
+        const have = c => rules.some(r => r.class === c);
+        const pick = (cls, name) => ({ id: "add:" + cls, name: name || cls, sub: cls, badge: have(cls) ? "●" : "", keep: true,
+            run: () => { if (!have(cls)) rule(["set", cls, "name", name || cls]); say("Added " + (name || cls) + ": open App rules to set it up"); } });
+        return { id: "rules", name: "App rules", glyph: Icons.apps, keywords: "window workspace float background open rule deadlock steam",
+                 sub: rules.length ? rules.length + " app" + (rules.length > 1 ? "s" : "") : "Workspace, background or floating per app",
+                 onOpen: () => fRules.refresh(),
+                 children: () => [
+            { id: "add", name: "Add an app", glyph: Icons.plus, sub: "Pick a window that is open, or an installed app", onOpen: () => fWins.refresh(),
+              children: () => [
+                { id: "open", name: "Open windows", glyph: Icons.monitor, sub: "The easiest way: open the app first", sorted: true, onOpen: () => fWins.refresh(),
+                  children: () => (fWins.data || []).map(w => pick(w.class, w.title && w.title.length < 40 ? w.title + "  ·  " + w.class : w.class)) },
+                { id: "installed", name: "Installed apps", glyph: Icons.apps, sorted: true,
+                  children: () => Apps.items().filter(a => a.kind === "app").map(a => pick(a.wm || a.id, a.name)) },
+                { id: "typed", name: "Type a window class…", glyph: Icons.keyboard2, keep: true,
+                  run: () => ask("Window class (hyprctl clients shows it)", false, c => { if (c.trim()) rule(["set", c.trim(), "name", c.trim()]); }) } ] } ].concat(
+                rules.map(r => ({ id: "r:" + r.class, name: r.name || r.class, sub: ruleSummary(r), glyph: Icons.apps, sorted: true,
+                    badge: r.workspace ? String(r.workspace) : "",
+                    children: () => [
+                    { id: "ws", name: "Workspace", glyph: Icons.monitor, badge: r.workspace ? String(r.workspace) : "None", children: () =>
+                        [{ id: "none", name: "None", badge: r.workspace ? "" : "●", keep: true, run: () => rule(["set", r.class, "workspace", "none"]) }].concat(
+                            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => ({ id: "w" + n, name: "Workspace " + n, badge: r.workspace === n ? "●" : "", keep: true,
+                                run: () => rule(["set", r.class, "workspace", String(n)]) }))) },
+                    { id: "silent", name: "Open in the background", sub: "Don't switch to its workspace", badge: r.silent ? "On" : "Off", keep: true,
+                      run: () => rule(["set", r.class, "silent", r.silent ? "false" : "true"]) },
+                    { id: "float", name: "Open floating", badge: r.float ? "On" : "Off", keep: true, run: () => rule(["set", r.class, "float", r.float ? "false" : "true"]) },
+                    { id: "remove", name: "Remove rule", glyph: Icons.trash, sub: r.class, run: () => rule(["remove", r.class]) } ] }))) };
     }
 
     // ---- widgets around the notch (shown while the launcher or the control panel is open)
@@ -530,7 +571,7 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
     }
 
     function mouseNode() {

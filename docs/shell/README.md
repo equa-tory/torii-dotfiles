@@ -214,3 +214,8 @@ control panel is open. `system` (CPU, RAM, GPU, VRAM and temperatures, `torii-sy
 `claude` (usage ring), `battery` (only if the machine has one). **Processes** (launcher root, `torii-sys procs`): sort by
 CPU / RAM / GPU with the first row, type to filter by name or pid, Enter asks `y` (stop) or `9` (force kill). The session,
 the shell, Hyprland, systemd, D-Bus, PipeWire and v2rayN are never listed.
+
+**App rules** (Setup › App rules, `torii-rules`, saved in `~/.config/torii/app-rules.json`): what happens when a window of an app
+opens: on a workspace (optionally in the background, without switching to it) and/or floating. *Add an app* lists the windows
+that are open right now (open the app first: its window class is what a rule matches), the installed apps, or lets you type a
+class. Changes are applied to the running Hyprland at once and again at every start (`hypr-rules.lua`, loaded by `hyprland.lua`).
