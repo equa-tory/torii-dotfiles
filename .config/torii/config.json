@@ -32,7 +32,8 @@
   },
   "automove": {
     "from": "~/Downloads",
-    "to": "/mnt/mass/Media_MASS/Photo/inbox"
+    "to": "/mnt/mass/Media_MASS/Photo/inbox",
+    "unzipDir": "_"
   },
   "launcher": {
     "rememberBack": true,

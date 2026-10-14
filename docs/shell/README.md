@@ -91,6 +91,8 @@ It reloads while the launcher is closed.
 - File auto mover (`torii-automove`): while it is on, files that newly appear in `~/Downloads` are moved to the folder in
   `automove.to` of `config.json` (default `/mnt/mass/Media_MASS/Photo/inbox`). It waits on inotify, ignores partial
   downloads and files that existed before you switched it on, and never creates the folder when the share is not mounted.
+  A `.zip` is unzipped once (archive order) into `<to>/_/<zip name>/` (`automove.unzipDir`, relative to `to` or absolute) and the
+  zip is deleted; a broken zip stays and you get a notification; every other file lands in `<to>` itself.
 - Switches: mute microphone, do not disturb (swaync), dark mode, menu bar shape (floating or attached), workspace layout
   (dwindle, master, scrolling) and window gaps (`torii-hypr`, remembered across logins).
 - Passwordless sudo (`torii-sudo`): for 5 minutes or until reboot. The launcher asks for your password once (masked, never

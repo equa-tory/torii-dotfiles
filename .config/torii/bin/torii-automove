@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """torii-automove on|off|status|apply  -  move NEW files from ~/Downloads to a folder, while it is switched on.
+A .zip is unzipped (in archive order) into <to>/_/<zip name>/ and the zip is deleted; every other file is moved
+into <to> as it is. The folder name comes from "automove.unzipDir" (default "_", relative to <to> or absolute).
 
   on       remember the time now; only files that appear after it are moved
   off      stop
@@ -16,11 +18,12 @@ import shutil
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 HOME = Path.home()
 STATE = Path(os.environ.get("TORII_STATE", HOME / ".local/state/torii")) / "automove.json"
-SKIP_EXT = (".part", ".crdownload", ".tmp", ".download", ".opdownload", ".partial")
+SKIP_EXT = (".part", ".crdownload", ".tmp", ".download", ".opdownload", ".partial", ".!qb", ".aria2", "~")
 IN_CLOSE_WRITE, IN_MOVED_TO = 0x8, 0x80
 
 
@@ -32,6 +35,44 @@ def cfg():
     except (OSError, ValueError):
         pass
     return Path(os.path.expanduser(src)), Path(os.path.expanduser(dst))
+
+
+def unzip_dir(dst):
+    name = "_"
+    try:
+        name = json.loads((HOME / ".config/torii/config.json").read_text()).get("automove", {}).get("unzipDir", name) or name
+    except (OSError, ValueError):
+        pass
+    p = Path(os.path.expanduser(name))
+    return p if p.is_absolute() else dst / p
+
+
+def extract(zpath, target):
+    """Unzip into target; entries that would land outside it are skipped."""
+    target.mkdir(parents=True, exist_ok=True)
+    root = os.path.abspath(target)
+    with zipfile.ZipFile(zpath) as zf:
+        for m in zf.namelist():
+            out = os.path.abspath(os.path.join(root, m))
+            if out != root and not out.startswith(root + os.sep):
+                continue
+            if m.endswith("/"):
+                os.makedirs(out, exist_ok=True)
+                continue
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            with zf.open(m) as a, open(out, "wb") as b:
+                shutil.copyfileobj(a, b)
+
+
+def handle_zip(f, dst):
+    target = unzip_dir(dst) / f.stem
+    if not (target.is_dir() and any(target.iterdir())):          # already unzipped once: just drop the archive
+        try:
+            extract(f, target)
+        except (zipfile.BadZipFile, OSError) as e:
+            notify("Auto mover: could not unzip " + f.name, str(e))
+            return
+    f.unlink()
 
 
 def load():
@@ -78,6 +119,9 @@ def sweep(src, dst, since, warned):
             size = f.stat().st_size
             time.sleep(0.8)                       # still being written?
             if f.stat().st_size != size:
+                continue
+            if f.suffix.lower() == ".zip":
+                handle_zip(f, dst)
                 continue
             target = dst / f.name
             n = 1
