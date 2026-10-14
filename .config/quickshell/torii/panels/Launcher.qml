@@ -43,8 +43,11 @@ Item {
     Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
     Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
+    // a quicklink icon of a single character is a font glyph, anything longer is an icon name or an image path
+    function glyphOf(i) { return i && i.length <= 2 && String.fromCodePoint(i.codePointAt(0)) === i ? i : ""; }
+
     function linkNode(link) {
-        return { id: "link:" + link.keyword, name: link.title, sub: link.sub, glyph: Icons.link,
+        return { id: "link:" + link.keyword, name: link.title, sub: link.sub, glyph: glyphOf(link.icon) || Icons.link, icon: glyphOf(link.icon) ? undefined : (link.icon || undefined),
                  run: () => Apps.run({ kind: "link", url: link.url }) };
     }
 

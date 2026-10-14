@@ -1,9 +1,9 @@
-{
-  "v":  "https://www.youtube.com/results?search_query={q}",
-  "g":   "https://www.duckduckgo.com/search?q={q}",
-  "x":   "https://x.com/search?q={q}",
-  "gh":  "https://github.com/search?q={q}",
-  "git": "https://github.com/equa-tory",
-  "w":   "https://en.wikipedia.org/wiki/Special:Search?search={q}",
-  "maps": "https://www.openstreetmap.org/search?query={q}"
-}
+[
+  {"keyword": "v", "name": "YouTube", "url": "https://www.youtube.com/results?search_query={input}", "icon": "󰗃"},
+  {"keyword": "g", "name": "DuckDuckGo", "url": "https://www.duckduckgo.com/search?q={input}", "icon": "󰇥"},
+  {"keyword": "x", "name": "X", "url": "https://x.com/search?q={input}", "icon": "󰕄"},
+  {"keyword": "gh", "name": "GitHub", "url": "https://github.com/search?q={input}", "icon": "󰊤"},
+  {"keyword": "git", "name": "My GitHub", "url": "https://github.com/equa-tory", "icon": "󰊤"},
+  {"keyword": "w", "name": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Special:Search?search={input}", "icon": "󰖬"},
+  {"keyword": "maps", "name": "OpenStreetMap", "url": "https://www.openstreetmap.org/search?query={input}", "icon": "󰍍"}
+]

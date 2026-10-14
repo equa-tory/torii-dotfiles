@@ -30,7 +30,7 @@ One file, hot-reloaded: `~/.config/torii/config.json`. Every key is optional.
 | `notch.radius` / `height` / `gap` | `16` / `34` / `6` | `gap` is for `floating` |
 | `notch.zoneTrim` | `12` | px removed from the strip the notch reserves: a smaller gap between the notch and windows |
 | `workspaces.count` | `5` | always shown per monitor; occupied/active ones beyond that are added |
-| `weather.lat` / `lon` / `refreshMin` | Moscow / `20` | Open-Meteo, no API key, Celsius |
+| `weather.location` / `lat` / `lon` / `refreshMin` | system timezone city / `0` / `20` | Open-Meteo, no API key, Celsius. Empty `location` = the city of the system timezone (geocoded once); a city name or `lat`+`lon` override it. Click the weather for the forecast; wind ≥ 30 km/h shows a wind icon |
 | `wallpaper.dir` / `transitionMs` | `~/Pictures/wallpapers` / `600` | |
 | `theme.tint` | `0.15` | `0` pure black backgrounds … `1` backgrounds tinted by the wallpaper |
 | `apps.dir` | `~/apps` | see below |
@@ -129,10 +129,15 @@ tints blacks); network and Bluetooth (same backends as the control panel); defau
 **Quicklinks** live in `~/.config/torii/quicklinks.json` (hot-reloaded; type `quicklinks` in the launcher to edit):
 
 ```json
-{ "yt": "https://www.youtube.com/results?search_query={q}", "git": "https://github.com/equa-tory" }
+[
+  {"keyword": "yt", "name": "YouTube", "url": "https://www.youtube.com/results?search_query={input}", "icon": "󰗃"},
+  {"keyword": "git", "name": "My GitHub", "url": "https://github.com/equa-tory", "icon": "󰊤"}
+]
 ```
 
-`yt cats` searches, `yt` alone opens youtube.com, `git` opens its URL. They open in the default browser.
+`yt cats` searches (`{input}` is replaced), `yt` alone opens youtube.com, `git` opens its URL. `icon` is a single Nerd Font
+glyph, an icon-theme name or an image path (none: the link glyph). The old `{"yt": "https://…{q}"}` map form still works.
+They open in the default browser.
 
 **Apps without a `.desktop`** (mac style): every folder directly inside `~/apps` that has an `app.json` is an app.
 Nothing is moved or installed.
@@ -178,3 +183,9 @@ file or set it to `false` to reset). Lists scroll smoothly and keep a row of mar
 
 **Night light fade** (`nightlight.rampMinutes`, default 30, `0` = at once): with a daily schedule the colour eases in from
 nothing to your temperature after the start time and eases out again before the end. Manual on/off and the slider act at once.
+
+**Claude usage**: while the launcher is open and `~/.claude/.credentials.json` exists, a ring with the 5-hour usage sits next to
+the weather (`torii-claude-usage`, read-only: it never refreshes the token). **Volume** changes show for about a second in the notch.
+**Terminal/prompt colours**: `torii-theme` builds a five-step gradient from the wallpaper's primary → secondary → tertiary
+colour (`ramp1`…`ramp5` in `tokens.json`); kitty's blue/magenta/cyan and the powerlevel10k prompt use it
+(`~/.local/state/torii/theme/p10k-colors.zsh`, picked up by open shells at the next prompt).
