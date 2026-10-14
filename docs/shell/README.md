@@ -14,7 +14,7 @@ panel, a wallpaper switcher and a launcher. A CLI (`torii-theme`) restyles the w
 | `mainMod + CTRL + SPACE` | wallpaper / theme switcher (`<` `>` preview, `Space`/`Enter` apply, `Esc` cancel) |
 | `mainMod + SHIFT + D` | dark / light |
 | `mainMod + SHIFT + R` | reload the shell |
-| `mainMod + SHIFT + 3 / 4 / 5` | screenshot, screenshot of a zone, start/stop screen recording |
+| `mainMod + SHIFT + Q / W / E` | screenshot, screenshot of a zone, start/stop screen recording |
 
 `Esc` or a click outside closes any panel. Panels only open on the focused monitor.
 (With `ALT`, `CTRL + ALT + SPACE` also hits the XKB layout toggle in `input.lua`; with `SUPER` there is no clash.)
@@ -103,8 +103,7 @@ file auto mover, passwordless sudo (ring while the 5 minutes run), night light a
 click turns it off. State comes from small files in `~/.local/state/torii/` that the `torii-*` scripts write, so it follows
 changes made from a terminal too.
 
-**Keys outside the launcher**: `mainMod+SHIFT+3` screenshot of the screen, `+4` of a zone, `+5` starts/stops a recording.
-Moving a window to workspace 3, 4 or 5 is `mainMod+CTRL+3/4/5` because of that; the other workspaces keep `SHIFT`.
+**Keys outside the launcher**: `mainMod+SHIFT+Q` screenshot of the screen, `+W` of a zone, `+E` starts/stops a recording (set in `binds.lua`).
 
 **Setup** menu: open any Hyprland/shell/kitty/tmux/nvim/zsh config in the editor (`Configs`); choose the default
 browser, editor, files app and terminal (`Defaults`, `torii-default`; Hyprland binds and uwsm read
