@@ -358,14 +358,23 @@ def ensure_gtk_links():
 
 
 def ensure_qt_conf():
-    """qt6ct needs to know where the generated colour scheme lives (created once, never overwritten)."""
+    """qt6ct needs to know where the generated colour scheme lives and which icons to use (breeze or breeze-dark by
+    mode). Created once; afterwards only the icon_theme line follows the mode."""
     f = HOME / ".config/qt6ct/qt6ct.conf"
-    if f.exists():
-        return
+    icons = "breeze" if get_mode() == "light" else "breeze-dark"
     try:
         f.parent.mkdir(parents=True, exist_ok=True)
-        f.write_text("[Appearance]\ncolor_scheme_path=%s\ncustom_palette=true\nstyle=Fusion\n"
-                     % (THEME_DIR / "qt6ct-colors.conf"))
+        if not f.exists():
+            f.write_text("[Appearance]\ncolor_scheme_path=%s\ncustom_palette=true\nstyle=Fusion\nicon_theme=%s\n"
+                         % (THEME_DIR / "qt6ct-colors.conf", icons))
+            return
+        text = f.read_text()
+        if re.search(r"^icon_theme=", text, re.M):
+            new = re.sub(r"^icon_theme=.*$", "icon_theme=" + icons, text, flags=re.M)
+        else:
+            new = re.sub(r"^\[Appearance\]\n", "[Appearance]\nicon_theme=" + icons + "\n", text, count=1, flags=re.M) if "[Appearance]" in text else text + "\n[Appearance]\nicon_theme=" + icons + "\n"
+        if new != text:
+            f.write_text(new)
     except OSError as e:
         log(f"qt6ct.conf: {e}")
 

@@ -27,6 +27,9 @@ if [[ -d $REPO/wallpapers ]]; then
   cp -an "$REPO/wallpapers/." "$HOME/Pictures/wallpapers/"
 fi
 
+say "File manager (Dolphin: minimal sidebar, opens in Downloads)"
+bash "$REPO/packages/dolphin.sh" || true
+
 say "App manifests for the launcher (~/apps)"
 bash "$REPO/packages/apps-sync.sh"
 
