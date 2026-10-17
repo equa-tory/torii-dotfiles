@@ -8,6 +8,7 @@ require("modules.animations")
 require("modules.misc")
 require("modules.input")
 require("modules.binds")
+require("modules.floatmode")
 require("modules.rules")
 
 -- layout / gaps chosen in the launcher (Trigger menu), written by torii-hypr

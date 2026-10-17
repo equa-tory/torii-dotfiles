@@ -192,32 +192,6 @@ hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),       { locked = tr
 hl.bind(mainMod .. " + slash",  hl.dsp.exec_cmd("playerctl next"),       { locked = true })
 
 
---- FLOAT MODE TOGGLE ---
--- Two modes: "tile" (Hyprland default) and "float" (every window floats)
-local float_mode = false
-local FLOAT_X, FLOAT_Y = 1000, 650
-
--- New windows: float them if float mode is on
-hl.on("window.open", function(w)
-    if float_mode then
-        hl.dispatch(hl.dsp.window.float({ action = "set", window = w }))
-        hl.dispatch(hl.dsp.window.resize({ x = FLOAT_X, y = FLOAT_Y, window = w }))
-        --hl.dispatch(hl.dsp.window.center({ window = w }))
-    end
-end)
-
--- Toggle the mode and convert the windows that are already open
---hl.bind(mainMod .. " + SHIFT + F", function()
---    float_mode = not float_mode
---    local action = float_mode and "set" or "unset"
---    for _, w in ipairs(hl.get_windows()) do
---       hl.dispatch(hl.dsp.window.float({ action = action, window = w }))
---       hl.dispatch(hl.dsp.window.resize({ x = FLOAT_X, y = FLOAT_Y, window = w }))
---    end
---    --hl.notification.create({ text = float_mode and "Float mode" or "Tile mode" })
---end)
-
-
 -- Dark / light mode (torii-theme restyles everything; dark is the default)
 -- Keyboard layout (a normal bind, so it doesn't fire on mainMod+SHIFT+<other key>)
 hl.bind(mainMod .. " + SHIFT + D",hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-theme mode toggle"))
