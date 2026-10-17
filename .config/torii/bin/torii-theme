@@ -268,7 +268,8 @@ def compute(image):
     tint = float(read_config().get("theme", {}).get("tint", 0.15))
     override = override_for(image)
     mode = get_mode()
-    key = hashlib.sha256(f"v4|{digest}|{tint}|{override}|{mode}".encode()).hexdigest()[:16]
+    tpl = hashlib.sha256(b"".join(p.read_bytes() for p in sorted(TEMPLATES.iterdir()) if p.is_file())).hexdigest()[:8]   # a changed template re-renders
+    key = hashlib.sha256(f"v4|{digest}|{tint}|{override}|{mode}|{tpl}".encode()).hexdigest()[:16]
     prim, others = palette_args(image, digest)
     tokens = build_tokens(prim, tint, override, mode, others)
     tokens.update({"wallpaper": str(image), "hash": key})
@@ -379,6 +380,8 @@ def run_hooks():
         sh("hyprctl", "eval", code)
     if running("kitty"):
         sh("pkill", "-USR1", "-x", "kitty")
+    if running("cava"):
+        sh("pkill", "-USR2", "-x", "cava")           # cava reloads its colours on SIGUSR2
     for sock in glob.glob(os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "nvim.*.0")):
         sh("nvim", "--server", sock, "--remote-expr", 'luaeval("require(\'torii_theme\').reload()")')
     if sh("tmux", "has-session"):

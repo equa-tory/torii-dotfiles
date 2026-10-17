@@ -132,9 +132,9 @@ for i = 1, 10 do
 end
 
 -- Screenshots and recording (torii-capture): whole screen, a zone, and start/stop screen recording
-hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture screen"))
-hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture zone"))
-hl.bind(mainMod .. " + SHIFT + E", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture record"))
+hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture screen"))
+hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture zone"))
+hl.bind("SUPER + SHIFT + E", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture record"))
 
 
 -- Example special workspace (scratchpad)

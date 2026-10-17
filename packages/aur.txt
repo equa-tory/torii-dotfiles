@@ -3,3 +3,4 @@ cliamp
 localsend-bin
 protonup-qt
 bottles
+lavat

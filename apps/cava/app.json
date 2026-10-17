@@ -1,0 +1,1 @@
+{"name": "cava", "exec": "kitty cava -p ~/.local/state/torii/theme/cava.conf", "icon": "multimedia-volume-control", "keywords": ["audio", "visualizer", "music", "spectrum"], "description": "Audio visualizer"}

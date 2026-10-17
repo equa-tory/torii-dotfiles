@@ -88,3 +88,9 @@ libnotify
 unicode-emoji
 noto-fonts-emoji
 sound-theme-freedesktop
+cava
+cmatrix
+asciiquarium
+dolphin
+kio-extras
+breeze-icons
