@@ -54,12 +54,14 @@ hl.bind(mainMod .. " + SHIFT + TAB", function()
     tabbing = true
     hl.exec_cmd(qsipc .. "windows prev")
 end)
-hl.bind("Alt_L", function()
-    if tabbing then
+-- The Alt release is read from the raw key events: a release bind does not fire when Tab was pressed in between.
+if torii_tab_sub then pcall(function() torii_tab_sub:remove() end) end     -- a reload runs this file again
+torii_tab_sub = hl.on("input.keyboard.key", function(code, _, state)
+    if state == 0 and (code == 64 or code == 108) and tabbing then      -- Alt_L / Alt_R (evdev code + 8)
         tabbing = false
         hl.exec_cmd(qsipc .. "windows commit")
     end
-end, { release = true, ignore_mods = true, non_consuming = true })
+end)
 
 hl.bind(mainMod .. "+ SHIFT + F", function()
     hl.dispatch(hl.dsp.window.fullscreen({

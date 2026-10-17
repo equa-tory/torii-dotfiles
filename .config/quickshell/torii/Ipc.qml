@@ -34,6 +34,7 @@ Scope {
         function left(): string { return Windows.arrow(-1); }
         function right(): string { return Windows.arrow(1); }
         function close(): string { return Windows.closeSelected(); }
+        function state(): string { return Panels.panel === "windows" ? "open" : (Windows.pending ? "pending" : "closed"); }
     }
     IpcHandler {
         target: "notifs"
