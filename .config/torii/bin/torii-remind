@@ -4,9 +4,11 @@
   add     in <minutes> (decimals fine): a transient systemd user timer shows a notification when it is due
   cancel  forget a reminder
   list    JSON, what the notch indicator reads from ~/.local/state/torii/reminders.json
+  due     show every reminder whose time has passed (the shell calls this when a ring reaches 0, as a safety net)
   apply   after login: timers do not survive a reboot, so set them up again (late ones are shown at once)
 """
 import json
+import math
 import os
 import subprocess
 import sys
@@ -32,8 +34,8 @@ def save(items):
 
 
 def arm(item):
-    wait = max(1, int(item["due"] - time.time()))
-    subprocess.run(["systemd-run", "--user", "--collect", f"--unit=torii-remind-{item['id']}", f"--on-active={wait}s", SELF, "fire", item["id"]],
+    wait = max(1, math.ceil(item["due"] - time.time()))
+    subprocess.run(["systemd-run", "--user", "--collect", "--timer-property=AccuracySec=1s", f"--unit=torii-remind-{item['id']}", f"--on-active={wait}s", SELF, "fire", item["id"]],
                    capture_output=True)
 
 
@@ -61,8 +63,16 @@ def main(a):
         save([i for i in items if i["id"] != a[1]])
     elif cmd == "fire" and len(a) == 2:
         hit = [i for i in items if i["id"] == a[1]]
-        save([i for i in items if i["id"] != a[1]])
-        notify(hit[0]["msg"] if hit else "")
+        if hit:                                   # already shown (the shell may have fired it first): nothing to do
+            save([i for i in items if i["id"] != a[1]])
+            notify(hit[0]["msg"])
+    elif cmd == "due":
+        late = [i for i in items if i["due"] <= time.time()]
+        if late:
+            save([i for i in items if i not in late])
+            for i in late:
+                subprocess.run(["systemctl", "--user", "stop", f"torii-remind-{i['id']}.timer"], capture_output=True)
+                notify(i["msg"])
     elif cmd == "apply":
         keep = []
         for i in items:

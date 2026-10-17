@@ -29,6 +29,15 @@ Singleton {
 
     Timer { interval: 1000; running: root.timed; repeat: true; triggeredOnStart: true; onTriggered: root.now = Date.now() }
 
+    // safety net: a ring that reached 0 more than 2 s ago and is still listed means the system timer did not fire
+    property double dueAsked: 0
+    onNowChanged: {
+        if (reminders.some(r => r.due < now / 1000 - 2) && now - dueAsked > 5000) {
+            dueAsked = now;
+            Quickshell.execDetached([Config.home + "/.config/torii/bin/torii-remind", "due"]);
+        }
+    }
+
     // expired reminders drop out of the list a moment before the script removes them
     function remaining(item) { return Math.max(0, item.due - now / 1000); }
 
