@@ -76,6 +76,7 @@ Singleton {
             }
             property JsonObject notifications: JsonObject {
                 property real popupSeconds: 5          // how long a notification stays in the notch
+                property string expand: "side"          // side: its own pill next to the notch | center: the notch grows around it
                 property bool badgeInDnd: false        // show the unread count while do not disturb is on
             }
             property JsonObject sounds: JsonObject {

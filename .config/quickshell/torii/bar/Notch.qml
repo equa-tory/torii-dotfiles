@@ -16,6 +16,7 @@ PanelWindow {
     readonly property real topGap: floating ? Config.notch.gap : 0
     readonly property real ear: floating ? 0 : Config.notch.radius
     readonly property bool widgetsShown: panelHere && (Panels.panel === "launcher" || Panels.panel === "control")
+    readonly property bool notifSide: Config.notifications.expand === "side"
     readonly property bool panelHere: Panels.panel !== "" && Panels.panelScreen === screen.name
 
     readonly property real contentW: row.implicitWidth + 36
@@ -34,7 +35,7 @@ PanelWindow {
     implicitHeight: screen.height
     exclusiveZone: Math.max(0, topGap + barH - Config.notch.zoneTrim)
     color: "transparent"
-    mask: Region { item: win.panelHere ? catcher : shape; regions: [ Region { item: activity } ] }
+    mask: Region { item: win.panelHere ? catcher : shape; regions: [ Region { item: activity }, Region { item: popup } ] }
 
     // Esc closes the panel. (QML `Shortcut` segfaults in Qt 6.12 when the shell hot-reloads, so use a key handler.)
     Item {
@@ -91,7 +92,7 @@ PanelWindow {
             }
             WidgetSlot { names: Config.widgets.right; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
             VolumeOsd { anchors.verticalCenter: parent.verticalCenter }
-            NotifyOsd { anchors.verticalCenter: parent.verticalCenter }
+            NotifyOsd { visible: !win.notifSide && width > 0.5; anchors.verticalCenter: parent.verticalCenter }
             ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
         }
 
@@ -112,6 +113,15 @@ PanelWindow {
         }
     }
 
+    // a notification in side mode: its own pill next to the notch (the activities make room), the notch stays put
+    NotifyOsd {
+        id: popup
+        pill: true
+        visible: win.notifSide && width > 0.5
+        x: shape.x + shape.width + 8
+        y: win.floating ? win.topGap : 4
+    }
+
     // what is switched on right now, right or left of the notch (activities.side), in one round pill or as separate
     // circles (activities.style)
     Rectangle {
@@ -120,7 +130,8 @@ PanelWindow {
         readonly property real size: win.floating ? win.barH : win.barH - 8
         readonly property real pad: (size - 22) / 2
         readonly property color back: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Config.notch.opacity)
-        x: Config.activities.side === "left" ? shape.x - 8 - width : shape.x + shape.width + 8
+        readonly property real shift: win.notifSide && Config.activities.side !== "left" && popup.width > 0.5 ? popup.width + 8 : 0
+        x: Config.activities.side === "left" ? shape.x - 8 - width : shape.x + shape.width + 8 + shift
         y: win.floating ? win.topGap : 4
         height: size
         width: acts.count > 0 ? (circles ? acts.implicitWidth : acts.implicitWidth + 2 * pad) : 0

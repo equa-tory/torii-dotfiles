@@ -193,7 +193,7 @@ colour (`ramp1`…`ramp5` in `tokens.json`); kitty's colours except red, nvim's 
 (`~/.local/state/torii/theme/p10k-colors.zsh`, picked up by open shells at the next prompt).
 
 **Notifications** are shown by the shell (it is the notification server, swaync is not started any more; remove it with
-`pacman -Rns swaync`). A new one slides open at the right end of the notch for `notifications.popupSeconds` (5): click
+`pacman -Rns swaync`). A new one opens for `notifications.popupSeconds` (5), as wide as its text needs (at most 340 px), as its own pill next to the notch (`notifications.expand`: `side`, the default) or inside the notch, which then grows around it (`center`): click
 runs its default action or brings the app forward, right click dismisses, hovering keeps it. The last 100 are kept in
 the launcher's Notifications menu (and the bell in the control panel opens it); the badge counts the unread ones and is
 hidden while do not disturb is on (`notifications.badgeInDnd`). Do not disturb also hides the other activities (only its own
