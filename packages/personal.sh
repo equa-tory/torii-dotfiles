@@ -26,11 +26,21 @@ command -v rsync >/dev/null || { warn "rsync is not installed (pacman -S rsync)"
 stage=$(mktemp -d); tmp_files=()
 trap 'rm -rf "$stage" "${tmp_files[@]}"' EXIT
 
+# Where the data lives: the home server first, then the backup copy on the Umbrel share (mounted at /mnt/umbrel)
+BACKUP_DIR="${PRIVATE_BACKUP:-/mnt/umbrel/Documents/torii-private}"
 say "Fetching private data from $PRIVATE_SRC"
 if ! rsync -a -e "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8" "$PRIVATE_SRC" "$stage/"; then
-  warn "Home server not reachable (or wrong login/path). Skipping personal data."
-  warn "Run it later:  bash packages/personal.sh"
-  exit 0
+  warn "Home server not reachable (or wrong login/path)."
+  if ls "$BACKUP_DIR" >/dev/null 2>&1 && [[ -n $(ls -A "$BACKUP_DIR" 2>/dev/null) ]]; then
+    say "Using the backup copy in $BACKUP_DIR"
+    rsync -rltD --no-perms "$BACKUP_DIR/" "$stage/"          # a cifs share has no unix modes: private folders are made 700 below
+    find "$stage/home" -type d -exec chmod 700 {} + 2>/dev/null || true
+    find "$stage/home/.config" "$stage/home/.local" -type f -exec chmod go-rwx {} + 2>/dev/null || true
+  else
+    warn "No backup copy either (needs /mnt/umbrel mounted). Skipping personal data."
+    warn "Run it later:  bash packages/personal.sh"
+    exit 0
+  fi
 fi
 
 # ---- 1. files for your home folder (apps, browser profile, launchers) ----

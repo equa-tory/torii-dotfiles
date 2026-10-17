@@ -7,9 +7,11 @@
 #   folders in ~/apps that the repo does not ship (v2rayN, your own tools)
 # They go to ~/torii-private/home/ on the server, never into the public repo. This only READS the local profile.
 #   bash packages/private-push.sh [--dry-run]
+# The server folder is also copied to the Umbrel share afterwards (packages/private-mirror.sh).
 # Close Helium first for a consistent copy. Options (environment): PRIVATE_DST=user@host:path/
 #   ONLY=localsend   push just LocalSend (works while Helium is open);  ONLY=helium  just the browser
 #   ONLY=apps        push just your own apps and .desktop files
+#   ONLY=webapps     push just the web apps and terminal apps lists (Telegram, Discord, ...)
 set -euo pipefail
 
 DST="${PRIVATE_DST:-equa@192.168.1.50:torii-private/home/}"; DST="${DST%/}/"
@@ -17,7 +19,7 @@ extra=(); [[ ${1:-} == --dry-run ]] && extra=(--dry-run)
 command -v rsync >/dev/null || { echo "rsync is not installed" >&2; exit 1; }
 
 ONLY="${ONLY:-all}"
-if [[ $ONLY != localsend ]] && ps -eo comm= | grep -qxE 'helium(-browser)?'; then
+if [[ $ONLY != localsend && $ONLY != webapps && $ONLY != apps ]] && ps -eo comm= | grep -qxE 'helium(-browser)?'; then
   echo "!!  Helium is running: the copy may be inconsistent (databases open). Close it and run again," >&2
   echo "!!  or continue anyway with  FORCE=1 bash packages/private-push.sh" >&2
   [[ ${FORCE:-0} == 1 ]] || exit 1
@@ -42,6 +44,7 @@ own_apps() {
 case $ONLY in
   localsend) paths=(.local/share/org.localsend.localsend_app) ;;
   helium)    paths=(.config/net.imput.helium) ;;
+  webapps)   paths=(.local/state/torii/webapps.json .local/state/torii/tuis.json) ;;
   apps)      mapfile -t paths < <(own_apps) ;;
   *)         mapfile -t mine < <(own_apps)
              paths=(.config/net.imput.helium .local/share/org.localsend.localsend_app .local/state/torii/webapps.json .local/state/torii/tuis.json "${mine[@]}") ;;
@@ -56,4 +59,5 @@ for p in "${paths[@]}"; do
     --exclude='BrowserMetrics*' --exclude='SingletonLock' --exclude='SingletonCookie' --exclude='SingletonSocket' \
     "$p" "$DST"
 done
+PRIVATE_SRC="${DST%home/}" bash "$REPO/packages/private-mirror.sh" || echo "(backup copy on the Umbrel share was not updated)" >&2
 echo "Pushed. Restore on a new machine with: bash packages/personal.sh"
