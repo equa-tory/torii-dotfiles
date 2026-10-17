@@ -65,6 +65,7 @@ Singleton {
     JsonFetch { id: fProcs;    command: [root.bin("torii-sys"), "procs"];             onDataChanged: root.bump() }
     JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: root.bump() }
     JsonFetch { id: fWins;     command: [root.bin("torii-rules"), "windows"];         onDataChanged: root.bump() }
+    JsonFetch { id: fSounds;   command: [root.bin("torii-sound"), "list"];             onDataChanged: root.bump() }
     JsonFetch { id: fGit;      command: [root.bin("torii-install"), "git-status"];        onDataChanged: root.bump() }
     JsonFetch { id: fWeb;      command: [root.bin("torii-apps"), "webapp", "list"];       onDataChanged: root.bump() }
     JsonFetch { id: fTui;      command: [root.bin("torii-apps"), "tui", "list"];          onDataChanged: root.bump() }
@@ -75,7 +76,7 @@ Singleton {
     JsonFetch { id: fHypr;     command: [root.bin("torii-hypr"), "status"];                onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fRules, fWins, fTrans, fHypr, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
@@ -270,6 +271,19 @@ Singleton {
                       run: () => rule(["set", r.class, "silent", r.silent ? "false" : "true"]) },
                     { id: "float", name: "Open floating", badge: r.float ? "On" : "Off", keep: true, run: () => rule(["set", r.class, "float", r.float ? "false" : "true"]) },
                     { id: "remove", name: "Remove rule", glyph: Icons.trash, sub: r.class, run: () => rule(["remove", r.class]) } ] }))) };
+    }
+
+    // ---- sounds: pick the file for reminders and for notifications (it plays as a preview)
+    function soundsMenu() {
+        const dir = home + "/.config/torii/sounds";
+        const kind = (k, label) => ({ id: k, name: label, glyph: Icons.bell, sub: Config.sounds[k] || "Default (" + k + ".*)", onOpen: () => fSounds.refresh(),
+            children: () => [{ id: "default", name: "Default", sub: k + ".* in the sounds folder", badge: Config.sounds[k] ? "" : "●", keep: true,
+                               run: () => { sh([bin("torii-config"), "set", "sounds." + k, '""']); sh([bin("torii-sound"), k]); } }].concat(
+                (fSounds.data || []).map(f => ({ id: "f:" + f, name: f, glyph: Icons.music, badge: Config.sounds[k] === f ? "●" : "", keep: true,
+                    run: () => { sh([bin("torii-config"), "set", "sounds." + k, JSON.stringify(f)]); sh([bin("torii-sound"), "play", f]); } })))
+                .concat([{ id: "folder", name: "Open the sounds folder", glyph: Icons.folderMove, sub: "Drop .ogg, .wav, .mp3 or .flac files in", keep: true, run: () => sh(["xdg-open", dir]) }]) });
+        return { id: "sounds", name: "Sounds", glyph: Icons.bell, keywords: "reminder notification alert ogg volume", sub: "Reminder and notification sounds",
+                 children: () => [kind("reminder", "Reminder"), kind("notification", "Notification")] };
     }
 
     // ---- widgets around the notch (shown while the launcher or the control panel is open)
@@ -571,7 +585,7 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
     }
 
     function mouseNode() {

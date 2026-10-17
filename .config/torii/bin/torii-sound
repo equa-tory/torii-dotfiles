@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """torii-sound reminder|notification  -  play the sound set in config.json ("sounds": {"reminder", "notification", "volume"}).
 
-A name is looked up in ~/.config/torii/sounds/ (drop your own files there; a missing file falls back to the freedesktop
-sound theme), an absolute path is used as it is. Notifications stay silent while do not disturb is on; reminders do not.
+Looked up in this order: the name set in config.json (a file in ~/.config/torii/sounds/, or an absolute path), then any
+~/.config/torii/sounds/<kind>.* (ogg, oga, wav, mp3, flac), then the freedesktop sound theme. Notifications stay silent
+while do not disturb is on; reminders do not. `torii-sound list` prints the files in the sounds folder (JSON) and
+`torii-sound play <file>` plays one (the launcher's preview).
 """
 import json
 import os
@@ -22,27 +24,51 @@ def read(path):
         return {}
 
 
-def main(kind):
+SOUNDS = HOME / ".config/torii/sounds"
+EXT = (".ogg", ".oga", ".wav", ".mp3", ".flac")
+
+
+def play(f, vol):
+    subprocess.Popen(["pw-play", "--volume", str(vol), str(f)], stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def volume(cfg):
+    return max(0.0, min(1.0, float(cfg.get("volume", 0.8))))
+
+
+def find(kind, name):
+    if name:
+        p = Path(os.path.expanduser(name))
+        yield p if p.is_absolute() else SOUNDS / name
+    for ext in EXT:
+        yield SOUNDS / (kind + ext)
+    yield THEME / FALLBACK[kind]
+
+
+def main(kind, arg=None):
+    cfg = read(HOME / ".config/torii/config.json").get("sounds", {})
+    if kind == "list":
+        print(json.dumps(sorted(p.name for p in SOUNDS.glob("*") if p.suffix.lower() in EXT)) if SOUNDS.is_dir() else "[]")
+        return
+    if kind == "play" and arg:
+        p = Path(os.path.expanduser(arg))
+        f = p if p.is_absolute() else SOUNDS / arg
+        if f.is_file():
+            play(f, volume(cfg))
+        return
     if kind not in FALLBACK:
         print(__doc__)
         sys.exit(2)
     state = Path(os.environ.get("TORII_STATE", HOME / ".local/state/torii"))
     if kind == "notification" and read(state / "notifications.json").get("dnd"):
         return
-    cfg = read(HOME / ".config/torii/config.json").get("sounds", {})
-    name = cfg.get(kind, f"{kind}.oga")
-    candidates = []
-    if name:
-        p = Path(os.path.expanduser(name))
-        candidates.append(p if p.is_absolute() else HOME / ".config/torii/sounds" / name)
-    candidates.append(THEME / FALLBACK[kind])
-    for f in candidates:
+    for f in find(kind, cfg.get(kind, "")):
         if f.is_file():
-            vol = max(0.0, min(1.0, float(cfg.get("volume", 0.8))))
-            subprocess.Popen(["pw-play", "--volume", str(vol), str(f)], stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL, start_new_session=True)
+            play(f, volume(cfg))
             return
+    print(f"torii-sound: no {kind} sound found (put one in {SOUNDS})", file=sys.stderr)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "")
+    main(*(sys.argv[1:3] or [""]))

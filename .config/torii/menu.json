@@ -2,6 +2,6 @@
   "order": ["apps", "trigger", "processes", "weather", "calendar", "setup", "install", "remove", "learn", "todo", "system"],
   "hidden": [],
   "submenus": {
-    "setup": ["configs", "defaults", "nightlight", "widgets", "rules", "network", "bluetooth", "input", "output", "mouse"]
+    "setup": ["configs", "defaults", "nightlight", "widgets", "sounds", "rules", "network", "bluetooth", "input", "output", "mouse"]
   }
 }

@@ -198,8 +198,9 @@ runs its default action or brings the app forward, right click dismisses, hoveri
 the launcher's Notifications menu (and the bell in the control panel opens it); the badge counts the unread ones and is
 hidden while do not disturb is on (`notifications.badgeInDnd`). Do not disturb also hides the other activities (only its own
 circle stays) and silences the pop-ups and sounds, except critical ones.
-Sounds (`torii-sound`): `sounds.reminder` / `sounds.notification` in `config.json` are file names in `~/.config/torii/sounds/`
-(drop your own there) or absolute paths; missing files fall back to the freedesktop theme. `sounds.volume` is 0–1.
+Sounds (`torii-sound`, Setup › Sounds picks them and plays a preview): `sounds.reminder` / `sounds.notification` in `config.json` are file names in
+`~/.config/torii/sounds/` (drop your own there; two short defaults are shipped) or absolute paths; empty means `reminder.*` /
+`notification.*` from that folder, then the freedesktop theme. `sounds.volume` is 0–1.
 
 **Activities layout** (`config.json`): `activities.side` is `right` or `left` of the notch, `activities.style` is `pill`
 (one round pill) or `circles` (every activity on its own circle).

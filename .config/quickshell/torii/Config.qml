@@ -80,9 +80,9 @@ Singleton {
                 property bool badgeInDnd: false        // show the unread count while do not disturb is on
             }
             property JsonObject sounds: JsonObject {
-                // a file name inside ~/.config/torii/sounds/, or an absolute path; empty or missing = silent
-                property string reminder: "reminder.oga"
-                property string notification: "notification.oga"
+                // a file name inside ~/.config/torii/sounds/ or an absolute path; empty = reminder.* / notification.* from that folder
+                property string reminder: ""
+                property string notification: ""
                 property real volume: 0.8
             }
             property JsonObject activities: JsonObject {
