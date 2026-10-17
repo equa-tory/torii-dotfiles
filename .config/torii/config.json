@@ -1,6 +1,6 @@
 {
   "notch": {
-    "shape": "attached",
+    "shape": "floating",
     "opacity": 1,
     "radius": 16,
     "height": 32,

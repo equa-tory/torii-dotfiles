@@ -1,1 +1,1 @@
-{ "name": "Disk usage", "exec": "kitty --title 'Disk usage' gdu", "icon": "drive-harddisk", "keywords": ["disk", "space", "storage", "gdu", "ncdu", "analyzer", "usage", "df"], "description": "Disk usage analyzer (terminal)" }
+{"name": "Disk usage", "exec": "kitty --title 'Disk usage' gdu --config-file ~/.local/state/torii/theme/gdu.yaml -x /", "icon": "drive-harddisk", "keywords": ["disk", "space", "storage", "gdu", "ncdu", "analyzer", "usage", "df"], "description": "Disk usage of the system drive (other drives and network shares are skipped; open them from inside)"}

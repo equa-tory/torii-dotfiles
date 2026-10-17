@@ -1,6 +1,7 @@
 [
   {
     "class": "discord",
-    "name": "Discord"
+    "name": "Discord",
+    "float": false
   }
 ]
