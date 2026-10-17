@@ -51,18 +51,22 @@ Singleton {
     property bool pending: false
     Timer { id: openTimer; interval: 160; onTriggered: { root.pending = false; if (root.list.length > 0) Panels.open("windows"); } }
 
-    // The Tab and the Alt release reach us as two separate `qs ipc` calls that can arrive in either order. A release
-    // that comes first (a very quick tap) is remembered for a moment and applied by the Tab that follows it.
-    property double earlyCommit: 0
+    // The Tab and the Alt release of one Alt hold arrive as separate `qs ipc` calls with the same id, in either order.
+    // A release that comes first (a very quick tap) is remembered by its id and applied by the Tab that follows it;
+    // a release with no Tab left to wait for (the open switcher already took it) changes nothing.
+    property string stepId: ""        // hold whose Tab was handled
+    property string doneId: ""        // hold whose release arrived
 
-    function step(d) {
+    function step(d, id) {
         const n = list.length;
         if (n === 0) return;
-        if (Panels.panel !== "windows" && !pending && Date.now() - earlyCommit < 600) {
-            earlyCommit = 0;
-            Hyprland.refreshToplevels();
-            focus(list[d > 0 ? Math.min(1, n - 1) : n - 1]);
-            return;
+        if (id && id !== stepId) {
+            stepId = id;
+            if (id === doneId && Panels.panel !== "windows" && !pending) {
+                Hyprland.refreshToplevels();
+                focus(list[d > 0 ? Math.min(1, n - 1) : n - 1]);
+                return;
+            }
         }
         if (Panels.panel === "windows") {
             index = (index + d + n) % n;
@@ -79,7 +83,8 @@ Singleton {
         }
     }
 
-    function commit() {
+    function commit(id) {
+        if (id) doneId = id;
         if (pending) {
             openTimer.stop();
             pending = false;
@@ -88,8 +93,6 @@ Singleton {
             const t = list[index];
             Panels.close();
             focus(t);
-        } else {
-            earlyCommit = Date.now();
         }
     }
 

@@ -27,9 +27,9 @@ Scope {
     }
     IpcHandler {
         target: "windows"
-        function next(): void { Windows.step(1); }
-        function prev(): void { Windows.step(-1); }
-        function commit(): void { Windows.commit(); }
+        function next(id: string): void { Windows.step(1, id); }
+        function prev(id: string): void { Windows.step(-1, id); }
+        function commit(id: string): void { Windows.commit(id); }
         // the Alt+arrow and Alt+Q binds ask first: "ok" when the switcher took the key, "no" when it is not open
         function left(): string { return Windows.arrow(-1); }
         function right(): string { return Windows.arrow(1); }

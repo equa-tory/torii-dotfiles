@@ -45,21 +45,25 @@ hl.bind(mainMod .. " + CTRL + SPACE",   hl.dsp.exec_cmd(qsipc .. "switcher toggl
 -- window switcher: Alt+Tab opens it on the previous window, more Tabs move on, letting go of Alt focuses
 -- A quick tap (Alt released at once) switches without the menu ever showing; the menu opens when Alt is held on.
 -- Hyprland sees the Alt release (the menu may not be open yet), so it tells the shell to commit.
-local tabbing = false
-hl.bind(mainMod .. " + TAB", function()
+-- Every Alt hold gets an id; the shell gets it with each call, because the separate `qs ipc` processes can arrive out
+-- of order (a release before its own Tab) and a late release must not be taken for the next hold.
+local tabbing, gesture, gestures = false, "", 0
+local function tab(cmd)
+    if not tabbing then
+        gestures = gestures + 1
+        gesture = os.time() .. "-" .. gestures
+    end
     tabbing = true
-    hl.exec_cmd(qsipc .. "windows next")
-end)
-hl.bind(mainMod .. " + SHIFT + TAB", function()
-    tabbing = true
-    hl.exec_cmd(qsipc .. "windows prev")
-end)
+    hl.exec_cmd(qsipc .. "windows " .. cmd .. " " .. gesture)
+end
+hl.bind(mainMod .. " + TAB", function() tab("next") end)
+hl.bind(mainMod .. " + SHIFT + TAB", function() tab("prev") end)
 -- The Alt release is read from the raw key events: a release bind does not fire when Tab was pressed in between.
 if torii_tab_sub then pcall(function() torii_tab_sub:remove() end) end     -- a reload runs this file again
 torii_tab_sub = hl.on("input.keyboard.key", function(code, _, state)
     if state == 0 and (code == 64 or code == 108) and tabbing then      -- Alt_L / Alt_R (evdev code + 8)
         tabbing = false
-        hl.exec_cmd(qsipc .. "windows commit")
+        hl.exec_cmd(qsipc .. "windows commit " .. gesture)
     end
 end)
 
