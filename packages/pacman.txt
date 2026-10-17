@@ -8,6 +8,7 @@ github-cli
 hyprpaper
 neovim
 noto-fonts
+noto-fonts-cjk
 stow
 tmux
 ttf-jetbrains-mono-nerd
