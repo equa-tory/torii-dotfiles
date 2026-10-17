@@ -16,6 +16,17 @@ Singleton {
     property string resets: ""
     readonly property bool ok: authed && pct >= 0
 
+    // time until the 5-hour window resets
+    property double clockMs: Date.now()
+    readonly property real resetIn: resets !== "" && !isNaN(Date.parse(resets)) ? (Date.parse(resets) - clockMs) / 1000 : -1
+    readonly property string resetText: {
+        if (resetIn < 0) return "";
+        const m = Math.ceil(resetIn / 60);
+        if (m <= 0) return "soon";
+        return m >= 60 ? Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m" : m + "m";
+    }
+    Timer { interval: 30000; running: root.watching; repeat: true; triggeredOnStart: true; onTriggered: root.clockMs = Date.now() }
+
     FileView {
         path: Config.home + "/.claude/.credentials.json"
         watchChanges: true

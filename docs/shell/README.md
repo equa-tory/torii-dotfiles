@@ -215,8 +215,9 @@ play / next, a seek bar you can drag, wheel or Left/Right (`media.seekSeconds`, 
 `qs -c torii ipc call media toggle|next|previous|seek 10`.
 
 **Widgets** (`widgets.left` / `widgets.right` in `config.json`, or Setup › Widgets): they only take room while the launcher or the
-control panel is open. `system` (CPU, RAM, GPU, VRAM and temperatures, `torii-sys stats`; click: the process list),
-`claude` (usage ring), `battery` (only if the machine has one). **Processes** (launcher root, `torii-sys procs`): sort by
+control panel is open (defaults: `claude` on the left with the 5-hour usage and the time until it resets, `battery` on the right,
+only if the machine has one). `system` (CPU, RAM, GPU, VRAM and temperatures, `torii-sys stats`; click: the process list) and
+the Processes menu are switched off for now: set `features.systemInfo` to `true` in `config.json` to bring them back. **Processes** (launcher root, `torii-sys procs`): sort by
 CPU / RAM / GPU with the first row, type to filter by name or pid, Enter asks `y` (stop) or `9` (force kill). The session,
 the shell, Hyprland, systemd, D-Bus, PipeWire and v2rayN are never listed.
 

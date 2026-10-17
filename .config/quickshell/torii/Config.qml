@@ -23,6 +23,7 @@ Singleton {
     readonly property var activities: adapter.activities
     readonly property var media: adapter.media
     readonly property var widgets: adapter.widgets
+    readonly property var features: adapter.features
     readonly property string quicklinks: adapter.quicklinks
 
     function expand(path) {
@@ -95,8 +96,11 @@ Singleton {
             }
             property JsonObject widgets: JsonObject {
                 // shown only while the launcher or the control panel is open: system, claude, battery
-                property var left: ["system"]
-                property var right: ["claude", "battery"]
+                property var left: ["claude"]
+                property var right: ["battery"]
+            }
+            property JsonObject features: JsonObject {
+                property bool systemInfo: false        // CPU/RAM/GPU widget and the Processes menu: switched off for now, the code is kept
             }
             property string quicklinks: "~/.config/torii/quicklinks.json"
         }

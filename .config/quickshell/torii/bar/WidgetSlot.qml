@@ -18,7 +18,7 @@ Row {
         Loader {
             required property string modelData
             anchors.verticalCenter: parent.verticalCenter
-            sourceComponent: modelData === "system" ? system : modelData === "claude" ? claude : modelData === "battery" ? battery : null
+            sourceComponent: modelData === "system" ? (Config.features.systemInfo ? system : null) : modelData === "claude" ? claude : modelData === "battery" ? battery : null
         }
     }
 

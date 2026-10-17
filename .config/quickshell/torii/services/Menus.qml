@@ -156,7 +156,7 @@ Singleton {
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
-    function rootNodes() { return ordered("", [appsMenu(), triggerMenu(), processesMenu(), weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()]); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu()].concat(Config.features.systemInfo ? [processesMenu()] : []).concat([weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()])); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
@@ -298,7 +298,7 @@ Singleton {
         };
         return { id: "widgets", name: "Widgets", glyph: Icons.apps, keywords: "notch system battery claude cpu left right hide",
                  sub: "What shows around the notch while the launcher is open",
-                 children: () => Object.keys(names).map(id => ({
+                 children: () => Object.keys(names).filter(id => id !== "system" || Config.features.systemInfo).map(id => ({
                     id: id, name: names[id], sub: id === "battery" ? "Only on a laptop" : id === "claude" ? "Needs a signed-in Claude Code" : "CPU, RAM, GPU, temperatures",
                     badge: place(id), children: () => ["Left", "Right", "Off"].map(side => ({
                         id: side.toLowerCase(), name: side, badge: place(id) === side ? "●" : "", keep: true, run: () => put(id, side) })) })) };

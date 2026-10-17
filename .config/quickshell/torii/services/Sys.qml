@@ -20,6 +20,6 @@ Singleton {
         }
     }
     function refresh() { if (!proc.running) proc.running = true; }
-    onWatchingChanged: if (watching) refresh()
-    Timer { interval: 2000; running: root.watching; repeat: true; onTriggered: root.refresh() }
+    onWatchingChanged: if (watching && Config.features.systemInfo) refresh()
+    Timer { interval: 2000; running: root.watching && Config.features.systemInfo; repeat: true; onTriggered: root.refresh() }
 }

@@ -48,7 +48,7 @@ Item {
         id: pctLabel
         x: 25
         anchors.verticalCenter: parent.verticalCenter
-        text: Math.round(ClaudeUsage.pct) + "%"
+        text: Math.round(ClaudeUsage.pct) + "%" + (ClaudeUsage.resetText !== "" ? "  ·  " + ClaudeUsage.resetText : "")
         color: Theme.fgDim
     }
 }
