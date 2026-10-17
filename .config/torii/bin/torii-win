@@ -31,7 +31,12 @@ def main(a):
     if cmd == "close":
         dispatch("hl.dsp.window.close()")
     elif cmd == "max":
-        dispatch('hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })')
+        act = json.loads(hc("activewindow", "-j") or "{}")
+        if act.get("floating") and act.get("fullscreen", 0) == 0:
+            # floating windows fill the work area themselves (below the title bar, inside the gaps); see floatmode.lua
+            hc("eval", "torii_float_maximize()")
+        else:
+            dispatch('hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })')
     elif cmd == "min":
         dispatch('hl.dsp.window.move({ workspace = "special:minimized", follow = false })')
     elif cmd == "restore":

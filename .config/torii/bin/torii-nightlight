@@ -10,6 +10,7 @@
   auto <HH:MM> <HH:MM>      switch on at the first time and off at the second, every day
   auto off                  manual only
   apply                     restore after login (autostart runs this)
+  dim <0..60>               filter mode only: how much darker the screen gets at full strength, in % (default 20, 0 = only the colour)
   fade <seconds>            how long the automatic fade takes (default 30, 0 = at once)
   tick                      the fade-out before the end of the window (a timer starts it)
 In auto mode the colour fades in over the fade time when the window starts and fades out the same way before it
@@ -26,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 
 STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii")) / "nightlight.json"
-DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00", "mode": "gpu", "fade": 30}
+DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00", "mode": "gpu", "fade": 30, "dim": 20}
 SELF = os.path.abspath(sys.argv[0])
 
 
@@ -56,13 +57,14 @@ SHADERS = [STATE.with_name("nightlight-a.frag"), STATE.with_name("nightlight-b.f
 PIDFILE = STATE.with_name("nightlight.pid")
 
 
-def shader_text(kelvin, strength=None):
+def shader_text(kelvin, strength=None, dim=20):
     """Multiplies the picture by a warm colour (what real night modes do): white becomes a calm dark amber-red."""
     import math
     t = kelvin / 100.0
     g = max(0.0, min(1.0, (99.4708025861 * math.log(t) - 161.1195681661) / 255)) if t > 1 else 0.0
     b = 1.0 if t >= 66 else (0.0 if t <= 19 else max(0.0, min(1.0, (138.5177312231 * math.log(t - 10) - 305.0447927307) / 255)))
-    r, g, b = 0.80, 0.80 * g ** 2.4, 0.70 * b ** 3.0
+    k = 1.0 - max(0, min(60, dim)) / 100.0          # how bright the screen stays at full strength (dim 20 = 0.80)
+    r, g, b = k, k * g ** 2.4, k * 0.875 * b ** 3.0
     f = max(0.0, min(1.0, (6500 - kelvin) / 1500.0)) if strength is None else strength   # fade: 0 = no change, 1 = full
     r, g, b = 1 + (r - 1) * f, 1 + (g - 1) * f, 1 + (b - 1) * f
     return ("#version 300 es\nprecision highp float;\nin vec2 v_texcoord;\nuniform sampler2D tex;\n"
@@ -130,7 +132,7 @@ def push(s):
             target = SHADERS[int(datetime.now().timestamp() * 2) % 2]
             strength = max(0.0, min(1.0, (6500 - eff) / max(1.0, 6500 - s["temp"])))
             tmp = target.with_suffix(".tmp")
-            tmp.write_text(shader_text(s["temp"], strength))
+            tmp.write_text(shader_text(s["temp"], strength, s.get("dim", 20)))
             os.replace(tmp, target)
             set_shader(str(target))
         else:
@@ -187,6 +189,8 @@ def main(a):
         s["temp"] = int(a[1])
     elif cmd == "fade" and len(a) == 2 and a[1].isdigit() and int(a[1]) <= 3600:
         s["fade"] = int(a[1])
+    elif cmd == "dim" and len(a) == 2 and a[1].isdigit() and int(a[1]) <= 60:
+        s["dim"] = int(a[1])
     elif cmd == "mode" and len(a) == 2 and a[1] in ("gpu", "filter", "overlay"):
         s["mode"] = a[1]
     elif cmd == "auto" and a[1:] == ["off"]:

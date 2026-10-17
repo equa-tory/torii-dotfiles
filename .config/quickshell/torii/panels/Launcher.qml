@@ -103,7 +103,7 @@ Item {
             }
             out = out.concat(Menus.search(scope, q, pathIds));
             if (!scope && out.length === 0) {
-                const g = Quicklinks.resolve("g " + q);
+                const g = Quicklinks.resolve("ddg " + q);
                 if (g) out.push({ node: linkNode(g), trail: [] });
             }
         }
@@ -490,7 +490,7 @@ Item {
                         source: {
                             const i = row.node.icon;
                             if (!i) return "";
-                            return i.charAt(0) === "/" ? "file://" + i : Quickshell.iconPath(i, true);
+                            return i.charAt(0) === "/" ? "file://" + i + "?" + Quicklinks.iconRev : Quickshell.iconPath(i, true);
                         }
                     }
                     Glyph {

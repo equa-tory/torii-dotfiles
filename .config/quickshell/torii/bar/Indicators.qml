@@ -54,7 +54,7 @@ Row {
             key: modelData.key
             glyph: kind === "reminder" ? Icons.timer : kind === "sudo" ? Icons.lock : kind === "rec" ? Icons.record
                  : kind === "media" ? Icons.music : kind === "mic" ? Icons.micOff : kind === "automove" ? Icons.folderMove : kind === "night" ? Icons.nightLight : Icons.bellOff
-            tint: kind === "rec" || kind === "mic" ? Theme.red : kind === "sudo" || kind === "night" ? Theme.yellow : kind === "dnd" ? Theme.subtle : Theme.accent
+            tint: kind === "rec" || kind === "mic" ? Theme.red : kind === "sudo" ? Theme.yellow : kind === "dnd" ? Theme.subtle : Theme.accent
             openable: kind === "reminder" || kind === "media"
             image: kind === "media" ? Media.art : ""
             content: kind === "media" ? mediaBody : null

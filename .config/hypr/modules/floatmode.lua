@@ -126,35 +126,78 @@ hl.on("window.close", function(w)
 end)
 
 -- Alt+Shift+arrows in float mode: half of the screen (still floating), up fills it, down gives back the old place.
-local before_snap = {}      -- address -> geometry before the first snap
+-- "Fills" means what a lone tiled window gets: inside the bar's reserved strip and the outer gaps (general.gaps_out),
+-- and below the title bar, so it follows the notch height and the gap settings.
+local before_snap = {}      -- address -> geometry before the first snap / maximise
+
+local function bar_height()
+    local ok, b = pcall(dofile, os.getenv("HOME") .. "/.local/state/torii/bars.lua")
+    return (ok and type(b) == "table" and tonumber(b.height)) or 28
+end
+
+local function work_area(w)
+    local mon = w.monitor or hl.get_active_monitor()
+    local r = mon.reserved or {}
+    local sc = mon.scale or 1
+    local go = hl.get_config("general.gaps_out")
+    if type(go) ~= "table" then go = { top = 20, left = 20, bottom = 20, right = 20 } end
+    local top = (r.top or 0) + (go.top or 0) + bar_height()
+    local left = (r.left or 0) + (go.left or 0)
+    return {
+        x = mon.x + left,
+        y = mon.y + top,
+        w = mon.width / sc - left - (r.right or 0) - (go.right or 0),
+        h = mon.height / sc - top - (r.bottom or 0) - (go.bottom or 0),
+        gap = go.left or 8,
+    }
+end
+
+local function place(w, g)
+    hl.dispatch(hl.dsp.window.resize({ x = math.floor(g.w), y = math.floor(g.h), exact = true, window = w }))
+    hl.dispatch(hl.dsp.window.move({ x = math.floor(g.x), y = math.floor(g.y), exact = true, window = w }))
+end
+
+local function remember_before(w)
+    if not before_snap[w.address] then
+        before_snap[w.address] = { x = xy(w.at, "x", 1), y = xy(w.at, "y", 2), w = xy(w.size, "x", 1), h = xy(w.size, "y", 2) }
+    end
+end
+
 function torii_float_snap(dir)
     if mode ~= "float" then return false end
     local w = hl.get_active_window()
     if not w or not w.floating then return false end
-    local mon = w.monitor or hl.get_active_monitor()
-    local r = mon.reserved or {}
-    local sc = mon.scale or 1
-    local gap = 8
-    local x0 = mon.x + (r.left or 0) + gap
-    local y0 = mon.y + (r.top or 0) + gap
-    local ww = mon.width / sc - (r.left or 0) - (r.right or 0) - 2 * gap
-    local wh = mon.height / sc - (r.top or 0) - (r.bottom or 0) - 2 * gap
+    local a = work_area(w)
+    local half = (a.w - a.gap) / 2
     local g
-    if dir == "left" then g = { x = x0, y = y0, w = math.floor((ww - gap) / 2), h = wh }
-    elseif dir == "right" then
-        local half = math.floor((ww - gap) / 2)
-        g = { x = x0 + ww - half, y = y0, w = half, h = wh }
-    elseif dir == "up" then g = { x = x0, y = y0, w = ww, h = wh }
+    if dir == "left" then g = { x = a.x, y = a.y, w = half, h = a.h }
+    elseif dir == "right" then g = { x = a.x + a.w - half, y = a.y, w = half, h = a.h }
+    elseif dir == "up" then g = { x = a.x, y = a.y, w = a.w, h = a.h }
     elseif dir == "down" then
         g = before_snap[w.address]
         before_snap[w.address] = nil
         if not g then return true end
+        place(w, g)
+        return true
     else return false end
-    if dir ~= "down" and not before_snap[w.address] then
-        before_snap[w.address] = { x = xy(w.at, "x", 1), y = xy(w.at, "y", 2), w = xy(w.size, "x", 1), h = xy(w.size, "y", 2) }
+    remember_before(w)
+    place(w, g)
+    return true
+end
+
+-- the maximise button / double-click on a floating window: fill the work area, again to go back (true = handled here)
+function torii_float_maximize()
+    local w = hl.get_active_window()
+    if not w or not w.floating then return false end
+    local old = before_snap[w.address]
+    if old then
+        before_snap[w.address] = nil
+        place(w, old)
+    else
+        local a = work_area(w)
+        remember_before(w)
+        place(w, a)
     end
-    hl.dispatch(hl.dsp.window.resize({ x = g.w, y = g.h, exact = true, window = w }))
-    hl.dispatch(hl.dsp.window.move({ x = g.x, y = g.y, exact = true, window = w }))
     return true
 end
 
