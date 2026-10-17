@@ -74,10 +74,11 @@ Singleton {
     JsonFetch { id: fLearnNvim; command: [root.bin("torii-learn"), "list", "nvim"];       onDataChanged: root.bump() }
     JsonFetch { id: fNotes;    command: [root.bin("torii-learn"), "files"];               onDataChanged: root.bump() }
     JsonFetch { id: fHypr;     command: [root.bin("torii-hypr"), "status"];                onDataChanged: root.bump() }
+    JsonFetch { id: fCalSync;  command: [root.bin("torii-calendar"), "autosync", "status"];  onDataChanged: root.bump() }
     JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fMons, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fMons, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
@@ -612,10 +613,20 @@ Singleton {
     }
 
     function calendarSetupMenu() {
-        return { id: "calsetup", name: "Calendar sync", glyph: Icons.calendar, sub: "iCloud (two-way), every 15 minutes", keywords: "icloud apple caldav events", children: () => [
-            { id: "connect", name: "Connect iCloud…", sub: "Apple ID + app-specific password, in a terminal", glyph: Icons.calendar,
+        fCalSync.ensure();
+        const cs = fCalSync.data || { configured: false, on: false, minutes: 15 };
+        const refresh = () => later(fCalSync, 700);
+        const minutesName = m => m === 60 ? "hour" : m + " min";
+        return { id: "calsetup", name: "Calendar sync", glyph: Icons.calendar, keywords: "icloud apple caldav events autosync",
+                 sub: !cs.configured ? "Not connected" : cs.on ? "iCloud, every " + minutesName(cs.minutes) : "iCloud, automatic sync off", children: () => [
+            { id: "connect", name: cs.configured ? "Reconnect iCloud…" : "Connect iCloud…", sub: "Apple ID + app-specific password, in a terminal", glyph: Icons.calendar,
               run: () => floatTerm("iCloud", [bin("torii-install"), "calendar"]) },
-            { id: "sync", name: "Sync now", glyph: Icons.refresh, keep: true, run: () => { sh([bin("torii-calendar"), "sync"]); say("Syncing the calendar"); } } ] };
+            { id: "sync", name: "Sync now", glyph: Icons.refresh, keep: true, run: () => { sh([bin("torii-calendar"), "sync"]); say("Syncing the calendar"); } },
+            { id: "auto", name: "Automatic sync", glyph: Icons.power, badge: cs.on ? "On" : "Off", keep: true, sub: "In the background, even with the calendar closed",
+              run: () => { sh([bin("torii-calendar"), "autosync", cs.on ? "off" : "on"]); refresh(); } },
+            { id: "every", name: "Sync every", glyph: Icons.tune, sub: minutesName(cs.minutes), children: () =>
+                [1, 5, 15, 30, 60].map(m => ({ id: "m" + m, name: m === 60 ? "1 hour" : m + (m === 1 ? " minute" : " minutes"), badge: cs.minutes === m ? "●" : "", keep: true,
+                    run: () => { sh([bin("torii-calendar"), "autosync", "interval", String(m)]); refresh(); } })) } ] };
     }
 
     // look: bar size, monitor scale, window transparency and blur

@@ -7,11 +7,13 @@ import QtQuick
 // Month calendar, Monday first. Arrows move the day, Page Up/Down the month, Home goes to today.
 // Events come from torii-calendar (local .ics files, kept in step with iCloud when it is connected): a dot under a day,
 // the selected day's events under the grid. "a" adds one: "14:30 Dentist" (a time is optional), Enter saves.
+// Tab walks into the day's events (Up/Down choose, "d" or Delete removes the chosen one, Tab or Esc leaves).
 Item {
     id: root
 
     property var evs: ({})
     property bool adding: false
+    property int evSel: -1               // chosen event of the day, -1 = moving over the days
     property date today: new Date()
     property date cursor: new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
@@ -25,7 +27,7 @@ Item {
     implicitWidth: 7 * cellW + 36
     readonly property string selKey: key(cursor.getFullYear(), cursor.getMonth(), cursor.getDate())
     readonly property var selEvents: evs[selKey] || []
-    readonly property int listRows: Math.min(4, selEvents.length) + 1
+    readonly property int listRows: Math.min(5, selEvents.length) + 1
     implicitHeight: 78 + weeks * cellH + 14 + 12 + listRows * 24
 
     opacity: 0
@@ -43,15 +45,18 @@ Item {
 
     Keys.onLeftPressed: go(-1)
     Keys.onRightPressed: go(1)
-    Keys.onUpPressed: go(-7)
-    Keys.onDownPressed: go(7)
+    Keys.onUpPressed: { if (evSel >= 0) evSel = Math.max(0, evSel - 1); else go(-7); }
+    Keys.onDownPressed: { if (evSel >= 0) evSel = Math.min(Math.min(5, selEvents.length) - 1, evSel + 1); else go(7); }
     Keys.onPressed: event => {
-        if (event.text === "a" || event.text === "+") { adding = true; event.accepted = true; }
+        if (event.text === "a" || event.text === "+") { adding = true; evSel = -1; event.accepted = true; }
+        else if (event.key === Qt.Key_Tab) { evSel = evSel >= 0 || selEvents.length === 0 ? -1 : 0; event.accepted = true; }
+        else if ((event.key === Qt.Key_Delete || event.text === "d") && evSel >= 0) { removeSelected(); event.accepted = true; }
         else if (event.key === Qt.Key_PageUp) { month(-1); event.accepted = true; }
         else if (event.key === Qt.Key_PageDown) { month(1); event.accepted = true; }
         else if (event.key === Qt.Key_Home) { cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate()); event.accepted = true; }
     }
-    Keys.onEscapePressed: Panels.close()
+    Keys.onEscapePressed: { if (evSel >= 0) evSel = -1; else Panels.close(); }
+    onCursorChanged: evSel = -1
 
     readonly property string bin: Config.home + "/.config/torii/bin/torii-calendar"
     readonly property string ym: cursor.getFullYear() + "-" + String(cursor.getMonth() + 1).padStart(2, "0")
@@ -62,6 +67,18 @@ Item {
         onDataChanged: root.evs = data && data.days ? data.days : ({})
     }
     Timer { id: later; interval: 900; onTriggered: fm.refresh() }
+
+    function removeSelected() {
+        const e = selEvents[evSel];
+        if (!e || !e.file) return;
+        Quickshell.execDetached([bin, "delete", e.file]);
+        // gone from the list at once; the next fetch confirms
+        const copy = Object.assign({}, evs);
+        copy[selKey] = selEvents.filter((x, i) => i !== evSel);
+        evs = copy;
+        evSel = Math.min(evSel, copy[selKey].length - 1);
+        later.restart();
+    }
 
     function addEvent(text) {
         const m = text.trim().match(/^(\d{1,2}:\d{2})\s+(.+)$/);
@@ -167,11 +184,12 @@ Item {
         width: parent.width - 36
         spacing: 4
         Repeater {
-            model: root.selEvents.slice(0, 4)
+            model: root.selEvents.slice(0, 5)
             Row {
                 spacing: 10
+                Rectangle { visible: index === root.evSel; width: 3; height: 14; radius: 1.5; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
                 Label { width: 48; text: modelData.allDay ? "all day" : modelData.start; color: Theme.accent; font.pixelSize: Config.font.size - 1 }
-                Label { width: parent.parent.width - 58; text: modelData.title; elide: Text.ElideRight; font.pixelSize: Config.font.size - 1 }
+                Label { width: parent.parent.width - 74; text: modelData.title; elide: Text.ElideRight; font.pixelSize: Config.font.size - 1 }
             }
         }
         Item {
@@ -179,7 +197,8 @@ Item {
             height: 20
             Label {
                 visible: !root.adding
-                text: root.selEvents.length === 0 ? "Nothing planned  ·  a: add" : "a: add an event"
+                text: root.evSel >= 0 ? "d: delete this event  ·  Esc: back"
+                    : root.selEvents.length === 0 ? "Nothing planned  ·  a: add" : "a: add  ·  Tab: choose / delete"
                 color: Theme.muted
                 font.pixelSize: Config.font.size - 2
             }

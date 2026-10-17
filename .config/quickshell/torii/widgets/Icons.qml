@@ -35,6 +35,7 @@ Singleton {
     readonly property string battery: g(0xF0079)
     readonly property string trash: g(0xF01B4)
     readonly property string link: g(0xF0337)
+    readonly property string calc: g(0xF00EC)
     readonly property string search: g(0xF0349)
     readonly property string apps: g(0xF003B)
     readonly property string cog: g(0xF0493)

@@ -3,6 +3,7 @@ import qs.services
 import qs.widgets
 import Quickshell
 import QtQuick
+import "../widgets/calc.js" as Calc
 import QtQuick.Layouts
 
 // Keyboard-first launcher. Opens as just the input; Down shows the menus, Right enters / runs, Left goes back / closes.
@@ -97,6 +98,9 @@ Item {
             out = q.length > 1 ? Menus.emojiSearch(q.slice(1)) : [];
         } else {
             if (!scope) {
+                const calc = Calc.evaluate(q);
+                if (calc.ok) out.push({ node: { id: "calc", name: "= " + calc.text, sub: q + "  ·  Enter copies the result", glyph: Icons.calc,
+                    run: () => Quickshell.execDetached(["sh", "-c", 'printf %s "$1" | wl-copy', "sh", calc.text]) }, trail: [] });
                 const link = Quicklinks.resolve(q);
                 if (link) out.push({ node: linkNode(link), trail: [] });
                 if (link && /\s/.test(q)) { results = out; selected = 0; return; }   // "yt cats" is a search, not a lookup

@@ -7,6 +7,8 @@ vdirsyncer keeps in step with iCloud (set up by packages/calendar.sh); without i
   month 2026-10   JSON {"days": {"2026-10-17": [{"title", "start", "end", "allDay", "cal"}]}}, recurring events expanded
   add             writes an event and pushes it (a day without time is an all-day event)
   sync            vdirsyncer sync (does nothing when it is not set up)
+  delete <file>   remove an event (the "file" of an event in `month`) and push it
+  autosync status | on | off | interval <minutes>   the background sync timer (default every 15 minutes)
 """
 import calendar as pycal
 import json
@@ -157,7 +159,9 @@ def month(ym):
         for f in sorted(ROOT.rglob("*.ics")):
             cal = f.parent.name if f.parent != ROOT else "local"
             try:
-                events += parse_events(f.read_text(errors="replace"), cal)
+                for e in parse_events(f.read_text(errors="replace"), cal):
+                    e["file"] = str(f)
+                    events.append(e)
             except OSError:
                 pass
     moved = {(e.get("uid"), e["recid"]) for e in events if "recid" in e}
@@ -181,7 +185,8 @@ def month(ym):
                     end = fmt(datetime.combine(d, start.time()) + length)
                 days.setdefault(day.isoformat(), []).append({
                     "title": ev.get("title", "(no title)"), "start": "" if allday else fmt(start), "end": end,
-                    "allDay": bool(allday), "cal": ev["cal"]})
+                    "allDay": bool(allday), "cal": ev["cal"], "file": ev.get("file", ""),
+                    "repeats": bool(ev["rrule"])})
     for v in days.values():
         v.sort(key=lambda e: (e["start"] != "", e["start"]))
     return {"days": days}
@@ -242,9 +247,49 @@ def add(title, day, at=None, minutes=60, cal=None):
     return uid
 
 
+def delete(path):
+    p = Path(path).resolve()
+    if ROOT.resolve() not in p.parents or p.suffix != ".ics":
+        print("not an event file", file=sys.stderr)
+        sys.exit(1)
+    p.unlink(missing_ok=True)
+    sync()
+
+
+UNITS = Path.home() / ".config/systemd/user"
+TIMER = UNITS / "torii-calendar-sync.timer"
+
+
+def ctl(*a):
+    return subprocess.run(["systemctl", "--user", *a], capture_output=True, text=True)
+
+
+def autosync(args):
+    if not configured() or not TIMER.exists():
+        return {"configured": False, "on": False, "minutes": 15}
+    m = re.search(r"OnUnitActiveSec=(\d+)min", TIMER.read_text())
+    minutes = int(m.group(1)) if m else 15
+    if args[:1] == ["on"]:
+        ctl("enable", "--now", "torii-calendar-sync.timer")
+    elif args[:1] == ["off"]:
+        ctl("disable", "--now", "torii-calendar-sync.timer")
+    elif args[:1] == ["interval"] and len(args) == 2 and args[1].isdigit() and 1 <= int(args[1]) <= 1440:
+        minutes = int(args[1])
+        TIMER.write_text(re.sub(r"OnUnitActiveSec=\d+min", f"OnUnitActiveSec={minutes}min", TIMER.read_text()))
+        TIMER.write_text(re.sub(r"(?m)^Description=.*$", f"Description=Sync the torii calendar every {minutes} minutes", TIMER.read_text()))
+        ctl("daemon-reload")
+        if ctl("is-enabled", "torii-calendar-sync.timer").stdout.strip() == "enabled":
+            ctl("restart", "torii-calendar-sync.timer")
+    return {"configured": True, "on": ctl("is-enabled", "torii-calendar-sync.timer").stdout.strip() == "enabled", "minutes": minutes}
+
+
 def main(a):
     if a[:1] == ["status"]:
         print(json.dumps({"configured": configured(), "calendars": calendars()}))
+    elif a[:1] == ["autosync"]:
+        print(json.dumps(autosync(a[1:])))
+    elif a[:1] == ["delete"] and len(a) == 2:
+        delete(a[1])
     elif a[:1] == ["sync"]:
         sys.exit(sync())
     elif a[:1] == ["calendars"]:
