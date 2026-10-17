@@ -45,6 +45,13 @@
     "expand": "side"
   },
   "sounds": {
-    "notification": "waterdrop.ogg"
+    "notification": "waterdrop.ogg",
+    "reminder": ""
+  },
+  "widgets": {
+    "left": [
+      "claude"
+    ],
+    "right": []
   }
 }

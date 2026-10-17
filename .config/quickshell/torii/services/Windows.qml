@@ -46,16 +46,38 @@ Singleton {
         if (act) touch(act.address);
     }
 
-    // step the selection: first call opens on the previous window, later ones move on
+    // Alt+Tab: the first Tab only picks the previous window and starts a short timer; the menu opens when Alt is still held
+    // after it (or at the second Tab). Letting go of Alt before that switches at once, with no menu at all.
+    property bool pending: false
+    Timer { id: openTimer; interval: 160; onTriggered: { root.pending = false; if (root.list.length > 0) Panels.open("windows"); } }
+
     function step(d) {
         const n = list.length;
         if (n === 0) return;
-        if (Panels.panel !== "windows") {
-            Hyprland.refreshToplevels();
-            index = d > 0 ? Math.min(1, n - 1) : n - 1;
+        if (Panels.panel === "windows") {
+            index = (index + d + n) % n;
+        } else if (pending) {
+            openTimer.stop();
+            pending = false;
+            index = (index + d + n) % n;
             Panels.open("windows");
         } else {
-            index = (index + d + n) % n;
+            Hyprland.refreshToplevels();
+            index = d > 0 ? Math.min(1, n - 1) : n - 1;
+            pending = true;
+            openTimer.restart();
+        }
+    }
+
+    function commit() {
+        if (pending) {
+            openTimer.stop();
+            pending = false;
+            focus(list[index]);
+        } else if (Panels.panel === "windows") {
+            const t = list[index];
+            Panels.close();
+            focus(t);
         }
     }
 

@@ -43,8 +43,23 @@ hl.bind(mainMod .. " + SPACE",          hl.dsp.exec_cmd(qsipc .. "launcher toggl
 hl.bind(mainMod .. " + N",              hl.dsp.exec_cmd(qsipc .. "control toggle"))
 hl.bind(mainMod .. " + CTRL + SPACE",   hl.dsp.exec_cmd(qsipc .. "switcher toggle"))
 -- window switcher: Alt+Tab opens it on the previous window, more Tabs move on, letting go of Alt focuses
-hl.bind(mainMod .. " + TAB",            hl.dsp.exec_cmd(qsipc .. "windows next"))
-hl.bind(mainMod .. " + SHIFT + TAB",    hl.dsp.exec_cmd(qsipc .. "windows prev"))
+-- A quick tap (Alt released at once) switches without the menu ever showing; the menu opens when Alt is held on.
+-- Hyprland sees the Alt release (the menu may not be open yet), so it tells the shell to commit.
+local tabbing = false
+hl.bind(mainMod .. " + TAB", function()
+    tabbing = true
+    hl.exec_cmd(qsipc .. "windows next")
+end)
+hl.bind(mainMod .. " + SHIFT + TAB", function()
+    tabbing = true
+    hl.exec_cmd(qsipc .. "windows prev")
+end)
+hl.bind("Alt_L", function()
+    if tabbing then
+        tabbing = false
+        hl.exec_cmd(qsipc .. "windows commit")
+    end
+end, { release = true, ignore_mods = true, non_consuming = true })
 
 hl.bind(mainMod .. "+ SHIFT + F", function()
     hl.dispatch(hl.dsp.window.fullscreen({
@@ -63,6 +78,7 @@ end)
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(browser))
 -- Alt+Q closes the active window, or the selected one while Alt+Tab is open
+hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-win min"))   -- minimise (still listed in Alt+Tab)
 hl.bind(mainMod .. " + Q", function()
     if torii_panel_open() then
         hl.exec_cmd("sh -c 'r=$(qs -c torii ipc call windows close); [ \"$r\" = ok ] || hyprctl dispatch \"hl.dsp.window.close()\"'")
@@ -72,13 +88,13 @@ hl.bind(mainMod .. " + Q", function()
 end)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
---hl.bind(mainMod .. " + F", hl.dsp.window.float({ action = "toggle" }))
+hl.bind(mainMod .. " + G", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + R", hl.dsp.layout("togglesplit"))    -- dwindle only
 
 
 -- Resize active window: mainMod + CTRL + arrow
-local STEP = 100
+local STEP = 50
 local resize = {
     left  = { x = -STEP, y = 0 },
     right = { x =  STEP, y = 0 },
@@ -93,9 +109,12 @@ end
 
 -- Move active window: mainMod + SHIFT + arrow (past the edge of a monitor it goes to the next monitor)
 local move = { left = "l", right = "r", up = "u", down = "d" }
+-- In float mode the same keys snap the window to the left / right half (up: fill the screen, down: back to where it was).
 for key, dir in pairs(move) do
-    hl.bind(mainMod .. " + SHIFT + " .. key,
-        hl.dsp.window.move({ direction = dir }))
+    hl.bind(mainMod .. " + SHIFT + " .. key, function()
+        if torii_float_snap and torii_float_snap(key) then return end
+        hl.dispatch(hl.dsp.window.move({ direction = dir }))
+    end)
 end
 
 
