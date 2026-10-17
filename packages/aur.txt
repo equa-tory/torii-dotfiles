@@ -7,3 +7,4 @@ lavat
 
 # title bars for floating windows (must match the Hyprland version, rebuilt by yay on updates)
 hyprland-plugin-hyprbars
+wayfreeze

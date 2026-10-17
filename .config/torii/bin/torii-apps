@@ -23,6 +23,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import sys
 from pathlib import Path
 
@@ -175,6 +176,29 @@ def desktop_sync():
     return len(keep)
 
 
+def open_entry(desk_id):
+    """Start an installed .desktop entry. Terminal=true entries (cliamp, htop, ...) are run in kitty by us: handing them to
+    uwsm / xdg-terminal-exec opens a kitty "Open URL error" window with `%`. Everything else goes through uwsm app."""
+    desk_id = desk_id if desk_id.endswith(".desktop") else desk_id + ".desktop"
+    dirs = [Path.home() / ".local/share/applications"] + [Path(d) / "applications" for d in
+            os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":")]
+    f = next((d / desk_id for d in dirs if (d / desk_id).is_file()), None)
+    uwsm = os.environ.get("UWSM_FINALIZE_VARNAMES") is not None or shutil.which("uwsm")
+    wrap = ["uwsm", "app", "--"] if uwsm else []
+    entry = {}
+    if f:
+        for line in f.read_text(errors="replace").splitlines():
+            if line.startswith("["):
+                if entry: break
+                continue
+            k, _, v = line.partition("=")
+            entry.setdefault(k, v)
+    if f and entry.get("Terminal", "").lower() == "true" and entry.get("Exec"):
+        argv = [w for w in shlex.split(entry["Exec"]) if not re.fullmatch(r"%[a-zA-Z%]", w)]
+        os.execvp(wrap[0] if wrap else "kitty", wrap + ["kitty", "--title", entry.get("Name", argv[0]), "-e"] + argv)
+    os.execvp(wrap[0] if wrap else "gtk-launch", wrap + [desk_id] if wrap else ["gtk-launch", desk_id])
+
+
 # ---------------------------------------------------------------- web apps and terminal apps
 STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii"))
 
@@ -288,6 +312,8 @@ if __name__ == "__main__":
     elif a == ["desktop"]:
         generate()
         print(desktop_sync())
+    elif a[:1] == ["open"] and len(a) == 2:
+        open_entry(a[1])
     elif a[:1] == ["run"] and len(a) in (2, 3):
         for app in scan():
             if app["folder"] == a[1] and (len(a) == 2 or app["name"] == a[2]):

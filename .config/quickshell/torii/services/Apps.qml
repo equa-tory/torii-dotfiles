@@ -27,12 +27,15 @@ Singleton {
 
     function items() {
         const out = [];
+        const names = {};
+        for (const e of DesktopEntries.applications.values) if (e.id.indexOf("torii-app-") !== 0) names[(e.name || "").toLowerCase()] = true;
         for (const e of DesktopEntries.applications.values) {
             if (e.id.indexOf("torii-app-") === 0) continue;           // generated from ~/apps, listed below as the folder itself
             out.push({ kind: "app", key: "app:" + e.id, name: e.name, sub: e.genericName || e.comment || "",
                        extra: (e.keywords || []).join(" "), icon: e.icon, id: e.id, wm: e.startupClass || "" });
         }
         for (const p of portable) {
+            if (names[(p.name || "").toLowerCase()]) continue;      // the installed app already has its own entry
             out.push({ kind: "portable", key: "portable:" + p.dir, name: p.name, sub: p.description || "App",
                        extra: (p.keywords || []).join(" "), icon: p.icon, dir: p.dir, exec: p.exec });
         }
@@ -44,9 +47,8 @@ Singleton {
 
     function run(item) {
         if (item.kind === "app") {
-            const entry = DesktopEntries.byId(item.id);
-            if (uwsm) Quickshell.execDetached({ command: ["uwsm", "app", "--", item.id + ".desktop"], workingDirectory: Config.home });
-            else if (entry) entry.execute();
+            // torii-apps opens it (Terminal=true entries like cliamp run in kitty; uwsm's own terminal wrapper breaks with kitty)
+            Quickshell.execDetached({ command: [Config.home + "/.config/torii/bin/torii-apps", "open", item.id], workingDirectory: Config.home });
         } else if (item.kind === "portable") {
             Quickshell.execDetached({ command: wrap(["sh", "-c", 'PATH="$PWD:$PATH"; exec ' + item.exec]), workingDirectory: item.dir });
         } else if (item.kind === "link") {

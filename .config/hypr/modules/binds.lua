@@ -107,6 +107,10 @@ for key, d in pairs(resize) do
         { repeating = true })   -- hold the keys to keep resizing
 end
 
+-- Big / centred window (floatmode.lua): Ctrl+Alt+Shift+Up takes 70 % of the screen (Setup > Windows), +Down centres it
+hl.bind(mainMod .. " + CTRL + SHIFT + up",   function() if torii_window_big then torii_window_big() end end)
+hl.bind(mainMod .. " + CTRL + SHIFT + down", function() if torii_window_center then torii_window_center() end end)
+
 -- Move active window: mainMod + SHIFT + arrow (past the edge of a monitor it goes to the next monitor)
 local move = { left = "l", right = "r", up = "u", down = "d" }
 -- In float mode the same keys snap the window to the left / right half (up: fill the screen, down: back to where it was).
@@ -191,6 +195,7 @@ end
 hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture screen"))
 hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture zone"))
 hl.bind("SUPER + SHIFT + E", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture record"))
+hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture text"))
 
 
 -- Example special workspace (scratchpad)

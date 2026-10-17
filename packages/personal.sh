@@ -37,6 +37,14 @@ fi
 if [[ -d $stage/home ]]; then
   say "Restoring files into $HOME"
   rsync -a --backup --suffix=.bak "$stage/home/" "$HOME/"      # permissions kept, replaced files saved as *.bak
+  # apps kept at the top of the server's home folder belong in ~/apps, where the launcher looks (v2rayN-linux-64, ...)
+  for d in "$stage"/home/*-linux-64 "$stage"/home/v2rayN*; do
+    [[ -d $d ]] || continue
+    name=$(basename "$d")
+    if [[ -d $HOME/$name && ! -e $HOME/apps/$name ]]; then
+      mkdir -p "$HOME/apps" && mv "$HOME/$name" "$HOME/apps/$name" && echo "  moved ~/$name -> ~/apps/$name"
+    fi
+  done
 fi
 
 # ---- 2. credentials for root (SMB logins) ----

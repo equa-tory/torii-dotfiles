@@ -99,3 +99,9 @@ curl
 
 # calendar sync (iCloud over CalDAV)
 vdirsyncer
+
+# apps
+telegram-desktop
+discord
+obsidian
+gdu

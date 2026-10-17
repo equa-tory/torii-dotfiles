@@ -11,6 +11,7 @@ Singleton {
     readonly property string stateDir: home + "/.local/state/torii"
 
     readonly property var notch: adapter.notch
+    readonly property var capture: adapter.capture
     readonly property var workspaces: adapter.workspaces
     readonly property var weather: adapter.weather
     readonly property var wallpaper: adapter.wallpaper
@@ -45,6 +46,9 @@ Singleton {
                 property int height: 34
                 property int gap: 6
                 property int zoneTrim: 12           // px taken off the reserved strip: smaller gap between the notch and windows
+            }
+            property JsonObject capture: JsonObject {
+                property bool freeze: true          // freeze the screen while you drag a zone (screenshot zone, text, QR)
             }
             property JsonObject workspaces: JsonObject {
                 property int count: 5

@@ -201,5 +201,48 @@ function torii_float_maximize()
     return true
 end
 
+
+-- Ctrl+Alt+Shift+Up: the focused window takes BIG_WINDOW_PERCENT of the work area, centred (again: back to how it was).
+-- Ctrl+Alt+Shift+Down: centre the focused window. Both float a tiled window first.
+-- The percentage: Setup > Windows > Big window size (kept in ~/.local/state/torii/windowsize.lua), or change the default here.
+local BIG_WINDOW_PERCENT = 70
+
+local function big_percent()
+    local ok, t = pcall(dofile, os.getenv("HOME") .. "/.local/state/torii/windowsize.lua")
+    local p = ok and type(t) == "table" and tonumber(t.percent) or BIG_WINDOW_PERCENT
+    return math.max(30, math.min(100, p)) / 100
+end
+
+local function ensure_floating(w)
+    if not w.floating then hl.dispatch(hl.dsp.window.float({ action = "set", window = w })) end
+end
+
+function torii_window_big()
+    local w = hl.get_active_window()
+    if not w then return end
+    local old = before_snap[w.address]
+    if old and w.floating then
+        before_snap[w.address] = nil
+        place(w, old)
+        return
+    end
+    local a = work_area(w)
+    local f = big_percent()
+    local width, height = a.w * f, a.h * f
+    ensure_floating(w)
+    remember_before(w)
+    place(w, { x = a.x + (a.w - width) / 2, y = a.y + (a.h - height) / 2, w = width, h = height })
+end
+
+function torii_window_center()
+    local w = hl.get_active_window()
+    if not w then return end
+    ensure_floating(w)
+    local a = work_area(w)
+    local ww, wh = xy(w.size, "x", 1), xy(w.size, "y", 2)
+    ww, wh = math.min(ww, a.w), math.min(wh, a.h)
+    place(w, { x = a.x + (a.w - ww) / 2, y = a.y + (a.h - wh) / 2, w = ww, h = wh })
+end
+
 -- the launcher (torii-hypr float) toggles it too
 function torii_float_toggle() set_mode(mode == "float" and "tile" or "float") end

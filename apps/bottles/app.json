@@ -1,0 +1,1 @@
+{ "name": "Bottles", "exec": "bottles", "icon": "com.usebottles.bottles", "keywords": ["wine", "windows", "bottle", "games", "proton"], "description": "Run Windows apps and games with Wine" }

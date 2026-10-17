@@ -1,6 +1,6 @@
 {
   "notch": {
-    "shape": "floating",
+    "shape": "attached",
     "opacity": 1,
     "radius": 16,
     "height": 32,
@@ -53,5 +53,8 @@
       "claude"
     ],
     "right": []
+  },
+  "capture": {
+    "freeze": true
   }
 }

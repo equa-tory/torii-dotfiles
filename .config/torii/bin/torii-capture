@@ -14,7 +14,18 @@ ts=$(date +%Y-%m-%d_%H-%M-%S)
 note() { notify-send -a torii "$@"; }
 need() { command -v "$1" >/dev/null 2>&1 || { note "torii-capture" "$1 is not installed"; exit 1; }; }
 focused() { hyprctl monitors -j | jq -r '.[] | select(.focused) | .name'; }
-zone() { slurp -d; }                       # empty when you press Esc
+# drag a rectangle; the screen is frozen while you choose when capture.freeze is on (default) and wayfreeze is installed
+freeze_on() { [ "$("$HOME/.config/torii/bin/torii-config" get capture.freeze 2>/dev/null)" != "false" ] && command -v wayfreeze >/dev/null 2>&1; }
+zone() {                                   # empty when you press Esc
+  if freeze_on; then
+    wayfreeze --hide-cursor & fp=$!
+    sleep 0.25
+    slurp -d; r=$?
+    kill "$fp" 2>/dev/null; wait "$fp" 2>/dev/null
+    return $r
+  fi
+  slurp -d
+}
 
 case "${1:-}" in
   screen)

@@ -80,6 +80,8 @@ Singleton {
     property var emojiNodes: []
     readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fMons, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
+    // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
+    Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
     Connections {
@@ -128,7 +130,7 @@ Singleton {
         return nodes;
     }
 
-    // ---- menu history: what you opened before ranks higher while you search (never touches apps, never leaves the machine)
+    // ---- menu history: what you opened before ranks higher while you search (menus and apps; it stays on this machine)
     property var usage: ({})
     FileView {
         id: usageFile
@@ -137,7 +139,7 @@ Singleton {
         onLoaded: { try { root.usage = JSON.parse(text()); } catch (e) { root.usage = {}; } }
     }
     function touch(keys) {
-        if (!Config.launcher.menuHistory || !keys.length || keys[0] === "apps") return;
+        if (!Config.launcher.menuHistory || !keys.length) return;
         const u = Object.assign({}, usage);
         const now = Date.now();
         for (let i = 1; i <= keys.length; i++) {
@@ -181,7 +183,9 @@ Singleton {
                 { text: e.node.keywords || "", weight: 0.6 },
                 { text: e.node.sub || "", weight: 0.3 }
             ]);
-            if (s >= 0) scored.push({ e: e, s: s + boost(e.chain, e.node.id) });
+            // "Remove ..." rows are never what you meant first: the app or web app itself comes before its Remove entry
+            const penalty = e.trail.length && e.trail[0] === "Remove" ? 60 : 0;
+            if (s >= 0) scored.push({ e: e, s: s + boost(e.chain, e.node.id) - penalty + (isMenu(e.node) ? 0 : 12) });   // things you can run beat folders
         }
         scored.sort((a, b) => b.s - a.s);
         return scored.map(x => x.e);
@@ -426,6 +430,9 @@ Singleton {
               keywords: "video screencast", badge: t.recording ? "●" : "", run: cap("record") },
             { id: "text", name: "Text from screen", sub: "Drag a rectangle, the text is copied", glyph: Icons.textScan, keywords: "ocr read copy", run: cap("text") },
             { id: "qr", name: "QR code", sub: "Drag a rectangle around it", glyph: Icons.qr, keywords: "scan barcode", run: cap("qr") },
+            { id: "freeze", name: "Freeze screen while selecting", sub: "Zone, text and QR: the picture stands still while you drag (needs wayfreeze)", glyph: Icons.camera,
+              badge: Config.capture.freeze ? "On" : "Off", keep: true,
+              run: () => sh([bin("torii-config"), "set", "capture.freeze", Config.capture.freeze ? "false" : "true"]) },
             { id: "color", name: "Colour picker", sub: "Click a pixel, the hex is copied", glyph: Icons.eyedropper, keywords: "color eyedropper hex", run: cap("color") }
         ] };
     }
@@ -605,6 +612,9 @@ Singleton {
             { id: "barh", name: "Title bar height", glyph: Icons.tune, sub: "On floating windows",
               slider: { min: 16, max: 56, step: 1, value: bars.height, unit: " px", decimals: 0 },
               onSlide: v => sh([bin("torii-hypr"), "bars", "height", String(v)]) },
+            { id: "bigsize", name: "Big window size", glyph: Icons.tune, sub: "Ctrl+Alt+Shift+Up: how much of the screen the window takes",
+              slider: { min: 30, max: 100, step: 5, value: d.bigPercent === undefined ? 70 : d.bigPercent, unit: " %", decimals: 0 },
+              onSlide: v => sh([bin("torii-hypr"), "size", String(v)]) },
             { id: "side", name: "Buttons", glyph: Icons.layout, sub: bars.side === "left" ? "Left (close, minimise, maximise)" : "Right (minimise, maximise, close)", children: () => [
                 { id: "l", name: "Left", sub: "Like macOS: close, minimise, maximise", badge: bars.side === "left" ? "●" : "", keep: true,
                   run: () => { sh([bin("torii-hypr"), "bars", "side", "left"]); refresh(); } },
