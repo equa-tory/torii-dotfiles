@@ -293,8 +293,11 @@ Singleton {
                 { id: "typed", name: "Type a window class…", glyph: Icons.keyboard2, keep: true,
                   run: () => ask("Window class (hyprctl clients shows it)", false, c => { if (c.trim()) rule(["set", c.trim(), "name", c.trim()]); }) } ] };
             const out = [addNode,
+                { id: "reopen", name: "Open all saved apps now", glyph: Icons.apps, keep: true,
+                  sub: "Starts every app that starts at login and is not open yet; the open ones stay as they are",
+                  run: () => { rule(["reopen"]); say("Opening the saved apps"); } },
                 { id: "capture", name: "Capture workspace " + ws, glyph: Icons.camera, keep: true,
-                  sub: "Every app on this workspace: where it is, floating, place and size, background, start at login. Arrange it first",
+                  sub: "Replaces what was saved for it: every app here, where it is, floating, place and size, background, start at login",
                   run: () => { rule(["snapshot-workspace", String(ws)]); say("Saved workspace " + ws); } }];
             const groups = {};
             for (const r of rules) (groups[r.workspace ? String(r.workspace) : "-"] = groups[r.workspace ? String(r.workspace) : "-"] || []).push(r);
@@ -303,8 +306,11 @@ Singleton {
                 const list = groups[k];
                 out.push({ id: "g:" + k, name: k === "-" ? "Not on a workspace" : "Workspace " + k, glyph: Icons.monitor, badge: String(list.length),
                            sub: list.map(r => r.name || r.class).join(", "), sorted: false,
-                           children: () => (k === "-" ? [] : [{ id: "cap:" + k, name: "Capture workspace " + k + " again", glyph: Icons.camera, keep: true,
-                               sub: "Open it the way you want it on that workspace first", run: () => { rule(["snapshot-workspace", k]); say("Saved workspace " + k); } }])
+                           children: () => (k === "-" ? [] : [
+                               { id: "cap:" + k, name: "Capture workspace " + k + " again", glyph: Icons.camera, keep: true,
+                                 sub: "Replaces what is saved for it with the apps on it now (open it the way you want first)", run: () => { rule(["snapshot-workspace", k]); say("Saved workspace " + k); } },
+                               { id: "open:" + k, name: "Open workspace " + k + " apps", glyph: Icons.apps, keep: true,
+                                 sub: "Starts the saved apps that are not open", run: () => { rule(["reopen", k]); say("Opening workspace " + k); } }])
                                .concat(list.map(ruleNode)) });
             }
             return out;

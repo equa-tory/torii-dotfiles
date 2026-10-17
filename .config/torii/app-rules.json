@@ -1,15 +1,5 @@
 [
   {
-    "class": "discord",
-    "name": "Discord",
-    "float": true,
-    "workspace": 2,
-    "silent": true,
-    "remember": true,
-    "autostart": true,
-    "exec": "desktop:discord.desktop"
-  },
-  {
     "class": "torii-app-cliamp",
     "name": "cliamp",
     "workspace": 2,

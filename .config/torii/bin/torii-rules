@@ -7,7 +7,8 @@ A rule says what happens when a window of an app opens:
   float      true|false           open floating
   remember   true|false           open floating where (and how big) it was last time (implies floating)
   autostart  true|false           start the app when the session starts (needs a desktop entry or a command with that name)
-  snapshot-workspace [N]          do that for every app on workspace N (the current one by default)
+  snapshot-workspace [N]          do that for every app on workspace N (the current one by default); it replaces what was saved for N
+  reopen [N]                      start the saved apps (of workspace N) that are not open, leave the open ones alone
   snapshot <class>                take over how the app's window is right now: its workspace, floating or not, place and size
                                   (remembered), opened in the background, and started at login
   name       text                 label shown in the launcher
@@ -187,14 +188,27 @@ def snapshot_workspace(ws=None):
         names.append(r.get("name", c["class"]))
         if c.get("floating"):
             floating.append(c["class"])
+    # the capture replaces what was saved for this workspace: an app saved here that is not on it now is dropped
+    here = {c["class"] for c in wins}
+    dropped = [r.get("name", r["class"]) for r in rules if r.get("workspace") == ws and r["class"] not in here]
+    rules = [r for r in rules if not (r.get("workspace") == ws and r["class"] not in here)]
     finish(rules, floating)
-    subprocess.run(["notify-send", "-a", "torii", "Saved workspace %s" % ws, ", ".join(names) + ": they will open like this at login"], capture_output=True)
+    msg = ", ".join(names) + ": they will open like this at login"
+    if dropped:
+        msg += " (no longer saved here: " + ", ".join(dropped) + ")"
+    subprocess.run(["notify-send", "-a", "torii", "Saved workspace %s" % ws, msg], capture_output=True)
 
 
-def autostart():
-    """Start every app that has autostart on (run once when the session starts)."""
+def autostart(only_missing=False, ws=None):
+    """Start every app that has autostart on. At login all of them; with only_missing (the launcher's "open all saved apps")
+    just those that have no window yet, so what is open stays as it is. ws limits it to one workspace."""
+    running = {c.get("class") for c in hypr_clients()} if only_missing else set()
     for r in load(RULES, []):
         if not r.get("autostart") or not r.get("exec"):
+            continue
+        if only_missing and r["class"] in running:
+            continue
+        if ws is not None and r.get("workspace") != ws:
             continue
         kind, _, what = r["exec"].partition(":")
         if kind == "desktop":
@@ -232,6 +246,9 @@ def main(a):
         return
     if a == ["autostart"]:
         autostart()
+        return
+    if a[:1] == ["reopen"] and len(a) <= 2:
+        autostart(True, int(a[1]) if len(a) == 2 and a[1].isdigit() else None)
         return
     if len(a) == 2 and a[0] == "snapshot":
         snapshot(a[1])
