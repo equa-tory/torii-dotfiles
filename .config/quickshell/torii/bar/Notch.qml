@@ -93,24 +93,43 @@ PanelWindow {
         // clicks on the black body itself never fall through to the catcher
         MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
 
-        Row {
+        // the clock stays in the middle of the notch: whatever is left of it and right of it, both sides get the width of the
+        // wider one, so opening a panel (widgets appear) or a notification never pushes the clock sideways
+        Item {
             id: row
-            x: win.ear + (win.bodyW - width) / 2
+            readonly property real gap: 16
+            readonly property real side: Math.max(leftRow.implicitWidth, rightRow.implicitWidth)
+            implicitWidth: clock.width + (side > 0 ? 2 * (side + gap) : 0)
+            width: implicitWidth
             height: win.barH
-            spacing: 16
+            x: win.ear + (win.bodyW - width) / 2
 
-            WidgetSlot { names: Config.widgets.left; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
-            LangWidget { anchors.verticalCenter: parent.verticalCenter }
-            Workspaces { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
-            Clock { anchors.verticalCenter: parent.verticalCenter }
-            Weather {
-                anchors.verticalCenter: parent.verticalCenter
-                open: win.panelHere && Panels.panel === "weather"
+            Row {
+                id: leftRow
+                spacing: 16
+                height: parent.height
+                anchors { right: clock.left; rightMargin: row.gap }
+                WidgetSlot { names: Config.widgets.left; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
+                LangWidget { anchors.verticalCenter: parent.verticalCenter }
+                Workspaces { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
             }
-            WidgetSlot { names: Config.widgets.right; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
-            VolumeOsd { anchors.verticalCenter: parent.verticalCenter }
-            NotifyOsd { visible: !win.notifSide && width > 0.5; anchors.verticalCenter: parent.verticalCenter }
-            ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
+
+            Clock { id: clock; x: (parent.width - width) / 2; anchors.verticalCenter: parent.verticalCenter }
+
+            Row {
+                id: rightRow
+                spacing: 16
+                height: parent.height
+                anchors { left: clock.right; leftMargin: row.gap }
+                Weather {
+                    anchors.verticalCenter: parent.verticalCenter
+                    open: win.panelHere && Panels.panel === "weather"
+                }
+                WidgetSlot { names: Config.widgets.right; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
+                VolumeOsd { anchors.verticalCenter: parent.verticalCenter }
+                NotifyOsd { visible: !win.notifSide && width > 0.5; anchors.verticalCenter: parent.verticalCenter }
+                ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
+            }
         }
 
         Loader {
