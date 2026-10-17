@@ -42,3 +42,5 @@ unset -f _torii_plugin
 # Home/End (also what Super+Left/Right send in kitty) and word jumps with Ctrl+arrows
 bindkey '^[[H' beginning-of-line '^[OH' beginning-of-line '^[[F' end-of-line '^[OF' end-of-line
 bindkey '^[[1;5D' backward-word '^[[1;5C' forward-word
+# Delete (without this the terminal prints a ~) and Ctrl+Delete
+bindkey '^[[3~' delete-char '^[[3;5~' kill-word

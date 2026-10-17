@@ -15,6 +15,8 @@ What is cleaned (nothing outside these):
   coredumps  /var/lib/systemd/coredump
   docker     unused images, stopped containers, networks and build cache (docker system prune -af)
   orphans    packages nothing needs any more (listed, removed after you confirm in the terminal)
+  downloads  ~/Downloads, moved to the trash after you type yes (never part of `safe`)
+Nothing in /tmp or /var/tmp is touched.
 """
 import json
 import os
@@ -81,6 +83,31 @@ def docker_size():
     return int(total)
 
 
+def pacman_reclaimable():
+    """What `pacman -Sc` would delete: cached package files that are not the installed version (or not installed at all)."""
+    cache = Path("/var/cache/pacman/pkg")
+    if not cache.is_dir():
+        return 0
+    installed = {}
+    for line in run("pacman", "-Q").stdout.splitlines():
+        n, _, v = line.partition(" ")
+        installed[n] = v
+    total = 0
+    for f in cache.glob("*.pkg.tar*"):
+        if f.name.endswith(".sig"):
+            continue
+        parts = f.name.rsplit("-", 3)                  # name, version, release, arch.pkg.tar.zst
+        if len(parts) < 4:
+            continue
+        name, ver, rel = parts[0], parts[1], parts[2]
+        if installed.get(name) != f"{ver}-{rel}":
+            try:
+                total += f.stat().st_size
+            except OSError:
+                pass
+    return total
+
+
 def orphans():
     r = run("pacman", "-Qdtq")
     return [x for x in r.stdout.split() if x] if r.returncode == 0 else []
@@ -90,10 +117,14 @@ def listing():
     items = [
         {"id": "trash", "name": "Trash", "size": du(HOME / ".local/share/Trash"), "sub": "~/.local/share/Trash"},
         {"id": "cache", "name": "App caches", "size": sum(du(d) for d in cache_dirs()), "sub": "~/.cache: thumbnails, yay, pip, npm, shaders, ..."},
-        {"id": "pacman", "name": "Package downloads", "size": du("/var/cache/pacman/pkg"), "sub": "pacman cache, the latest 2 versions stay", "root": True},
-        {"id": "journal", "name": "System logs", "size": journal_size(), "sub": "journal reduced to 200 MB / 2 weeks", "root": True},
+        {"id": "pacman", "name": "Package downloads", "size": pacman_reclaimable(), "sub": "old and uninstalled package files in the pacman cache (installed versions stay)", "root": True},
+        {"id": "journal", "name": "System logs", "size": max(0, journal_size() - 200 * 1024 * 1024), "sub": "the journal above 200 MB (and older than 2 weeks) goes", "root": True},
         {"id": "coredumps", "name": "Crash dumps", "size": du("/var/lib/systemd/coredump"), "sub": "/var/lib/systemd/coredump", "root": True},
     ]
+    dl = HOME / "Downloads"
+    if dl.is_dir():
+        items.append({"id": "downloads", "name": "Downloads folder", "size": du(dl), "warn": True,
+                      "sub": "everything in ~/Downloads goes to the trash. Asks first, not part of 'everything safe'"})
     d = docker_size()
     if d is not None:
         items.append({"id": "docker", "name": "Docker", "size": d, "sub": "unused images, containers, build cache"})
@@ -105,6 +136,16 @@ def listing():
     return items
 
 
+def _writable(func, path, exc):
+    """read-only folders (go module caches, ...) refuse deletion: make them writable and try again"""
+    try:
+        os.chmod(os.path.dirname(path) or ".", 0o700)
+        os.chmod(path, 0o700)
+        func(path)
+    except OSError:
+        pass
+
+
 def rm_contents(path):
     p = Path(path)
     if not p.is_dir():
@@ -112,7 +153,7 @@ def rm_contents(path):
     for child in p.iterdir():
         try:
             if child.is_dir() and not child.is_symlink():
-                shutil.rmtree(child, ignore_errors=True)
+                shutil.rmtree(child, onexc=_writable)
             else:
                 child.unlink()
         except OSError:
@@ -120,11 +161,15 @@ def rm_contents(path):
 
 
 def sudo(*cmd):
-    return subprocess.run(["sudo", *cmd]).returncode
+    return subprocess.run([*os.environ.get("TORII_SUDO", "sudo").split(), *cmd]).returncode
+
+
+def size_of(cid):
+    return next((i["size"] for i in listing() if i["id"] == cid), 0)
 
 
 def clean(cid):
-    before = {i["id"]: i["size"] for i in listing()}
+    before = {cid: size_of(cid)}
     if cid == "trash":
         rm_contents(HOME / ".local/share/Trash/files")
         rm_contents(HOME / ".local/share/Trash/info")
@@ -132,17 +177,32 @@ def clean(cid):
         for d in cache_dirs():
             rm_contents(d)
     elif cid == "pacman":
-        if shutil.which("paccache"):
-            sudo("paccache", "-rk2")
-            sudo("paccache", "-ruk0")                       # packages that are not installed any more
-        else:
-            sudo("sh", "-c", "yes | pacman -Sc")
+        # everything but the installed versions (what `pacman -Sc` does) and the repository databases stay as they are
+        sudo("pacman", "-Sc", "--noconfirm")
     elif cid == "journal":
         sudo("journalctl", "--vacuum-size=200M", "--vacuum-time=2weeks")
     elif cid == "coredumps":
         sudo("sh", "-c", "rm -rf /var/lib/systemd/coredump/*")
     elif cid == "docker":
-        subprocess.run(["docker", "system", "prune", "-af"])
+        if shutil.which("docker"):
+            subprocess.run(["docker", "system", "prune", "-af"])
+    elif cid == "downloads":
+        dl = HOME / "Downloads"
+        kids = sorted(dl.iterdir(), key=lambda p: -du(p)) if dl.is_dir() else []
+        if not kids:
+            print("Downloads is empty.")
+        else:
+            print("This moves EVERYTHING in ~/Downloads to the trash (%d items, %s):" % (len(kids), human(du(dl))))
+            for k in kids[:8]:
+                print("   %9s  %s" % (human(du(k)), k.name))
+            if len(kids) > 8:
+                print("   ... and %d more" % (len(kids) - 8))
+            print("You can still restore them from the trash (Dolphin > Trash) until you empty it.")
+            if input("Type yes to continue: ").strip().lower() == "yes":
+                for k in kids:
+                    run("gio", "trash", str(k))
+            else:
+                print("Left as it is.")
     elif cid == "orphans":
         o = orphans()
         if o:
@@ -152,8 +212,7 @@ def clean(cid):
     else:
         print("unknown:", cid)
         return 0
-    after = {i["id"]: i["size"] for i in listing()}
-    freed = max(0, before.get(cid, 0) - after.get(cid, 0))
+    freed = max(0, before[cid] - size_of(cid))
     print(f"{cid}: freed {human(freed)}")
     return freed
 
@@ -184,7 +243,8 @@ def main(a):
     elif a[:1] == ["run"] and len(a) >= 2:
         ids = a[1:]
         if ids == ["safe"]:
-            ids = ["trash", "cache", "pacman", "journal", "coredumps", "docker"]
+            have = {i["id"] for i in listing()}
+            ids = [i for i in ("trash", "cache", "pacman", "journal", "coredumps", "docker") if i in have]
         total = sum(clean(i) for i in ids)
         print(f"\nIn total {human(total)} freed.")
     elif a[:1] == ["big"]:
