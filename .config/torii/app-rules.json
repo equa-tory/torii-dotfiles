@@ -2,6 +2,31 @@
   {
     "class": "discord",
     "name": "Discord",
-    "float": false
+    "float": true,
+    "workspace": 2,
+    "silent": true,
+    "remember": true,
+    "autostart": true,
+    "exec": "desktop:discord.desktop"
+  },
+  {
+    "class": "torii-app-cliamp",
+    "name": "cliamp",
+    "workspace": 2,
+    "float": false,
+    "remember": false,
+    "silent": true,
+    "autostart": true,
+    "exec": "desktop:torii-app-cliamp.desktop"
+  },
+  {
+    "class": "torii-app-lava-lamp",
+    "name": "Lava lamp",
+    "workspace": 2,
+    "float": false,
+    "remember": false,
+    "silent": true,
+    "autostart": true,
+    "exec": "desktop:torii-app-lava-lamp.desktop"
   }
 ]

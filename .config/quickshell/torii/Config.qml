@@ -78,6 +78,8 @@ Singleton {
                 property bool rememberForward: true    // entering a menu again lands on the row you left there
                 property bool menuHistory: true        // menus you used before rank higher while you search
                 property string placeholder: "Search apps  ·  ↓ opens the menus"
+                // menus whose rows are left out of the search (the menu itself still shows up): path of ids, e.g. "setup/rules"
+                property var searchHidden: ["setup/rules"]
             }
             property JsonObject notifications: JsonObject {
                 property real popupSeconds: 5          // how long a notification stays in the notch

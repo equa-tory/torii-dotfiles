@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""torii-clean list | run <id>... | big [min-MB] | trash <path>  -  free disk space: caches, logs, Docker, big files.
+
+  list           JSON: the things that can be cleaned, with their size now
+  run <id>...    clean them (ids from `list`; `safe` = every safe one); prints what was freed. Root parts ask for sudo,
+                 so run it in a terminal (the launcher does)
+  big [MB]       JSON: the largest files (default >= 100 MB) in Downloads, Documents, Videos, Pictures, Desktop, Music
+  trash <path>   move a file to the trash (it can be restored from there), nothing is deleted for good
+
+What is cleaned (nothing outside these):
+  trash      ~/.local/share/Trash
+  cache      known safe folders in ~/.cache (thumbnails, yay, pip, npm, mesa shaders, go build, ...), not browser profiles
+  pacman     downloaded package files, the latest 2 versions of each stay (paccache), or everything old via pacman -Sc
+  journal    systemd journal reduced to 200 MB and 2 weeks
+  coredumps  /var/lib/systemd/coredump
+  docker     unused images, stopped containers, networks and build cache (docker system prune -af)
+  orphans    packages nothing needs any more (listed, removed after you confirm in the terminal)
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+SAFE_CACHE = ["thumbnails", "yay", "paru", "pip", "npm", "pnpm", "yarn", "mesa_shader_cache", "mesa_shader_cache_db", "nvidia",
+              "go-build", "electron", "node-gyp", "fontconfig", "ccache", "sccache", "pre-commit", "cargo", "typescript",
+              "gstreamer-1.0", "qtshadercache-x86_64-little_endian-lp64", "kitty", "pipx", "uv", "bun", "deno"]
+BIG_DIRS = ["Downloads", "Documents", "Videos", "Video", "Pictures", "Photo", "Photos", "Desktop", "Music"]
+
+
+def run(*cmd, **kw):
+    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+def du(path):
+    p = Path(path)
+    if not p.exists():
+        return 0
+    r = run("du", "-sb", "--", str(p))
+    try:
+        return int(r.stdout.split()[0])
+    except (IndexError, ValueError):
+        return 0
+
+
+def human(n):
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if n < 1024 or unit == "TiB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+
+
+def cache_dirs():
+    base = HOME / ".cache"
+    return [base / n for n in SAFE_CACHE if (base / n).is_dir()]
+
+
+def journal_size():
+    r = run("journalctl", "--disk-usage")
+    import re
+    m = re.search(r"([\d.]+)([KMGT])", r.stdout)
+    if not m:
+        return 0
+    return int(float(m.group(1)) * {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3, "T": 1024 ** 4}[m.group(2)])
+
+
+def docker_size():
+    if not shutil.which("docker"):
+        return None
+    r = run("docker", "system", "df", "--format", "{{.Type}}|{{.Reclaimable}}")
+    if r.returncode != 0:
+        return None
+    import re
+    total = 0
+    for line in r.stdout.splitlines():
+        m = re.search(r"\|([\d.]+)([kKMGT]?)B", line)
+        if m:
+            total += float(m.group(1)) * {"": 1, "k": 1e3, "K": 1e3, "M": 1e6, "G": 1e9, "T": 1e12}[m.group(2)]
+    return int(total)
+
+
+def orphans():
+    r = run("pacman", "-Qdtq")
+    return [x for x in r.stdout.split() if x] if r.returncode == 0 else []
+
+
+def listing():
+    items = [
+        {"id": "trash", "name": "Trash", "size": du(HOME / ".local/share/Trash"), "sub": "~/.local/share/Trash"},
+        {"id": "cache", "name": "App caches", "size": sum(du(d) for d in cache_dirs()), "sub": "~/.cache: thumbnails, yay, pip, npm, shaders, ..."},
+        {"id": "pacman", "name": "Package downloads", "size": du("/var/cache/pacman/pkg"), "sub": "pacman cache, the latest 2 versions stay", "root": True},
+        {"id": "journal", "name": "System logs", "size": journal_size(), "sub": "journal reduced to 200 MB / 2 weeks", "root": True},
+        {"id": "coredumps", "name": "Crash dumps", "size": du("/var/lib/systemd/coredump"), "sub": "/var/lib/systemd/coredump", "root": True},
+    ]
+    d = docker_size()
+    if d is not None:
+        items.append({"id": "docker", "name": "Docker", "size": d, "sub": "unused images, containers, build cache"})
+    o = orphans()
+    if o:
+        items.append({"id": "orphans", "name": "Unused packages", "size": 0, "count": len(o), "sub": ", ".join(o[:6]) + (" ..." if len(o) > 6 else ""), "root": True})
+    for i in items:
+        i["human"] = human(i["size"]) if i["size"] else ("%d packages" % i.get("count", 0) if i.get("count") else "empty")
+    return items
+
+
+def rm_contents(path):
+    p = Path(path)
+    if not p.is_dir():
+        return
+    for child in p.iterdir():
+        try:
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child, ignore_errors=True)
+            else:
+                child.unlink()
+        except OSError:
+            pass
+
+
+def sudo(*cmd):
+    return subprocess.run(["sudo", *cmd]).returncode
+
+
+def clean(cid):
+    before = {i["id"]: i["size"] for i in listing()}
+    if cid == "trash":
+        rm_contents(HOME / ".local/share/Trash/files")
+        rm_contents(HOME / ".local/share/Trash/info")
+    elif cid == "cache":
+        for d in cache_dirs():
+            rm_contents(d)
+    elif cid == "pacman":
+        if shutil.which("paccache"):
+            sudo("paccache", "-rk2")
+            sudo("paccache", "-ruk0")                       # packages that are not installed any more
+        else:
+            sudo("sh", "-c", "yes | pacman -Sc")
+    elif cid == "journal":
+        sudo("journalctl", "--vacuum-size=200M", "--vacuum-time=2weeks")
+    elif cid == "coredumps":
+        sudo("sh", "-c", "rm -rf /var/lib/systemd/coredump/*")
+    elif cid == "docker":
+        subprocess.run(["docker", "system", "prune", "-af"])
+    elif cid == "orphans":
+        o = orphans()
+        if o:
+            print("Unused packages:", " ".join(o))
+            if input("Remove them? [y/N] ").strip().lower() == "y":
+                sudo("pacman", "-Rns", "--noconfirm", *o)
+    else:
+        print("unknown:", cid)
+        return 0
+    after = {i["id"]: i["size"] for i in listing()}
+    freed = max(0, before.get(cid, 0) - after.get(cid, 0))
+    print(f"{cid}: freed {human(freed)}")
+    return freed
+
+
+def big(min_mb):
+    out = []
+    min_b = int(min_mb) * 1024 * 1024
+    for name in BIG_DIRS:
+        d = HOME / name
+        if not d.is_dir():
+            continue
+        r = run("find", str(d), "-xdev", "-type", "f", "-size", f"+{int(min_mb)}M", "-printf", "%s\t%T@\t%p\n")
+        for line in r.stdout.splitlines():
+            try:
+                size, mtime, path = line.split("\t", 2)
+            except ValueError:
+                continue
+            if int(size) >= min_b:
+                out.append({"path": path, "size": int(size), "human": human(int(size)), "age": int(__import__("time").time() - float(mtime)) // 86400,
+                            "dir": str(Path(path).parent), "name": Path(path).name})
+    out.sort(key=lambda x: -x["size"])
+    return out[:60]
+
+
+def main(a):
+    if a[:1] == ["list"]:
+        print(json.dumps(listing()))
+    elif a[:1] == ["run"] and len(a) >= 2:
+        ids = a[1:]
+        if ids == ["safe"]:
+            ids = ["trash", "cache", "pacman", "journal", "coredumps", "docker"]
+        total = sum(clean(i) for i in ids)
+        print(f"\nIn total {human(total)} freed.")
+    elif a[:1] == ["big"]:
+        print(json.dumps(big(a[1] if len(a) > 1 and a[1].isdigit() else 100)))
+    elif a[:1] == ["trash"] and len(a) == 2:
+        p = Path(a[1]).resolve()
+        if HOME not in p.parents or not p.is_file():
+            sys.exit("only files inside your home folder")
+        sys.exit(run("gio", "trash", str(p)).returncode)
+    else:
+        print(__doc__)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

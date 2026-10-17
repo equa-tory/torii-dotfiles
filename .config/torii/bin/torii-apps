@@ -142,6 +142,10 @@ def scan():
                 else:
                     ex = ""
                 if ex:
+                    # a terminal app gets its own window class (torii-app-<name>) so App rules can tell cliamp from lava lamp
+                    nm = str(m.get("name") or d.name)
+                    if re.match(r"kitty(\s|$)", ex) and "--class" not in ex:
+                        ex = "kitty --class torii-app-%s %s" % (re.sub(r"[^a-z0-9]+", "-", nm.lower()).strip("-"), ex[5:].strip())
                     icon = str(m.get("icon", ""))
                     if icon and (d / icon).is_file():
                         icon = str(d / icon)
@@ -156,6 +160,13 @@ def scan():
     return out
 
 
+def dq(arg):
+    """one argument of a .desktop Exec line (double quotes, not the shell's single quotes)"""
+    if re.fullmatch(r"[A-Za-z0-9_./:+@%-]+", arg):
+        return arg
+    return '"' + arg.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`") + '"'
+
+
 def desktop_sync():
     """~/.local/share/applications/torii-app-<name>.desktop for every app; entries of apps that are gone are removed."""
     target = Path.home() / ".local/share/applications"
@@ -168,7 +179,7 @@ def desktop_sync():
         f.write_text(
             "[Desktop Entry]\nType=Application\nVersion=1.0\n"
             f"Name={a['name']}\nComment={a['description'] or 'App from ~/apps'}\nIcon={a['icon'] or 'application-x-executable'}\n"
-            f"Path={a['dir']}\nExec={Path.home()}/.config/torii/bin/torii-apps run {shlex.quote(a['folder'])} {shlex.quote(a['name'])}\nTerminal=false\n"
+            f"Path={a['dir']}\nExec={Path.home()}/.config/torii/bin/torii-apps run {dq(a['folder'])} {dq(a['name'])}\nTerminal=false\n"
             f"Keywords={';'.join(a['keywords'])};\nX-Torii-App=true\n")
     for old in target.glob("torii-app-*.desktop"):
         if old.name not in keep:
@@ -195,7 +206,8 @@ def open_entry(desk_id):
             entry.setdefault(k, v)
     if f and entry.get("Terminal", "").lower() == "true" and entry.get("Exec"):
         argv = [w for w in shlex.split(entry["Exec"]) if not re.fullmatch(r"%[a-zA-Z%]", w)]
-        os.execvp(wrap[0] if wrap else "kitty", wrap + ["kitty", "--title", entry.get("Name", argv[0]), "-e"] + argv)
+        cls = "torii-app-" + re.sub(r"[^a-z0-9]+", "-", desk_id[:-8].lower()).strip("-")
+        os.execvp(wrap[0] if wrap else "kitty", wrap + ["kitty", "--class", cls, "--title", entry.get("Name", argv[0]), "-e"] + argv)
     os.execvp(wrap[0] if wrap else "gtk-launch", wrap + [desk_id] if wrap else ["gtk-launch", desk_id])
 
 

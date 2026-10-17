@@ -105,3 +105,4 @@ telegram-desktop
 discord
 obsidian
 gdu
+pacman-contrib

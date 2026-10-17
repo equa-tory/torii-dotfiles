@@ -75,13 +75,16 @@ Singleton {
     JsonFetch { id: fNotes;    command: [root.bin("torii-learn"), "files"];               onDataChanged: root.bump() }
     JsonFetch { id: fHypr;     command: [root.bin("torii-hypr"), "status"];                onDataChanged: root.bump() }
     JsonFetch { id: fCalSync;  command: [root.bin("torii-calendar"), "autosync", "status"];  onDataChanged: root.bump() }
+    JsonFetch { id: fClean;    command: [root.bin("torii-clean"), "list"];                 onDataChanged: root.bump() }
+    JsonFetch { id: fBig;      command: [root.bin("torii-clean"), "big", "100"];           onDataChanged: root.bump() }
     JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fMons, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
+    Connections { target: Config.launcher; function onSearchHiddenChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
     Connections {
@@ -160,7 +163,7 @@ Singleton {
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
-    function rootNodes() { return ordered("", [appsMenu(), triggerMenu()].concat(Config.features.systemInfo ? [processesMenu()] : []).concat([weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), learnMenu(), todoMenu(), systemMenu()])); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu()].concat(Config.features.systemInfo ? [processesMenu()] : []).concat([weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), cleanMenu(), learnMenu(), todoMenu(), systemMenu()])); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
@@ -168,10 +171,11 @@ Singleton {
     function search(scope, query, baseChain) {
         const q = query.trim().toLowerCase();
         const entries = [];
+        const hidden = Config.launcher.searchHidden || [];
         function walk(node, trail, chain, depth) {
             for (const c of childrenOf(node)) {
                 entries.push({ node: c, trail: trail, chain: chain });
-                if (isMenu(c) && !c.noSearch && depth < 4) walk(c, c.flat ? trail : trail.concat(c.name), chain.concat([c.id]), depth + 1);
+                if (isMenu(c) && !c.noSearch && depth < 4 && hidden.indexOf(chain.concat([c.id]).join("/")) < 0) walk(c, c.flat ? trail : trail.concat(c.name), chain.concat([c.id]), depth + 1);
             }
         }
         walk(scope, scope ? [scope.name] : [], baseChain || [], 0);
@@ -265,7 +269,8 @@ Singleton {
                 { id: "open", name: "Open windows", glyph: Icons.monitor, sub: "The easiest way: open the app first", sorted: true, onOpen: () => fWins.refresh(),
                   children: () => (fWins.data || []).map(w => pick(w.class, w.title && w.title.length < 40 ? w.title + "  ·  " + w.class : w.class)) },
                 { id: "installed", name: "Installed apps", glyph: Icons.apps, sorted: true,
-                  children: () => Apps.items().filter(a => a.kind === "app").map(a => pick(a.wm || a.id, a.name)) },
+                  children: () => Apps.items().filter(a => a.kind === "app" || (a.exec && /--class\s+\S+/.test(a.exec)))
+                      .map(a => a.kind === "app" ? pick(a.wm || a.id, a.name) : pick(/--class\s+(\S+)/.exec(a.exec)[1], a.name)) },
                 { id: "typed", name: "Type a window class…", glyph: Icons.keyboard2, keep: true,
                   run: () => ask("Window class (hyprctl clients shows it)", false, c => { if (c.trim()) rule(["set", c.trim(), "name", c.trim()]); }) } ] } ].concat(
                 rules.map(r => ({ id: "r:" + r.class, name: r.name || r.class, sub: ruleSummary(r), glyph: Icons.apps, sorted: true,
@@ -278,6 +283,8 @@ Singleton {
                     { id: "silent", name: "Open in the background", sub: "Don't switch to its workspace", badge: r.silent ? "On" : "Off", keep: true,
                       run: () => rule(["set", r.class, "silent", r.silent ? "false" : "true"]) },
                     { id: "float", name: "Open floating", badge: r.float ? "On" : "Off", keep: true, run: () => rule(["set", r.class, "float", r.float ? "false" : "true"]) },
+                    { id: "snapshot", name: "Use how it is now", glyph: Icons.camera, sub: "Open the app first: saves its workspace, floating, place and size, background and start at login", keep: true,
+                      run: () => { rule(["snapshot", r.class]); say("Saved how " + (r.name || r.class) + " is now"); } },
                     { id: "remember", name: "Remember position and size", sub: "Opens floating where you left it (move and resize it once)", badge: r.remember ? "On" : "Off", keep: true,
                       run: () => rule(["set", r.class, "remember", r.remember ? "false" : "true"]) },
                     { id: "autostart", name: "Start at login", sub: "Opens with the session, on the workspace chosen above", badge: r.autostart ? "On" : "Off", keep: true,
@@ -600,7 +607,68 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), windowsMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+    }
+
+    // ================= Clean up: caches, logs, Docker, big files (torii-clean)
+    function cleanMenu() {
+        const items = fClean.data || [];
+        const totalBytes = items.reduce((n, i) => n + (i.size || 0), 0);
+        const human = n => n >= 1073741824 ? (n / 1073741824).toFixed(1) + " GiB" : n >= 1048576 ? (n / 1048576).toFixed(0) + " MiB" : (n / 1024).toFixed(0) + " KiB";
+        const term = (title, ids) => floatTerm(title, ["sh", "-c", bin("torii-clean") + " run " + ids.join(" ") + '; printf "\\nPress Enter to close "; read _']);
+        const after = () => { later(fClean, 4000); later(fBig, 4500); };
+        return { id: "clean", name: "Clean up", glyph: Icons.trash, sub: items.length ? human(totalBytes) + " can be freed" : "Caches, logs, Docker, big files",
+                 keywords: "cleanup free space disk cache logs journal docker downloads big files trash temp", onOpen: () => { fClean.refresh(); fBig.refresh(); },
+                 children: () => {
+            const rows = [{ id: "safe", name: "Clean everything safe", glyph: Icons.trash, badge: human(totalBytes),
+                            sub: "Trash, caches, package downloads, logs, crash dumps, Docker. Asks for your password in a terminal",
+                            run: () => { term("Clean up", ["safe"]); after(); } }];
+            for (const i of items)
+                rows.push({ id: "c:" + i.id, name: i.name, sub: i.sub, glyph: Icons.trash, badge: i.human || "", keep: false,
+                            run: () => { term("Clean up: " + i.name, [i.id]); after(); } });
+            const big = fBig.data || [];
+            rows.push({ id: "big", name: "Big files", glyph: Icons.folder, sub: big.length ? big.length + " files over 100 MB in your folders" : "Nothing over 100 MB in Downloads, Documents, Videos, Pictures, Desktop",
+                        badge: big.length ? human(big.reduce((n, f) => n + f.size, 0)) : "", keywords: "large files downloads videos documents pictures desktop",
+                        children: () => (fBig.data || []).map(f => ({ id: "f:" + f.path, name: f.name, sub: f.dir.replace(home, "~") + "  ·  " + f.age + " days old", badge: f.human, glyph: Icons.folder,
+                            children: () => [
+                                { id: "trash", name: "Move to trash", glyph: Icons.trash, sub: "It can be restored from the trash", keep: true,
+                                  run: () => { sh([bin("torii-clean"), "trash", f.path]); say("Moved to the trash: " + f.name); later(fBig, 1200); later(fClean, 1500); } },
+                                { id: "open", name: "Show in files", glyph: Icons.folder, run: () => app(["xdg-open", f.dir]) } ] })) });
+            return rows;
+        } };
+    }
+
+    // which menus the launcher search looks inside (the menu itself is always found; its rows only when this is on)
+    function searchMenu() {
+        return { id: "search", name: "Launcher search", glyph: Icons.search, sub: "Which menus show their rows when you type",
+                 keywords: "hide menus fzf clutter results", noSearch: true, children: () => {
+            const hidden = Config.launcher.searchHidden || [];
+            const rows = [];
+            const add = (chain, node) => {
+                const path = chain.concat([node.id]).join("/");
+                const off = hidden.indexOf(path) >= 0;
+                rows.push({ id: "s:" + path, name: chain.length ? node.name + "  ·  " + chain.join(" › ") : node.name,
+                            sub: off ? "Rows inside are not searched" : "Rows inside show up in the search", badge: off ? "Off" : "On", keep: true,
+                            run: () => {
+                                const next = off ? hidden.filter(x => x !== path) : hidden.concat([path]);
+                                sh([bin("torii-config"), "set", "launcher.searchHidden", JSON.stringify(next)]);
+                            } });
+            };
+            for (const top of rootNodes()) {
+                if (!isMenu(top) || top.noSearch) continue;
+                if (top.id !== "setup") add([], top);
+                const ids = [top.id];
+                for (const sub of childrenOf(top)) {
+                    if (isMenu(sub) && !sub.noSearch && !sub.flat && sub.id !== "search") {
+                        const p = ids.concat([sub.id]).join("/"), off = hidden.indexOf(p) >= 0;
+                        rows.push({ id: "s:" + p, name: sub.name + "  ·  " + top.name, sub: off ? "Rows inside are not searched" : "Rows inside show up in the search",
+                                    badge: off ? "Off" : "On", keep: true,
+                                    run: () => sh([bin("torii-config"), "set", "launcher.searchHidden", JSON.stringify(off ? hidden.filter(x => x !== p) : hidden.concat([p]))]) });
+                    }
+                }
+            }
+            return rows;
+        } };
     }
 
     // floating mode and the title bars (hyprbars)

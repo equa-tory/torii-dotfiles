@@ -194,6 +194,13 @@ Choices are kept in `~/.local/state/torii/hypr-user.json` and replayed at every 
 
 **Launcher extras:** type a sum (`2+2`, `sqrt(16)*3`, `2^10`, `sin(pi/2)`) and the first row is the result, Enter copies it. Quicklinks without an
 `icon` use the site's own icon (fetched once by `torii-favicon` into `~/.cache/torii/favicons`). A search that matches nothing goes to DuckDuckGo (`ddg`).
+**Launcher search clutter:** Setup › Launcher search lists the menus with an On/Off switch for "their rows show up when you type" (App rules is off by
+default; the menu itself is still found). **App rules:** *Use how it is now* in an app's rule saves what its open window looks like (workspace, floating, place
+and size, background, start at login); terminal apps from `~/apps` (cliamp, lava lamp, ...) get their own window class `torii-app-<name>` so they can be
+placed and started at login too (the session starts them silently on their workspace). **Clean up** (launcher, top level): torii-clean frees trash, app
+caches, package downloads, old logs, crash dumps and Docker leftovers (root parts ask for your password in a terminal), lists unused packages, and finds files
+over 100 MB in Downloads, Documents, Videos, Pictures, Desktop, Music (move to trash, show in files).
+
 **Your own apps on the home server:** web apps and terminal apps made in the launcher (Install › Web app / Terminal app) are kept in
 `~/.local/state/torii/{webapps,tuis}.json`; a `.desktop` file you write yourself goes in `~/.local/share/applications/`, and a program folder in
 `~/apps/<name>/`. `bash packages/private-push.sh` copies all of that (plus the Helium profile and LocalSend) to `~/torii-private/home/` on the server

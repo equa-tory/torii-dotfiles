@@ -161,6 +161,14 @@ on("window.active", function()
     if changed then save() end
 end)
 
+-- "Use how it is now" (torii-rules snapshot): keep the place and size of this app's floating windows right away
+function torii_remember_class_now(class)
+    for _, w in ipairs(hl.get_windows()) do
+        if w.class == class and w.floating and w.mapped then remember(w) end
+    end
+    save()
+end
+
 -- remember where a floating window was when it goes away, so the next one of that app comes back there
 on("window.close", function(w)
     if w and w.floating and (not remembered(w.class) or placed[w.address]) then remember(w) end
