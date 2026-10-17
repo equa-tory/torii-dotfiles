@@ -11,4 +11,5 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("$HOME/.config/torii/bin/torii-remind apply")
   hl.exec_cmd("$HOME/.config/torii/bin/torii-sudo clear")
   hl.exec_cmd("$HOME/.config/torii/bin/torii-capture reset")
+  hl.exec_cmd("$HOME/.config/torii/bin/torii-rules autostart")      -- apps with "Start at login" in Setup > App rules
 end)

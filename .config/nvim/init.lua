@@ -33,6 +33,37 @@ o.set("x", "<C-/>", "gc", { remap = true })
 o.set("n", "<leader>/", "gcc", { remap = true, desc = "Comment line" })
 o.set("x", "<leader>/", "gc", { remap = true, desc = "Comment selection" })
 o.set({ "n", "x" }, ";", ":", { desc = "Command line without Shift" })
+-- <leader>= makes the buffer (or the selection) look normal: a one-line JSON / minified code / run-together text becomes
+-- readable. prettier when it is installed, jq for JSON, the language server's formatter, xmllint for xml / html, text is
+-- re-wrapped at 80 columns, anything else is re-indented.
+local function tidy(visual)
+  local ft, buf = vim.bo.filetype, vim.api.nvim_get_current_buf()
+  local function filter(cmd)
+    local range = visual and "'<,'>" or "%"
+    vim.cmd(range .. "!" .. cmd)
+  end
+  local web = { javascript = 1, typescript = 1, javascriptreact = 1, typescriptreact = 1, css = 1, scss = 1, html = 1,
+                json = 1, jsonc = 1, markdown = 1, yaml = 1 }
+  if web[ft] and vim.fn.executable("prettier") == 1 and not visual then
+    filter("prettier --stdin-filepath " .. vim.fn.shellescape(vim.api.nvim_buf_get_name(buf) ~= "" and vim.api.nvim_buf_get_name(buf) or "x." .. ft))
+  elseif (ft == "json" or ft == "jsonc") and vim.fn.executable("jq") == 1 then
+    filter("jq .")
+  elseif (ft == "json" or ft == "jsonc") and vim.fn.executable("python3") == 1 then
+    filter("python3 -m json.tool")
+  elseif #vim.lsp.get_clients({ bufnr = buf, method = "textDocument/formatting" }) > 0 then
+    vim.lsp.buf.format({ async = false, range = visual and { start = vim.api.nvim_buf_get_mark(0, "<"), ["end"] = vim.api.nvim_buf_get_mark(0, ">") } or nil })
+  elseif (ft == "xml" or ft == "html") and vim.fn.executable("xmllint") == 1 then
+    filter(ft == "html" and "xmllint --html --format - 2>/dev/null" or "xmllint --format -")
+  elseif ft == "" or ft == "text" or ft == "markdown" or ft == "gitcommit" then
+    vim.opt_local.textwidth = 80
+    vim.cmd(visual and "normal! gvgq" or "normal! gggqG")
+  else
+    vim.cmd(visual and "normal! gv=" or "normal! gg=G``")
+  end
+end
+o.set("n", "<leader>=", function() tidy(false) end, { desc = "Format: make the buffer look normal" })
+o.set("x", "<leader>=", function() vim.cmd("normal! \27"); tidy(true) end, { desc = "Format: make the selection look normal" })
+
 o.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 o.set("n", "U", "<C-r>", { desc = "Redo" })
 

@@ -8,9 +8,15 @@
 
 local STATE = os.getenv("HOME") .. "/.local/state/torii/floatmode.lua"
 
+-- a config reload runs this file again: drop the event handlers of the previous run, or they would all fire (with their own old state)
+for _, sub in ipairs(torii_float_subs or {}) do pcall(function() sub:remove() end) end
+torii_float_subs = {}
+local function on(event, fn) torii_float_subs[#torii_float_subs + 1] = hl.on(event, fn) end
+
 local mode = "tile"           -- "tile" | "float"
 local class_geo = {}          -- class -> {x, y, w, h}: where the last window of that app floated
 local geo = {}                -- address -> {x, y, w, h}: where this window floated
+local placed = {}             -- address -> true: a remembered app's window that has been put in place
 local was_floating = {}       -- address -> true: floating before float mode took over (stays floating in tile mode)
 
 do
@@ -32,6 +38,9 @@ local function save()
     f:close()
 end
 
+-- apps with "Remember position and size" (Setup > App rules; torii-rules sets the torii_remember_apps table)
+local function remembered(class) return type(torii_remember_apps) == "table" and torii_remember_apps[class] == true end
+
 local function xy(v, a, b) return v[a] or v[b] or 0 end
 
 local function remember(w)
@@ -47,6 +56,7 @@ local function target(w)
     local g = geo[w.address]
     if g then return g end
     g = class_geo[w.class]
+    if g and remembered(w.class) then return g end          -- exactly where it was
     if g then                                   -- the app's usual place, nudged so windows of one app do not stack exactly
         cascade = (cascade + 1) % 8
         local mon = w.monitor or hl.get_active_monitor()
@@ -71,7 +81,7 @@ local function target(w)
 end
 
 local function float_to(w, g)
-    hl.dispatch(hl.dsp.window.float({ action = "set", window = w }))
+    if not w.floating then hl.dispatch(hl.dsp.window.float({ action = "set", window = w })) end
     hl.dispatch(hl.dsp.window.resize({ x = g.w, y = g.h, exact = true, window = w }))
     hl.dispatch(hl.dsp.window.move({ x = g.x, y = g.y, exact = true, window = w }))
 end
@@ -113,14 +123,48 @@ end
 hl.bind("ALT + SHIFT + N", function() set_mode(mode == "float" and "tile" or "float") end)
 
 -- windows opened while floating: float them where they were last
-hl.on("window.open", function(w)
+on("window.open", function(w)
+    if remembered(w.class) then
+        -- a remembered app's window is floating (the rule says so) and goes where it was; Hyprland centres a new floating
+        -- window once it is mapped, so it is put back a moment later. Only then does it count as "placed": until then
+        -- the focus snapshot below must not take its fresh, centred position as the app's remembered one.
+        local g = class_geo[w.class]
+        local addr = w.address
+        if g then float_to(w, g) end
+        hl.timer(function()
+            if g then
+                os.execute(string.format(
+                    "hyprctl --batch 'dispatch hl.dsp.window.resize({ x = %d, y = %d, exact = true, window = \"address:%s\" }) ; dispatch hl.dsp.window.move({ x = %d, y = %d, exact = true, window = \"address:%s\" })' >/dev/null 2>&1 &",
+                    g.w, g.h, addr, g.x, g.y, addr))
+            end
+            placed[addr] = true
+        end, { timeout = 500, type = "oneshot" })
+        return
+    end
     if mode ~= "float" or w.floating then return end
     float_to(w, target(w))
 end)
 
+-- remembered apps: note where their windows are whenever focus moves, so a move or resize is not lost (also at close)
+on("window.active", function()
+    local changed = false
+    for _, w in ipairs(hl.get_windows()) do
+        if w.floating and w.mapped and remembered(w.class) and placed[w.address] then
+            local g = class_geo[w.class]
+            local x, y, ww, hh = xy(w.at, "x", 1), xy(w.at, "y", 2), xy(w.size, "x", 1), xy(w.size, "y", 2)
+            if not g or g.x ~= x or g.y ~= y or g.w ~= ww or g.h ~= hh then
+                class_geo[w.class] = { x = x, y = y, w = ww, h = hh }
+                changed = true
+            end
+        end
+    end
+    if changed then save() end
+end)
+
 -- remember where a floating window was when it goes away, so the next one of that app comes back there
-hl.on("window.close", function(w)
-    if w and w.floating then remember(w) end
+on("window.close", function(w)
+    if w and w.floating and (not remembered(w.class) or placed[w.address]) then remember(w) end
+    if w then placed[w.address] = nil end
     if w then geo[w.address], was_floating[w.address] = nil, nil end
     save()
 end)

@@ -246,7 +246,9 @@ Singleton {
     function ruleSummary(r) {
         const p = [];
         if (r.workspace) p.push("workspace " + r.workspace + (r.silent ? " (background)" : ""));
-        if (r.float) p.push("floating");
+        if (r.float && !r.remember) p.push("floating");
+        if (r.remember) p.push("remembers place and size");
+        if (r.autostart) p.push("starts at login");
         return p.length ? p.join("  ·  ") : "No effect yet";
     }
     function rulesMenu() {
@@ -276,6 +278,10 @@ Singleton {
                     { id: "silent", name: "Open in the background", sub: "Don't switch to its workspace", badge: r.silent ? "On" : "Off", keep: true,
                       run: () => rule(["set", r.class, "silent", r.silent ? "false" : "true"]) },
                     { id: "float", name: "Open floating", badge: r.float ? "On" : "Off", keep: true, run: () => rule(["set", r.class, "float", r.float ? "false" : "true"]) },
+                    { id: "remember", name: "Remember position and size", sub: "Opens floating where you left it (move and resize it once)", badge: r.remember ? "On" : "Off", keep: true,
+                      run: () => rule(["set", r.class, "remember", r.remember ? "false" : "true"]) },
+                    { id: "autostart", name: "Start at login", sub: "Opens with the session, on the workspace chosen above", badge: r.autostart ? "On" : "Off", keep: true,
+                      run: () => rule(["set", r.class, "autostart", r.autostart ? "false" : "true"]) },
                     { id: "remove", name: "Remove rule", glyph: Icons.trash, sub: r.class, run: () => rule(["remove", r.class]) } ] }))) };
     }
 

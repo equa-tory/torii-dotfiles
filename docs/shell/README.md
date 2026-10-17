@@ -198,8 +198,8 @@ Choices are kept in `~/.local/state/torii/hypr-user.json` and replayed at every 
 `~/.local/state/torii/{webapps,tuis}.json`; a `.desktop` file you write yourself goes in `~/.local/share/applications/`, and a program folder in
 `~/apps/<name>/`. `bash packages/private-push.sh` copies all of that (plus the Helium profile and LocalSend) to `~/torii-private/home/` on the server
 (`ONLY=apps bash packages/private-push.sh` just the apps; `--dry-run` shows what would go). `./install.sh` restores them through `packages/personal.sh`.
-Apps shipped with the repo (`apps/*/app.json`) are not pushed. **Disk usage** (`gdu`) opens on `/` without crossing into other drives (so a big NAS
-is not scanned), in the theme colours.
+Apps shipped with the repo (`apps/*/app.json`) are not pushed. **Disk usage** (`gdu`) opens on `/` including `/home`, skipping `/mnt` and `/media` (big data drives and network shares are
+not scanned), in the theme colours.
 
 **Calendar:** Tab in the calendar walks into the day's events, `d` or Delete removes the chosen one (also on iCloud); Setup › Calendar sync has
 the automatic sync switch and how often it runs (1, 5, 15, 30, 60 minutes). **Night light:** Setup › Night light › Dimming sets how much darker the

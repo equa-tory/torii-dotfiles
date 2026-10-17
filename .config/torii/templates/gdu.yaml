@@ -20,6 +20,15 @@ style:
     use-old-size-bar: false
     show-bar-percentage: true
     show-item-count-bar: false
-no-cross: true
+# the whole system including /home (even when it is a separate drive or subvolume), but not the big data drives and
+# network shares mounted under /mnt, /media and /run/media: open those from inside when you want them
+no-cross: false
+ignore-dirs:
+    - /proc
+    - /dev
+    - /sys
+    - /run
+    - /mnt
+    - /media
 show-relative-size: true
 show-item-count: true
