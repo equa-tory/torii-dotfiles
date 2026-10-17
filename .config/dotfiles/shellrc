@@ -162,6 +162,11 @@ alias rc='$EDITOR ~/.config/dotfiles/shellrc'
 # ==============================
 export PATH="$HOME/.local/bin:$HOME/.config/torii/bin:$PATH"
 
+# a server that does not know our terminal (e.g. xterm-kitty over ssh) breaks clear, tmux, nvim: use a common one instead
+if [ -n "$TERM" ] && command -v infocmp >/dev/null 2>&1 && ! infocmp "$TERM" >/dev/null 2>&1; then
+  export TERM=xterm-256color
+fi
+
 c
 
 command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init "${SHELL##*/}" --cmd cd)"
