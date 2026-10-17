@@ -9,6 +9,8 @@ for d in "$REPO"/apps/*/; do
   mkdir -p "$dst"; cp -n "$d"app.json "$dst/app.json"
 done
 "$REPO/.config/torii/bin/torii-apps" generate >/dev/null || true
+# real .desktop files (~/.local/share/applications/torii-app-*.desktop) so other launchers and xdg-open see them too
+"$REPO/.config/torii/bin/torii-apps" desktop >/dev/null || true
 # web apps and terminal apps restored from the home server (state files) become launcher entries again
 "$REPO/.config/torii/bin/torii-apps" webapp sync >/dev/null || true
 "$REPO/.config/torii/bin/torii-apps" tui sync >/dev/null || true
