@@ -1,0 +1,1 @@
+{ "name": "ProtonUp-Qt", "exec": "protonup-qt", "icon": "protonup-qt", "keywords": ["proton", "wine", "steam", "games"], "description": "Install Proton-GE and Wine-GE for Steam and Lutris" }

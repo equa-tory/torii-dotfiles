@@ -1,9 +1,12 @@
 [
+  {"keyword": "ddg", "name": "DuckDuckGo", "url": "https://duckduckgo.com/?q={input}", "icon": "󰇥"},
+  {"keyword": "g", "name": "Google", "url": "https://www.google.com/search?q={input}", "icon": "󰊭"},
+  {"keyword": "gg", "name": "ChatGPT", "url": "https://chatgpt.com/?q={input}", "icon": "󰚩"},
+  {"keyword": "x", "name": "X", "url": "https://x.com/search?q={input}", "icon": ""},
   {"keyword": "v", "name": "YouTube", "url": "https://www.youtube.com/results?search_query={input}", "icon": "󰗃"},
-  {"keyword": "g", "name": "DuckDuckGo", "url": "https://www.duckduckgo.com/search?q={input}", "icon": "󰇥"},
-  {"keyword": "x", "name": "X", "url": "https://x.com/search?q={input}", "icon": "󰕄"},
-  {"keyword": "gh", "name": "GitHub", "url": "https://github.com/search?q={input}", "icon": "󰊤"},
+  {"keyword": "gh", "name": "GitHub", "url": "https://github.com/search?q={input}", "icon": ""},
+  {"keyword": "w", "name": "Wikipedia", "url": "https://en.wikipedia.org/w/index.php?search={input}", "icon": ""},
+  {"keyword": "aur", "name": "AUR", "url": "https://aur.archlinux.org/packages?K={input}", "icon": ""},
   {"keyword": "git", "name": "My GitHub", "url": "https://github.com/equa-tory", "icon": "󰊤"},
-  {"keyword": "w", "name": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Special:Search?search={input}", "icon": "󰖬"},
   {"keyword": "maps", "name": "OpenStreetMap", "url": "https://www.openstreetmap.org/search?query={input}", "icon": "󰍍"}
 ]

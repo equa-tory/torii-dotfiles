@@ -36,6 +36,9 @@ bash packages/apps-sync.sh || true
 echo "==> Mirrors on the home server (skipped if unreachable)"
 bash packages/mirrors.sh || true
 
+echo "==> Claude Code status line (adds one key to ~/.claude/settings.json)"
+bash packages/claude-statusline.sh || true
+
 echo "==> NVIDIA driver (skipped without an NVIDIA GPU)"
 bash packages/nvidia.sh || true
 
