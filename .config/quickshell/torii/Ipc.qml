@@ -37,4 +37,8 @@ Scope {
         function previous(): void { Media.previous(); }
         function seek(seconds: int): void { Media.seekBy(seconds); }
     }
+    IpcHandler {
+        target: "text"
+        function edit(action: string): void { Panels.editRequested(action); }
+    }
 }

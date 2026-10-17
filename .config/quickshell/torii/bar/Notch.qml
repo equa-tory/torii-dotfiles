@@ -47,6 +47,22 @@ PanelWindow {
         Keys.onRightPressed: if (win.mediaOpen) Svc.Media.seekBy(Config.media.seekSeconds)
         Keys.onSpacePressed: if (win.mediaOpen) Svc.Media.toggle()
     }
+    // the same editing keys for the control panel's text fields (the launcher handles its own)
+    Connections {
+        target: Panels
+        enabled: win.panelHere && Panels.panel !== "launcher"
+        function onEditRequested(action) {
+            const it = win.activeFocusItem;
+            if (!it) return;
+            if (action === "copy" && it.copy) it.copy();
+            else if (action === "paste" && it.paste) it.paste();
+            else if (action === "cut" && it.cut) it.cut();
+            else if (action === "undo" && it.undo) it.undo();
+            else if (action === "selectall" && it.selectAll) it.selectAll();
+            else if (action === "home" && it.cursorPosition !== undefined) it.cursorPosition = 0;
+            else if (action === "end" && it.cursorPosition !== undefined && it.text !== undefined) it.cursorPosition = it.text.length;
+        }
+    }
     onPanelHereChanged: if (panelHere) keys.forceActiveFocus()
     onMediaOpenChanged: if (mediaOpen) keys.forceActiveFocus()
 

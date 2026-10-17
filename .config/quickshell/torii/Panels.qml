@@ -13,6 +13,9 @@ Singleton {
     property string panelScreen: ""
     property var launcherPath: []    // menu ids the launcher opens inside of next time (e.g. ["notifications"])
 
+    // text editing keys forwarded by Hyprland while a panel has the keyboard: copy paste cut undo selectall home end selecthome selectend
+    signal editRequested(string action)
+
     // wallpaper shown while the switcher previews (focused monitor only), "" = the real one
     property string previewWallpaper: ""
     // wallpaper just confirmed: shown on every monitor until torii-theme has written the new tokens

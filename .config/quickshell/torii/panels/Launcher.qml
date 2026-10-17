@@ -119,6 +119,21 @@ Item {
     Connections { target: Menus; function onRevChanged() { root.update(true); } }
     Connections { target: Apps; function onPortableChanged() { root.update(true); } }
     Connections { target: Quicklinks; function onLinksChanged() { root.update(true); } }
+    // Alt+A/C/V/X/Z and Super+Left/Right arrive here from Hyprland (it would send them to the window underneath)
+    Connections {
+        target: Panels
+        function onEditRequested(action) {
+            if (action === "copy") input.copy();
+            else if (action === "paste") input.paste();
+            else if (action === "cut") input.cut();
+            else if (action === "undo") input.undo();
+            else if (action === "selectall") input.selectAll();
+            else if (action === "home") { input.deselect(); input.cursorPosition = 0; }
+            else if (action === "end") { input.deselect(); input.cursorPosition = input.text.length; }
+            else if (action === "selecthome") input.select(input.cursorPosition, 0);
+            else if (action === "selectend") input.select(input.cursorPosition, input.text.length);
+        }
+    }
     Connections { target: Menus; function onPromptChanged() { input.text = ""; root.update(false); } }
 
     // ---- actions

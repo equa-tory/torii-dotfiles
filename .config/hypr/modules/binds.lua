@@ -74,7 +74,7 @@ for key, d in pairs(resize) do
         { repeating = true })   -- hold the keys to keep resizing
 end
 
--- Move active window: mainMod + SHIFT + arrow
+-- Move active window: mainMod + SHIFT + arrow (past the edge of a monitor it goes to the next monitor)
 local move = { left = "l", right = "r", up = "u", down = "d" }
 for key, dir in pairs(move) do
     hl.bind(mainMod .. " + SHIFT + " .. key,
@@ -82,9 +82,21 @@ for key, dir in pairs(move) do
 end
 
 
--- MacOS like binds --
+-- Text editing keys. Alt (mainMod) + C/V/X/Z/A act like the Mac's copy/paste/cut/undo/select all and Super + Left/Right
+-- jump to the start/end of the line, in every app. While a torii panel (launcher, control panel) has the keyboard these
+-- would hit the window underneath, so they are forwarded to the panel's text field instead.
+local function torii_panel_open()
+    for _, l in ipairs(hl.get_layers({ namespace = "torii-notch" })) do
+        if l.mapped and l.interactivity == 1 then return true end
+    end
+    return false
+end
+local qs_text = "qs -c torii ipc call text edit "
+
 for _, key in ipairs({ "C", "V", "X", "Z", "A" }) do
+    local action = ({ C = "copy", V = "paste", X = "cut", Z = "undo", A = "selectall" })[key]
     hl.bind(mainMod .. " + " .. key, function()
+        if torii_panel_open() then hl.exec_cmd(qs_text .. action); return end
         local w = hl.get_active_window()
         local mods = "CTRL"
         if w and w.class == "kitty" then
@@ -97,21 +109,24 @@ for _, key in ipairs({ "C", "V", "X", "Z", "A" }) do
     end)
 end
 
-
--- Move focus with mainMod + arrow keys
--- mac style: in a terminal mainMod + left/right jump to the start/end of the line (Home/End), elsewhere they move focus
-local function arrow(dir, key)
-    return function()
-        local w = hl.get_active_window()
-        if w and w.class == "kitty" then
-            hl.dispatch(hl.dsp.send_shortcut({ mods = "", key = key }))
-        else
-            hl.dispatch(hl.dsp.focus({ direction = dir }))
-        end
-    end
+for _, e in ipairs({
+    { "left",  "Home", "home" },  { "right", "End", "end" },
+}) do
+    local dir, key, action = e[1], e[2], e[3]
+    hl.bind("SUPER + " .. dir, function()
+        if torii_panel_open() then hl.exec_cmd(qs_text .. action); return end
+        hl.dispatch(hl.dsp.send_shortcut({ mods = "", key = key }))
+    end)
+    hl.bind("SUPER + SHIFT + " .. dir, function()      -- select to the start/end of the line
+        if torii_panel_open() then hl.exec_cmd(qs_text .. "select" .. action); return end
+        hl.dispatch(hl.dsp.send_shortcut({ mods = "SHIFT", key = key }))
+    end)
 end
-hl.bind(mainMod .. " + left",  arrow("left", "Home"))
-hl.bind(mainMod .. " + right", arrow("right", "End"))
+
+
+-- Move focus with mainMod + arrow keys (across monitors too)
+hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
+hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 

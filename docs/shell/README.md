@@ -15,6 +15,10 @@ panel, a wallpaper switcher and a launcher. A CLI (`torii-theme`) restyles the w
 | `mainMod + SHIFT + D` | dark / light |
 | `mainMod + SHIFT + R` | reload the shell |
 | `mainMod + SHIFT + Q / W / E` | screenshot, screenshot of a zone, start/stop screen recording |
+| `mainMod + arrows` | move focus (across monitors too) |
+| `mainMod + SHIFT + arrows` | move the window (past a monitor's edge it goes to the next monitor) |
+| `mainMod + C / V / X / Z / A` | copy, paste, cut, undo, select all in any app (Ctrl+Shift variants in kitty); work inside the launcher too |
+| `SUPER + Left / Right` | start / end of the line (`Shift` selects to it); works inside the launcher too |
 
 `Esc` or a click outside closes any panel. Panels only open on the focused monitor.
 (`CTRL + ALT + SPACE` also hits the XKB layout toggle in `input.lua`.)
