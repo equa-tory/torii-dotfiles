@@ -25,6 +25,8 @@ o.set("n", "<C-_>", "gcc", { remap = true })
 o.set("x", "<C-_>", "gc", { remap = true })
 o.set("n", "<C-/>", "gcc", { remap = true })
 o.set("x", "<C-/>", "gc", { remap = true })
+o.set("n", "<leader>/", "gcc", { remap = true, desc = "Comment line" })
+o.set("x", "<leader>/", "gc", { remap = true, desc = "Comment selection" })
 o.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 o.set("n", "U", "<C-r>", { desc = "Redo" })
 

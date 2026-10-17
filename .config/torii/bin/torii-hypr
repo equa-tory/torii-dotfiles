@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""torii-hypr layout <dwindle|master|scrolling> | gaps <inner> <outer> | sensitivity <-1..1> | status | apply
+"""torii-hypr layout <dwindle|master|scrolling> | gaps <inner> <outer> | sensitivity <-1..1>
+            | scale <monitor> <factor> | monitors | opacity <0.3..1> | blur <on|off> | blur <size> <passes> <vibrancy> | status | apply
 
 Runtime choices made from the launcher. They are kept in ~/.local/state/torii/hypr-user.json, applied to the running
 Hyprland at once and re-applied at every start through hypr-user.lua (hyprland.lua loads it last).
@@ -23,17 +24,26 @@ def load():
 
 
 def lua(s):
-    inp = ""
-    if "sens" in s:
-        inp = ", input={sensitivity=%s}" % float(s["sens"])
-    parts = []
+    general, decoration, inp = [], [], ""
     if "layout" in s:
-        parts.append(f'layout="{s["layout"]}"')
+        general.append(f'layout="{s["layout"]}"')
     if "gaps_in" in s:
-        parts.append(f'gaps_in={int(s["gaps_in"])}, gaps_out={int(s["gaps_out"])}')
-    if not parts and not inp:
-        return "-- nothing chosen yet\n"
-    return "hl.config({%s%s})\n" % ("general={%s}" % ", ".join(parts) if parts else "", inp if parts else inp.lstrip(", "))
+        general.append(f'gaps_in={int(s["gaps_in"])}, gaps_out={int(s["gaps_out"])}')
+    if "opacity" in s:
+        decoration.append(f'active_opacity={float(s["opacity"])}, inactive_opacity={float(s["opacity"])}')
+    if "blur" in s:
+        b = s["blur"]
+        decoration.append("blur={enabled=%s, size=%d, passes=%d, vibrancy=%s}" % (
+            "true" if b.get("enabled", True) else "false", int(b.get("size", 3)), int(b.get("passes", 1)), float(b.get("vibrancy", 0.17))))
+    if "sens" in s:
+        inp = "input={sensitivity=%s}" % float(s["sens"])
+    tables = [t for t in (
+        "general={%s}" % ", ".join(general) if general else "",
+        "decoration={%s}" % ", ".join(decoration) if decoration else "", inp) if t]
+    out = "hl.config({%s})\n" % ", ".join(tables) if tables else ""
+    for name, m in s.get("scale", {}).items():
+        out += 'hl.monitor({ output = "%s", mode = "%s", position = "%s", scale = %s })\n' % (name, m["mode"], m["pos"], m["scale"])
+    return out or "-- nothing chosen yet\n"
 
 
 def save(s):
@@ -46,7 +56,8 @@ def save(s):
 
 def apply(s):
     if not os.environ.get("TORII_NO_HOOKS") and s:
-        subprocess.run(["hyprctl", "eval", lua(s).strip()], capture_output=True)
+        for line in lua(s).strip().splitlines():
+            subprocess.run(["hyprctl", "eval", line], capture_output=True)
 
 
 def live_sensitivity():
@@ -57,10 +68,45 @@ def live_sensitivity():
         return 0.0
 
 
+def monitors():
+    try:
+        out = subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True, text=True, timeout=3).stdout
+        return json.loads(out)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return []
+
+
+def set_scale(s, name, factor):
+    """Scale one monitor. Hyprland silently keeps the old scale when the factor leaves a fractional logical size,
+    so the factor snaps to the nearest one that divides the resolution into whole pixels (1896x1003 only allows 1)."""
+    cur = next((m for m in monitors() if m["name"] == name), None)
+    if not cur:
+        print("no such monitor", file=sys.stderr)
+        sys.exit(1)
+    old = s.get("scale", {}).get(name)
+    ok = [c / 20 for c in range(10, 61)
+          if all(abs(v / (c / 20) - round(v / (c / 20))) < 0.01 for v in (cur["width"], cur["height"]))]
+    if ok:
+        factor = min(ok, key=lambda c: abs(c - factor))
+    spec = {"mode": "%dx%d@%.2f" % (cur["width"], cur["height"], cur["refreshRate"]), "pos": "%dx%d" % (cur["x"], cur["y"]), "scale": factor}
+    if not os.environ.get("TORII_NO_HOOKS"):
+        subprocess.run(["hyprctl", "eval", 'hl.monitor({ output = "%s", mode = "%s", position = "%s", scale = %s })' % (name, spec["mode"], spec["pos"], factor)], capture_output=True)
+        after = next((m for m in monitors() if m["name"] == name), None)
+        if after and abs(after["scale"] - float(factor)) > 0.01:
+            print("Hyprland refused scale %s" % factor, file=sys.stderr)
+            sys.exit(1)
+    s.setdefault("scale", {})[name] = spec if old is None or old != spec else old
+
+
 def main(a):
     s = load()
+    if a[:1] == ["monitors"]:
+        print(json.dumps([{"name": m["name"], "scale": m["scale"], "w": m["width"], "h": m["height"],
+                           "desc": m.get("description", "")} for m in monitors()]))
+        return
     if a[:1] == ["status"]:
-        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20, "sens": live_sensitivity()}
+        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20, "sens": live_sensitivity(), "opacity": 1.0,
+               "blur": {"enabled": True, "size": 3, "passes": 1, "vibrancy": 0.17}}
         print(json.dumps({**cur, **s}))
         return
     if a[:1] == ["layout"] and len(a) == 2 and a[1] in LAYOUTS:
@@ -70,6 +116,14 @@ def main(a):
     elif a[:1] == ["sensitivity"] and len(a) == 2:
         v = max(-1.0, min(1.0, round(float(a[1]), 2)))
         s["sens"] = v
+    elif a[:1] == ["scale"] and len(a) == 3:
+        set_scale(s, a[1], float(a[2]))
+    elif a[:1] == ["opacity"] and len(a) == 2:
+        s["opacity"] = max(0.3, min(1.0, round(float(a[1]), 2)))
+    elif a[:2] == ["blur", "on"] or a[:2] == ["blur", "off"]:
+        s["blur"] = dict(s.get("blur", {}), enabled=a[1] == "on")
+    elif a[:1] == ["blur"] and len(a) == 4:
+        s["blur"] = dict(s.get("blur", {}), size=int(a[1]), passes=int(a[2]), vibrancy=round(float(a[3]), 2))
     elif a[:1] == ["apply"]:
         apply(s)
         return

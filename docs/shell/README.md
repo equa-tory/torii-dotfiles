@@ -187,6 +187,11 @@ launcher opens), `rememberBack` / `rememberForward` switch the two row memories 
 used before rank higher while you search (never apps; the counts stay in `~/.local/state/torii/menu-usage.json`; delete the
 file or set it to `false` to reset). Lists scroll smoothly and keep a row of margin, with a soft glow on the edge you can still scroll to.
 
+**Appearance** (Setup › Appearance): bar height and bar opacity (`notch.height`, `notch.opacity` in `config.json`, live), monitor scale
+(one slider per monitor, `torii-hypr scale`), window opacity and blur (on/off, size, passes, vibrancy). Hyprland ignores a scale that leaves a
+fractional logical size, so the slider snaps to the nearest factor the resolution allows (1920x1080: 0.5 … 1.25, 1.5, 2; the VM's 1896x1003 only 1).
+Choices are kept in `~/.local/state/torii/hypr-user.json` and replayed at every start by `hypr-user.lua`.
+
 **Night light fade** (Setup › Night light › Fade, 0–300 s, default 30, `0` = at once): with a daily schedule the colour eases in from
 nothing to your temperature after the start time and eases out again before the end. Manual on/off and the slider act at once.
 

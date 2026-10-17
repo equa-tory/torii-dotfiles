@@ -1,13 +1,16 @@
-# ==============================================================
-# ==============================================================
-# ==============================================================
-# ==============================================================
-# ==============================================================
-
+# Shared by zsh and bash (sourced from ~/.zshrc / ~/.bashrc).
 
 # ==============================
-# SUDO AUTO-DETECT
+# EDITOR: the one the user chose in Setup > Defaults (uwsm env), else nvim, vim, nano
 # ==============================
+if [ -z "$EDITOR" ]; then
+  for _e in nvim vim nano; do
+    command -v "$_e" &>/dev/null && { EDITOR="$_e"; break; }
+  done
+  unset _e
+fi
+export EDITOR="${EDITOR:-vi}" VISUAL="${VISUAL:-$EDITOR}"
+
 if command -v sudo &>/dev/null; then
   SUDO="sudo"
 else
@@ -15,57 +18,15 @@ else
 fi
 
 # ==============================
-# SMART PACKAGE MANAGER  pkg
-# Auto-detects: yay > pacman > apt
+# PYTHON
 # ==============================
-#	pkg() {
-#	  local cmd="$1"; shift
-#
-#	  if   command -v yay    &>/dev/null; then local pm="yay"
-#	  elif command -v pacman &>/dev/null; then local pm="pacman"
-#	  elif command -v apt    &>/dev/null; then local pm="apt"
-#	  else echo "No supported package manager found."; return 1
-#	  fi
-#
-#	  case "$cmd" in
-#	    i|install)  [[ $pm == apt ]]    && $SUDO apt install -y "$@"     || $SUDO $pm -Sy "$@" ;;
-#	    ii|confirm)  [[ $pm == apt ]]    && $SUDO apt install -y "$@"     || $SUDO $pm -Sy --noconfirm "$@" ;;
-#	    r|remove)   [[ $pm == apt ]]    && $SUDO apt remove -y "$@"      || $SUDO $pm -Rns "$@" ;;
-#	    u|update)   [[ $pm == apt ]]    && $SUDO apt update && $SUDO apt upgrade -y \
-#					    || $SUDO $pm -Syu ;;
-#	    s|search)   [[ $pm == apt ]]    && apt search "$@"              || $pm -Ss "$@" ;;
-#	    l|list)     [[ $pm == apt ]]    && apt list --installed         || $pm -Qe ;;
-#	    info)       [[ $pm == apt ]]    && apt show "$@"                || $pm -Qi "$@" ;;
-#	    *)          echo "pkg [i|r|u|s|l|info] [package]"; return 1 ;;
-#	  esac
-#	}
-
-# ==============================
-# PIP  pip wrapper, no conflicts
-# ==============================
-#	py() {
-#	  local cmd="$1"; shift
-#	  case "$cmd" in
-#	    i|install)   pip install "$@" ;;
-#	    r|remove)    pip uninstall "$@" ;;
-#	    u|update)    pip install --upgrade "$@" ;;
-#	    s|search)    pip index versions "$@" 2>/dev/null || pip search "$@" ;;
-#	    l|list)      pip list ;;
-#	    freeze)      pip freeze > requirements.txt && echo "Saved to requirements.txt" ;;
-#	    req)         pip install -r requirements.txt ;;
-#	    venv)        python3 -m venv venv && source venv/bin/activate ;;
-#	    on)          source venv/bin/activate ;;
-#	    off)         deactivate ;;
-#	    *)           python3 "$cmd" "$@" ;;   # fallback: run python directly
-#	  esac
-#	}
 alias py='python3'
 alias vnv='source venv/bin/activate'
 alias vnvv='python3 -m venv venv && source venv/bin/activate'
 alias deac='deactivate'
 
 # ==============================
-# DOCKER  dk
+# DOCKER  d
 # ==============================
 d() {
   local cmd="$1"; shift
@@ -85,87 +46,30 @@ d() {
     # Exec / logs
     sh)          docker exec -it "$1" bash ;;
     logs)        docker logs -f "$@" ;;
-    # Run: dk run <image> [extra flags]
+    # Run: d run <image> [extra flags]
     run)
       local image="$1"; shift
       local name="${image%%:*}"
       docker run -d --name "$name" "$@" "$image"
       ;;
-    *)           echo "dk [ps|up|down|build|start|stop|rm|pull|rmi|images|sh|logs|run]"; return 1 ;;
+    *)           echo "d [ps|up|down|build|start|stop|rm|pull|rmi|images|sh|logs|run]"; return 1 ;;
   esac
 }
 
 # ==============================
-# GIT  g
-# ==============================
-#g() {
-#  local cmd="$1"; shift
-#  case "$cmd" in
-#    s|status)    git status ;;
-#    a|add)       git add "${@:-.}" ;;          # default: add all
-#    c|commit)    git commit -m "$@" ;;
-#    p|push)      git push "$@" ;;
-#    l|pull)      git pull "$@" ;;
-#    b|branch)    git branch "$@" ;;
-#    co)          git checkout "$@" ;;
-#    cb)          git checkout -b "$@" ;;
-#    main)        git checkout main ;;
-#    undo)        git reset --soft HEAD~1 ;;
-#    log)         git log --oneline --graph --decorate -15 "$@" ;;
-#    diff)        git diff "$@" ;;
-#    stash)       git stash "$@" ;;
-#    cl|clone)    git clone "$@" ;;
-#    # Shortcut: g "message"  add all + commit + push
-#    *)           git add . && git commit -m "$cmd" && git push ;;
-#  esac
-#}
-
-# ==============================
-# MISC UTILS (kept from original)
+# MISC UTILS
 # ==============================
 mdd()  { mkdir -p "$1" && cd "$1"; }
 port() { $SUDO lsof -i :"$1"; }
-#mc()   { java -Xmx"$1"G -jar server.jar nogui; }
 
-
-#	gg() {
-#	    if [ -z "$1" ]; then
-#		echo "usage: g <text>"
-#		return 1
-#	    fi
-#
-#	    grep -Rin --color=always -C 3 "$1" .
-#	}
-#
-#	f() {
-#	  if [ -z "$1" ]; then
-#	    echo "usage: f <text>"
-#	    return 1
-#	  fi
-#	  find . -type f -iname "*$1*"
-#	}
-
-#export HTTP_PROXY="http://127.0.0.1:1081"
-#export HTTPS_PROXY="http://127.0.0.1:1081"
-#export NO_PROXY=""
-
+# Claude Code through the local xray proxy
 claude-xray() {
-    HTTPS_PROXY="http://127.0.0.1:1081" \
-    HTTP_PROXY="http://127.0.0.1:1081" \
-    https_proxy="http://127.0.0.1:1081" \
-    http_proxy="http://127.0.0.1:1081" \
-    NO_PROXY="" \
-    claude "$@"
+  HTTPS_PROXY="http://127.0.0.1:1081" HTTP_PROXY="http://127.0.0.1:1081" \
+  https_proxy="http://127.0.0.1:1081" http_proxy="http://127.0.0.1:1081" \
+  NO_PROXY="" claude "$@"
 }
+alias cx='claude-xray'
 
-cx() {
-    HTTPS_PROXY="http://127.0.0.1:1081" \
-    HTTP_PROXY="http://127.0.0.1:1081" \
-    https_proxy="http://127.0.0.1:1081" \
-    http_proxy="http://127.0.0.1:1081" \
-    NO_PROXY="" \
-    claude "$@"
-}
 # ==============================
 # ALIASES - GENERAL
 # ==============================
@@ -190,7 +94,6 @@ r() {
   fi
 }
 
-
 # ==============================
 # LS & DIRECTORY
 # ==============================
@@ -206,20 +109,18 @@ alias dev='cd ~/Developer'
 # MISC
 # ==============================
 alias s='sudo '
-#alias screen='screen -S'
 alias sc='screen'
 alias scl='screen -list'
 alias ff='clear; fastfetch -c ~/.local/state/torii/theme/fastfetch.jsonc 2>/dev/null || fastfetch'
 alias smi='nvidia-smi'
 alias g='rg'
-#alias f='fdfind'
 if command -v fd >/dev/null 2>&1; then
-    alias f='fd'
+  alias f='fd'
 elif command -v fdfind >/dev/null 2>&1; then
-    alias f='fdfind'
+  alias f='fdfind'
 fi
-alias nv='~/log.sh'
-alias log='~/log.sh'
+alias tren='trans -b :en'
+alias myip='curl ifconfig.me'
 
 # ==============================
 # SYSTEMCTL
@@ -233,79 +134,31 @@ alias sdaemon='$SUDO systemctl daemon-reload'
 alias slist='$SUDO ls /etc/systemd/system/ | grep .service'
 
 sedit() {
-    local service="$1"
-
-    if [[ -z "$service" ]]; then
-        echo "Usage: sedit <service>"
-        return 1
-    fi
-
-    sudo nano "/etc/systemd/system/${service}.service"
-    sudo systemctl daemon-reload
+  if [[ -z "$1" ]]; then
+    echo "Usage: sedit <service>"
+    return 1
+  fi
+  $SUDO ${EDITOR} "/etc/systemd/system/${1}.service" && $SUDO systemctl daemon-reload
 }
 
 srestart() {
-  sudo systemctl restart "$1" && sudo systemctl status "$1"
+  $SUDO systemctl restart "$1" && $SUDO systemctl status "$1"
 }
 
 # ==============================
 # EDITORS
 # ==============================
-if command -v nvim &>/dev/null; then
-  alias vim='nvim'
-  alias v='nvim'
-else
-  alias v='vim'
-fi
+alias v='$EDITOR'
+[ "$EDITOR" = nvim ] && alias vim='nvim'
 alias n='nano'
-alias rc='nvim ~/.config/dotfiles/shellrc'
-#alias zrc='nano ~/.zshrc'
-
-#  rc() {
-#    if [ "$(uname)" = "Darwin" ]; then
-#      nvim ~/Developer/sh/dotfiles/shellrc
-#    else
-#      nvim ~/git/dotfiles/shellrc
-#    fi
-#  }
-#  rc() {
-#    if [ -n "$ZSH_VERSION" ]; then
-#      ${EDITOR:-nvim} ~/.zshrc
-#    elif [ -n "$BASH_VERSION" ]; then
-#      ${EDITOR:-nvim} ~/.bashrc
-#    else
-#      echo "Unsupported shell"
-#      return 1
-#    fi
-#  }
-
-
-# ==============================
-# TRANSLATION
-# ==============================
-alias tren='trans -b :en'
-
-# ==============================
-# NETWORK / IP
-# ==============================
-alias myip='curl ifconfig.me'
-
-# ==============================
-# REVERSE SSH
-# ==============================
-#alias rssh22='screen -dmS rssh22 autossh -M 0 -N -R 0.0.0.0:2222:localhost:22 rtunnel@equatory.ddns.net'
-#alias rsshmc='screen -dmS rsshmc autossh -M 0 -N -R 0.0.0.0:25565:localhost:25565 rtunnel@equatory.ddns.net'
-#alias rsshweb='screen -dmS rsshweb autossh -M 0 -N -R 0.0.0.0:80:localhost:80 rtunnel@equatory.ddns.net'
+alias rc='$EDITOR ~/.config/dotfiles/shellrc'
 
 # ==============================
 # STARTUP
 # ==============================
+export PATH="$HOME/.local/bin:$HOME/.config/torii/bin:$PATH"
+
 c
 
 eval "$(zoxide init "${SHELL##*/}" --cmd cd)"
-
 source <(fzf --zsh)
-
-
-export PATH="$HOME/.local/bin:$HOME/.config/torii/bin:$PATH"
-

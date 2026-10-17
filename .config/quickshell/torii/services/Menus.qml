@@ -74,9 +74,10 @@ Singleton {
     JsonFetch { id: fLearnNvim; command: [root.bin("torii-learn"), "list", "nvim"];       onDataChanged: root.bump() }
     JsonFetch { id: fNotes;    command: [root.bin("torii-learn"), "files"];               onDataChanged: root.bump() }
     JsonFetch { id: fHypr;     command: [root.bin("torii-hypr"), "status"];                onDataChanged: root.bump() }
+    JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fMons, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
@@ -585,7 +586,38 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+    }
+
+    // look: bar size, monitor scale, window transparency and blur
+    function cfgSlider(id, name, key, min, max, step, value, unit, decimals, sub) {
+        return { id: id, name: name, sub: sub || "", glyph: Icons.tune, keywords: "size look appearance",
+                 slider: { min: min, max: max, step: step, value: value, unit: unit, decimals: decimals },
+                 onSlide: v => sh([bin("torii-config"), "set", key, String(v)]) };
+    }
+    function hyprSlider(id, name, args, min, max, step, value, unit, decimals, sub) {
+        return { id: id, name: name, sub: sub || "", glyph: Icons.tune, keywords: "window look appearance",
+                 slider: { min: min, max: max, step: step, value: value, unit: unit, decimals: decimals },
+                 onSlide: v => sh([bin("torii-hypr")].concat(args(v))) };
+    }
+    function appearanceMenu() {
+        fMons.ensure(); fHypr.ensure();
+        const h = Live.hypr, b = h.blur || { enabled: true, size: 3, passes: 1, vibrancy: 0.17 };
+        const blurSet = (k, v) => { const n = Object.assign({}, b, k); return ["blur", String(n.size), String(n.passes), String(n.vibrancy)]; };
+        return { id: "appearance", name: "Appearance", glyph: Icons.tune, sub: "Bar size, monitor scale, transparency, blur", keywords: "look theme resize scale opacity transparent vibrancy", children: () => [
+            cfgSlider("barh", "Bar height", "notch.height", 24, 60, 1, Config.notch.height, " px", 0, "The notch bar at the top"),
+            cfgSlider("baro", "Bar opacity", "notch.opacity", 0.3, 1, 0.05, Config.notch.opacity, "", 2),
+            { id: "scale", name: "Monitor scale", glyph: Icons.monitor, sub: "Snaps to what the resolution allows", onOpen: () => fMons.refresh(), children: () =>
+                (fMons.data || []).map(m => ({ id: "m:" + m.name, name: m.name, sub: m.w + "×" + m.h + (m.desc ? "  ·  " + m.desc : ""), glyph: Icons.monitor,
+                    slider: { min: 0.5, max: 3, step: 0.05, value: m.scale, unit: "×", decimals: 2 },
+                    onSlide: v => { sh([bin("torii-hypr"), "scale", m.name, String(v)]); later(fMons, 900); } })) },
+            hyprSlider("wopac", "Window opacity", v => ["opacity", String(v)], 0.3, 1, 0.05, h.opacity === undefined ? 1 : h.opacity, "", 2, "Transparent windows show the blur behind them"),
+            { id: "blur", name: "Blur", glyph: Icons.tune, sub: b.enabled === false ? "Off" : b.size + " · " + b.passes + " passes · " + b.vibrancy, children: () => [
+                { id: "bon", name: b.enabled === false ? "Turn on" : "Turn off", glyph: Icons.power, badge: b.enabled === false ? "Off" : "On", keep: true,
+                  run: () => sh([bin("torii-hypr"), "blur", b.enabled === false ? "on" : "off"]) },
+                hyprSlider("bsize", "Size", v => blurSet({ size: v }), 1, 20, 1, b.size, "", 0, "How far the blur spreads"),
+                hyprSlider("bpass", "Passes", v => blurSet({ passes: v }), 1, 6, 1, b.passes, "", 0, "More passes: smoother, heavier on the GPU"),
+                hyprSlider("bvib", "Vibrancy", v => blurSet({ vibrancy: v }), 0, 1, 0.05, b.vibrancy, "", 2, "How strongly the colours behind are boosted") ] } ] };
     }
 
     function mouseNode() {

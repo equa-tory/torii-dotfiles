@@ -60,8 +60,8 @@ ForegroundPositive={{green|kde}}
 ForegroundVisited={{ramp3|kde}}
 
 [Colors:View]
-BackgroundAlternate={{surface|kde}}
-BackgroundNormal={{bg|kde}}
+BackgroundAlternate={{overlay|kde}}
+BackgroundNormal={{surface2|kde}}
 DecorationFocus={{accent|kde}}
 DecorationHover={{accent|kde}}
 ForegroundActive={{accent|kde}}
@@ -74,8 +74,8 @@ ForegroundPositive={{green|kde}}
 ForegroundVisited={{ramp3|kde}}
 
 [Colors:Window]
-BackgroundAlternate={{surface|kde}}
-BackgroundNormal={{bg|kde}}
+BackgroundAlternate={{surface2|kde}}
+BackgroundNormal={{surface|kde}}
 DecorationFocus={{accent|kde}}
 DecorationHover={{accent|kde}}
 ForegroundActive={{accent|kde}}
