@@ -100,7 +100,7 @@ Item {
             if (!scope) {
                 const calc = Calc.evaluate(q);
                 if (calc.ok) out.push({ node: { id: "calc", name: "= " + calc.text, sub: q + "  ·  Enter copies the result", glyph: Icons.calc,
-                    run: () => Quickshell.execDetached(["sh", "-c", 'printf %s "$1" | wl-copy', "sh", calc.text]) }, trail: [] });
+                    run: () => Quickshell.execDetached(["sh", "-c", 'printf %s "$1" | wl-copy && notify-send -a torii -t 2500 "Copied" "$1"', "sh", calc.text]) }, trail: [] });
                 const link = Quicklinks.resolve(q);
                 if (link) out.push({ node: linkNode(link), trail: [] });
                 if (link && /\s/.test(q)) { results = out; selected = 0; return; }   // "yt cats" is a search, not a lookup

@@ -15,7 +15,12 @@ o.cursorline = true
 o.scrolloff = 8
 o.updatetime = 250
 o.undofile = true
---o.clipboard = "wl-clipboard"
+-- yank / delete / paste go through the system clipboard (so a yank can be pasted anywhere with Alt+V), when there is one:
+-- wl-copy (Wayland), pbcopy (macOS), xclip, or the terminal itself over ssh (OSC 52)
+if vim.fn.executable("wl-copy") == 1 or vim.fn.executable("pbcopy") == 1 or vim.fn.executable("xclip") == 1
+  or vim.env.SSH_TTY then
+  o.clipboard = "unnamedplus"
+end
 o.splitright = true
 o.splitbelow = true
 
