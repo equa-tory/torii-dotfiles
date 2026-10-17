@@ -1,9 +1,9 @@
 {
   "notch": {
     "shape": "floating",
-    "opacity": 1.0,
+    "opacity": 1,
     "radius": 16,
-    "height": 34,
+    "height": 32,
     "gap": 6
   },
   "workspaces": {

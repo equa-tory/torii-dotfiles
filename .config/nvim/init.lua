@@ -27,6 +27,7 @@ o.set("n", "<C-/>", "gcc", { remap = true })
 o.set("x", "<C-/>", "gc", { remap = true })
 o.set("n", "<leader>/", "gcc", { remap = true, desc = "Comment line" })
 o.set("x", "<leader>/", "gc", { remap = true, desc = "Comment selection" })
+o.set({ "n", "x" }, ";", ":", { desc = "Command line without Shift" })
 o.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 o.set("n", "U", "<C-r>", { desc = "Redo" })
 
@@ -37,6 +38,44 @@ o.set("n", "<leader>?", function()
   })
 end, { desc = "Cheatsheets" })
 
+-- Leaving a file you only touched (a space typed and deleted again) is not an unsaved change:
+-- when the text equals the file on disk, drop the modified flag before :q checks it.
+vim.api.nvim_create_autocmd("QuitPre", {
+  callback = function()
+    local buf = vim.api.nvim_get_current_buf()
+    local name = vim.api.nvim_buf_get_name(buf)
+    if not vim.bo[buf].modified or vim.bo[buf].buftype ~= "" or name == "" or vim.fn.filereadable(name) == 0 then return end
+    local disk = vim.fn.readfile(name)
+    local text = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    if table.concat(disk, "\n") == table.concat(text, "\n") then
+      vim.bo[buf].modified = false
+    end
+  end,
+})
+
+-- html: a line with only "!" becomes the default page template
+local html_template = {
+  "<!DOCTYPE html>",
+  '<html lang="en">',
+  "<head>",
+  '  <meta charset="UTF-8">',
+  '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+  "  <title></title>",
+  "</head>",
+  "<body>",
+  "  ",
+  "</body>",
+  "</html>",
+}
+vim.api.nvim_create_autocmd("TextChangedI", {
+  pattern = { "*.html", "*.htm" },
+  callback = function()
+    local row = vim.api.nvim_win_get_cursor(0)[1]
+    if vim.api.nvim_get_current_line() ~= "!" then return end
+    vim.api.nvim_buf_set_lines(0, row - 1, row, false, html_template)
+    vim.api.nvim_win_set_cursor(0, { row + 8, 2 })      -- inside <body>
+  end,
+})
 
 -- Bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
