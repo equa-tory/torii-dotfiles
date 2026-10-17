@@ -102,7 +102,6 @@ vdirsyncer
 
 # apps
 telegram-desktop
-discord
 obsidian
 gdu
 pacman-contrib
