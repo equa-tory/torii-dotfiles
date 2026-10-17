@@ -3,7 +3,23 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-echo "==> Setting up torii-dotfiles"
+PROFILE=""
+if [ "${1:-}" = "--profile" ]; then PROFILE="${2:?terminal|desktop}"; fi
+if [ -z "$PROFILE" ]; then
+  if [ "$(uname)" = Darwin ]; then PROFILE=terminal
+  elif [ -f /etc/arch-release ]; then PROFILE=desktop
+  else PROFILE=terminal; fi
+fi
+
+echo "==> Setting up torii-dotfiles ($PROFILE profile)"
+
+if [ "$PROFILE" = terminal ]; then
+  # macOS / Ubuntu server: zsh, p10k, aliases, tmux, nvim only
+  bash packages/terminal.sh
+  bash packages/link.sh terminal
+  echo "==> Setup complete (existing files were moved to ~/.local/state/torii/backup, restore: packages/link.sh --restore <stamp>)"
+  exit 0
+fi
 
 sudo sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 sudo pacman -Syu
@@ -16,15 +32,8 @@ fi
 echo "==> Installing powerlevel10k"
 [ -d ~/.local/share/powerlevel10k ] || git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.local/share/powerlevel10k
 
-echo "==> Backing up existing configs"
-for p in ~/.zprofile ~/.config/hypr ~/.config/kitty ~/.config/nvim ~/.config/tmux ~/.config/waybar ~/.config/dotfiles ~/.config/torii ~/.config/quickshell ~/.config/uwsm ~/.zshrc ~/.p10k.zsh; do
-  if [ -e "$p" ] && [ ! -L "$p" ]; then mv "$p" "$p.bak-$(date +%s)"; fi
-done
-
-echo "==> Linking dotfiles"
-# real parent dirs first, otherwise stow folds all of ~/.config into this repo (and apps would write into it)
-mkdir -p ~/.config ~/.config/autostart ~/.local/share ~/.local/state
-stow .
+echo "==> Linking dotfiles (anything in the way is moved to ~/.local/state/torii/backup first)"
+bash packages/link.sh desktop
 
 echo "==> Torii shell (wallpapers, theme, services)"
 bash packages/torii-setup.sh

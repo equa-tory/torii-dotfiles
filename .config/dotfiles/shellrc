@@ -83,7 +83,7 @@ alias h='history -10'
 alias x='exit'
 alias q='exit'
 alias a='alias | grep'
-alias w='watch -n 1'
+command -v watch >/dev/null 2>&1 && alias w='watch -n 1'
 
 unalias r 2>/dev/null
 r() {
@@ -98,7 +98,11 @@ r() {
 # LS & DIRECTORY
 # ==============================
 alias l='ls'
-alias ll='eza -lah --group-directories-first --sort=modified'
+if command -v eza >/dev/null 2>&1; then
+  alias ll='eza -lah --group-directories-first --sort=modified'
+else
+  alias ll='ls -lah'
+fi
 alias la='ls -a'
 alias md='mdd'
 alias desk='cd ~/Desktop'
@@ -112,7 +116,7 @@ alias s='sudo '
 alias sc='screen'
 alias scl='screen -list'
 alias ff='clear; fastfetch -c ~/.local/state/torii/theme/fastfetch.jsonc 2>/dev/null || fastfetch'
-alias smi='nvidia-smi'
+command -v nvidia-smi >/dev/null 2>&1 && alias smi='nvidia-smi'
 alias g='rg'
 if command -v fd >/dev/null 2>&1; then
   alias f='fd'
@@ -160,5 +164,7 @@ export PATH="$HOME/.local/bin:$HOME/.config/torii/bin:$PATH"
 
 c
 
-eval "$(zoxide init "${SHELL##*/}" --cmd cd)"
-source <(fzf --zsh)
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init "${SHELL##*/}" --cmd cd)"
+if [ -n "$ZSH_VERSION" ] && command -v fzf >/dev/null 2>&1; then
+  source <(fzf --zsh 2>/dev/null) 2>/dev/null
+fi
