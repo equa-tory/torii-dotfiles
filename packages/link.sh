@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # link.sh desktop|terminal      link the dotfiles into $HOME, moving whatever is in the way to a backup first
+# link.sh paths <path>...       link just these paths (relative to $HOME, e.g. .config/nvim .zshrc); the installer uses this
 # link.sh --restore <stamp>     put a backup back (stamps: ls ~/.local/state/torii/backup)
 #
 # desktop   the whole repo through stow (Arch + Hyprland)
@@ -27,9 +28,9 @@ is_ours() {  # a symlink that points into this repo
   return 1
 }
 
-link_terminal() {
+link_paths() {
   local rel
-  for rel in "${TERMINAL_PATHS[@]}"; do
+  for rel in "$@"; do
     [ -e "$REPO/$rel" ] || continue
     if is_ours "$HOME/$rel"; then continue; fi
     if [ -e "$HOME/$rel" ] || [ -L "$HOME/$rel" ]; then backup "$rel"; fi
@@ -38,6 +39,8 @@ link_terminal() {
     echo "    linked ~/$rel"
   done
 }
+
+link_terminal() { link_paths "${TERMINAL_PATHS[@]}"; }
 
 link_desktop() {
   command -v stow >/dev/null || { echo "!!  stow is missing"; exit 1; }
@@ -74,6 +77,7 @@ restore() {
 case "${1:-}" in
   desktop)    link_desktop ;;
   terminal)   link_terminal ;;
+  paths)      shift; link_paths "$@" ;;
   --restore)  restore "${2:?stamp}" ;;
   *) sed -n '2,9p' "$0"; exit 2 ;;
 esac

@@ -192,13 +192,21 @@ file or set it to `false` to reset). Lists scroll smoothly and keep a row of mar
 fractional logical size, so the slider snaps to the nearest factor the resolution allows (1920x1080: 0.5 … 1.25, 1.5, 2; the VM's 1896x1003 only 1).
 Choices are kept in `~/.local/state/torii/hypr-user.json` and replayed at every start by `hypr-user.lua`.
 
+**Launcher extras:** type a sum (`2+2`, `sqrt(16)*3`, `2^10`, `sin(pi/2)`) and the first row is the result, Enter copies it. Quicklinks without an
+`icon` use the site's own icon (fetched once by `torii-favicon` into `~/.cache/torii/favicons`). A search that matches nothing goes to DuckDuckGo (`ddg`).
+**Calendar:** Tab in the calendar walks into the day's events, `d` or Delete removes the chosen one (also on iCloud); Setup › Calendar sync has
+the automatic sync switch and how often it runs (1, 5, 15, 30, 60 minutes). **Night light:** Setup › Night light › Dimming sets how much darker the
+screen filter makes the screen (0 = only the colour changes).
+
 **Windows** (Alt+Tab, Alt+Shift+N, Setup › Windows):
 - *Alt+Tab* shows a card with a live picture per open window, most recently used first. Tab / Shift+Tab / Alt+Left / Alt+Right move,
   letting go of Alt focuses the selected window (switching workspace, or bringing back a minimised one), **Alt+Q** closes the *selected*
   window, Esc cancels. It works the same with tiled and floating windows.
+- *Alt+H* minimises the window (it stays in Alt+Tab). A quick Alt+Tab tap switches at once; the menu only opens if Alt is held.
 - *Alt+Shift+N* switches the whole desktop between tiled and floating. Floating windows get a title bar (hyprbars plugin) with
   close / minimise / maximise (drag the bar to move, double-click to maximise); tiled windows have none. Each window remembers its
-  floating size and place, also across the switch (animated), and the mode survives a restart. Windows that were floating on
+  floating size and place, also across the switch (animated), and the mode survives a restart. In float mode Alt+Shift+Left/Right snap a window to half of the screen (still floating), Alt+Shift+Up fills the work area (inside the gaps, below the title bar),
+  Alt+Shift+Down gives the old place back. Windows that were floating on
   their own (dialogs, app rules) stay floating in tiled mode. Setup › Windows has the same switch, the bar height and which side
   the buttons are on (left: close, minimise, maximise like macOS; right: minimise, maximise, close like Windows).
 - The plugin is loaded by `torii-bars-setup` (Hyprland reloads its config whenever a plugin is loaded, so the newest run wins and
