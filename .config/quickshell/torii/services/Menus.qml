@@ -586,7 +586,14 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+    }
+
+    function calendarSetupMenu() {
+        return { id: "calsetup", name: "Calendar sync", glyph: Icons.calendar, sub: "iCloud (two-way), every 15 minutes", keywords: "icloud apple caldav events", children: () => [
+            { id: "connect", name: "Connect iCloud…", sub: "Apple ID + app-specific password, in a terminal", glyph: Icons.calendar,
+              run: () => floatTerm("iCloud", [bin("torii-install"), "calendar"]) },
+            { id: "sync", name: "Sync now", glyph: Icons.refresh, keep: true, run: () => { sh([bin("torii-calendar"), "sync"]); say("Syncing the calendar"); } } ] };
     }
 
     // look: bar size, monitor scale, window transparency and blur

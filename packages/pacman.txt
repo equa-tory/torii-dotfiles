@@ -99,4 +99,3 @@ curl
 
 # calendar sync (iCloud over CalDAV)
 vdirsyncer
-python-icalendar

@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""torii-calendar status | sync | calendars | month YYYY-MM | add <title> <YYYY-MM-DD> [HH:MM] [minutes] [calendar]
+
+The calendar behind the notch clock. Events are plain .ics files in ~/.local/share/torii/calendars/<calendar>/ that
+vdirsyncer keeps in step with iCloud (set up by packages/calendar.sh); without it the folder simply stays local.
+
+  month 2026-10   JSON {"days": {"2026-10-17": [{"title", "start", "end", "allDay", "cal"}]}}, recurring events expanded
+  add             writes an event and pushes it (a day without time is an all-day event)
+  sync            vdirsyncer sync (does nothing when it is not set up)
+"""
+import calendar as pycal
+import json
+import os
+import re
+import subprocess
+import sys
+import uuid
+from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+ROOT = Path(os.environ.get("TORII_CALENDARS", Path.home() / ".local/share/torii/calendars"))
+VDIR_CONF = Path.home() / ".config/vdirsyncer/config"
+DAYS = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
+
+
+def unfold(text):
+    out = []
+    for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if line[:1] in (" ", "\t") and out:
+            out[-1] += line[1:]
+        else:
+            out.append(line)
+    return out
+
+
+def unescape(v):
+    return v.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
+
+
+def parse_dt(value, params):
+    """-> (datetime in local time or date, allDay)"""
+    value = value.strip()
+    if params.get("VALUE") == "DATE" or len(value) == 8:
+        return datetime.strptime(value[:8], "%Y%m%d").date(), True
+    dt = datetime.strptime(value.rstrip("Z")[:15], "%Y%m%dT%H%M%S")
+    if value.endswith("Z"):
+        dt = dt.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
+    elif "TZID" in params:
+        try:
+            dt = dt.replace(tzinfo=ZoneInfo(params["TZID"])).astimezone().replace(tzinfo=None)
+        except Exception:
+            pass
+    return dt, False
+
+
+def parse_events(text, cal):
+    events, cur = [], None
+    for line in unfold(text):
+        if line == "BEGIN:VEVENT":
+            cur = {"cal": cal, "exdate": [], "rrule": None}
+        elif line == "END:VEVENT" and cur is not None:
+            if "dtstart" in cur:
+                events.append(cur)
+            cur = None
+        elif cur is not None and ":" in line:
+            head, _, value = line.partition(":")
+            name, *plist = head.split(";")
+            params = dict(p.split("=", 1) for p in plist if "=" in p)
+            name = name.upper()
+            try:
+                if name == "SUMMARY":
+                    cur["title"] = unescape(value)
+                elif name == "UID":
+                    cur["uid"] = value
+                elif name == "DTSTART":
+                    cur["dtstart"], cur["allDay"] = parse_dt(value, params)
+                elif name == "DTEND":
+                    cur["dtend"], _ = parse_dt(value, params)
+                elif name == "DURATION":
+                    m = re.match(r"P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?", value)
+                    if m:
+                        w, d, h, mi = (int(x or 0) for x in m.groups())
+                        cur["duration"] = timedelta(weeks=w, days=d, hours=h, minutes=mi)
+                elif name == "RRULE":
+                    cur["rrule"] = dict(p.split("=", 1) for p in value.split(";") if "=" in p)
+                elif name == "EXDATE":
+                    for v in value.split(","):
+                        d, _ = parse_dt(v, params)
+                        cur["exdate"].append(d.date() if isinstance(d, datetime) else d)
+                elif name == "RECURRENCE-ID":
+                    d, _ = parse_dt(value, params)
+                    cur["recid"] = d.date() if isinstance(d, datetime) else d
+            except ValueError:
+                pass
+    return events
+
+
+def add_months(d, n):
+    m = d.month - 1 + n
+    y, m = d.year + m // 12, m % 12 + 1
+    return d.replace(year=y, month=m, day=min(d.day, pycal.monthrange(y, m)[1]))
+
+
+def occurrences(ev, lo, hi):
+    """start dates (date objects) of an event inside [lo, hi)"""
+    start = ev["dtstart"]
+    first = start.date() if isinstance(start, datetime) else start
+    r = ev["rrule"]
+    if not r:
+        return [first] if lo <= first < hi else []
+    freq, step = r.get("FREQ", ""), max(1, int(r.get("INTERVAL", 1)))
+    count = int(r["COUNT"]) if "COUNT" in r else None
+    until = None
+    if "UNTIL" in r:
+        u, _ = parse_dt(r["UNTIL"], {})
+        until = u.date() if isinstance(u, datetime) else u
+    byday = [DAYS.index(x[-2:]) for x in r.get("BYDAY", "").split(",") if x[-2:] in DAYS]
+    out, n, i = [], 0, 0
+    while i < 6000:
+        if freq == "DAILY":
+            cands = [first + timedelta(days=i * step)]
+        elif freq == "WEEKLY":
+            week0 = first - timedelta(days=first.weekday()) + timedelta(weeks=i * step)
+            cands = [week0 + timedelta(days=d) for d in sorted(byday or [first.weekday()])]
+        elif freq == "MONTHLY":
+            cands = [add_months(first, i * step)]
+        elif freq == "YEARLY":
+            cands = [add_months(first, 12 * i * step)]
+        else:
+            return [first] if lo <= first < hi else []
+        i += 1
+        for c in cands:
+            if c < first:
+                continue
+            if (until and c > until) or (count is not None and n >= count):
+                return out
+            n += 1
+            if lo <= c < hi and c not in ev["exdate"]:
+                out.append(c)
+        if cands[0] >= hi:
+            break
+    return out
+
+
+def fmt(t):
+    return t.strftime("%H:%M") if isinstance(t, datetime) else ""
+
+
+def month(ym):
+    y, m = (int(x) for x in ym.split("-"))
+    lo = date(y, m, 1)
+    hi = date(y + (m == 12), m % 12 + 1, 1)
+    days = {}
+    events = []
+    if ROOT.is_dir():
+        for f in sorted(ROOT.rglob("*.ics")):
+            cal = f.parent.name if f.parent != ROOT else "local"
+            try:
+                events += parse_events(f.read_text(errors="replace"), cal)
+            except OSError:
+                pass
+    moved = {(e.get("uid"), e["recid"]) for e in events if "recid" in e}
+    for ev in events:
+        if "recid" not in ev and ev["rrule"] and any(ev.get("uid") == u and d in occurrences(ev, lo, hi) for u, d in moved):
+            ev["exdate"] += [d for u, d in moved if u == ev.get("uid")]
+        start = ev["dtstart"]
+        allday = ev.get("allDay", False)
+        if "dtend" in ev:
+            length = ev["dtend"] - start
+        else:
+            length = ev.get("duration", timedelta(days=1) if allday else timedelta())
+        for d in occurrences(ev, lo - timedelta(days=40), hi):
+            span = max(1, (length.days if allday else 0) or 1) if allday else 1
+            for k in range(span):
+                day = d + timedelta(days=k)
+                if not lo <= day < hi:
+                    continue
+                end = ""
+                if not allday:
+                    end = fmt(datetime.combine(d, start.time()) + length)
+                days.setdefault(day.isoformat(), []).append({
+                    "title": ev.get("title", "(no title)"), "start": "" if allday else fmt(start), "end": end,
+                    "allDay": bool(allday), "cal": ev["cal"]})
+    for v in days.values():
+        v.sort(key=lambda e: (e["start"] != "", e["start"]))
+    return {"days": days}
+
+
+def calendars():
+    out = []
+    if ROOT.is_dir():
+        for d in sorted(p for p in ROOT.iterdir() if p.is_dir()):
+            name = d / "displayname"
+            out.append({"id": d.name, "name": name.read_text().strip() if name.exists() else d.name})
+    return out
+
+
+def configured():
+    return VDIR_CONF.exists()
+
+
+def sync():
+    if not configured():
+        return 0
+    return subprocess.run(["vdirsyncer", "sync"], capture_output=True).returncode
+
+
+def esc(s):
+    return s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def add(title, day, at=None, minutes=60, cal=None):
+    d = datetime.strptime(day, "%Y-%m-%d").date()
+    cals = calendars()
+    target = next((c["id"] for c in cals if cal in (c["id"], c["name"])), None) or (cals[0]["id"] if cals else "local")
+    folder = ROOT / target
+    folder.mkdir(parents=True, exist_ok=True)
+    uid = f"{uuid.uuid4()}@torii"
+    now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//torii//calendar//EN", "BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{now}",
+             f"SUMMARY:{esc(title)}"]
+    if at:
+        t = datetime.strptime(at, "%H:%M").time()
+        start = datetime.combine(d, t).astimezone()
+        end = start + timedelta(minutes=int(minutes))
+        lines += [f"DTSTART:{start.astimezone(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+                  f"DTEND:{end.astimezone(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"]
+    else:
+        lines += [f"DTSTART;VALUE=DATE:{d.strftime('%Y%m%d')}", f"DTEND;VALUE=DATE:{(d + timedelta(days=1)).strftime('%Y%m%d')}"]
+    lines += ["END:VEVENT", "END:VCALENDAR"]
+    (folder / f"{uid}.ics").write_text("\r\n".join(lines) + "\r\n")
+    sync()
+    return uid
+
+
+def main(a):
+    if a[:1] == ["status"]:
+        print(json.dumps({"configured": configured(), "calendars": calendars()}))
+    elif a[:1] == ["sync"]:
+        sys.exit(sync())
+    elif a[:1] == ["calendars"]:
+        print(json.dumps(calendars()))
+    elif a[:1] == ["month"] and len(a) == 2 and re.fullmatch(r"\d{4}-\d{2}", a[1]):
+        print(json.dumps(month(a[1])))
+    elif a[:1] == ["add"] and len(a) >= 3:
+        at = a[3] if len(a) > 3 and ":" in a[3] else None
+        rest = a[4 if at else 3:]
+        minutes = rest[0] if rest and rest[0].isdigit() else 60
+        cal = rest[1] if len(rest) > 1 else (rest[0] if rest and not rest[0].isdigit() else None)
+        print(add(a[1], a[2], at, minutes, cal))
+    else:
+        print(__doc__)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

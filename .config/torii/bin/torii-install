@@ -57,6 +57,9 @@ case "${1:-}" in
       else sudo pacman -Rns "$p" && { del_line "$PAC" "$p"; del_line "$AUR" "$p"; }; fi
     done
     pause ;;
+  calendar)
+    say "Connect iCloud"
+    bash "$REPO/packages/calendar.sh"; pause ;;
   update)
     say "Updating the system"
     if command -v yay >/dev/null; then yay -Syu; else sudo pacman -Syu; fi
