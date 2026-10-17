@@ -4,6 +4,7 @@ import qs.widgets
 import "../widgets/fuzzy.js" as Fuzzy
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Networking
 import QtQuick
 
@@ -263,17 +264,9 @@ Singleton {
         return { id: "rules", name: "App rules", glyph: Icons.apps, keywords: "window workspace float background open rule deadlock steam",
                  sub: rules.length ? rules.length + " app" + (rules.length > 1 ? "s" : "") : "Workspace, background or floating per app",
                  onOpen: () => fRules.refresh(),
-                 children: () => [
-            { id: "add", name: "Add an app", glyph: Icons.plus, sub: "Pick a window that is open, or an installed app", onOpen: () => fWins.refresh(),
-              children: () => [
-                { id: "open", name: "Open windows", glyph: Icons.monitor, sub: "The easiest way: open the app first", sorted: true, onOpen: () => fWins.refresh(),
-                  children: () => (fWins.data || []).map(w => pick(w.class, w.title && w.title.length < 40 ? w.title + "  ·  " + w.class : w.class)) },
-                { id: "installed", name: "Installed apps", glyph: Icons.apps, sorted: true,
-                  children: () => Apps.items().filter(a => a.kind === "app" || (a.exec && /--class\s+\S+/.test(a.exec)))
-                      .map(a => a.kind === "app" ? pick(a.wm || a.id, a.name) : pick(/--class\s+(\S+)/.exec(a.exec)[1], a.name)) },
-                { id: "typed", name: "Type a window class…", glyph: Icons.keyboard2, keep: true,
-                  run: () => ask("Window class (hyprctl clients shows it)", false, c => { if (c.trim()) rule(["set", c.trim(), "name", c.trim()]); }) } ] } ].concat(
-                rules.map(r => ({ id: "r:" + r.class, name: r.name || r.class, sub: ruleSummary(r), glyph: Icons.apps, sorted: true,
+                 children: () => {
+            const ws = Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 1;
+            const ruleNode = r => ({ id: "r:" + r.class, name: r.name || r.class, sub: ruleSummary(r), glyph: Icons.apps, sorted: true,
                     badge: r.workspace ? String(r.workspace) : "",
                     children: () => [
                     { id: "ws", name: "Workspace", glyph: Icons.monitor, badge: r.workspace ? String(r.workspace) : "None", children: () =>
@@ -289,7 +282,33 @@ Singleton {
                       run: () => rule(["set", r.class, "remember", r.remember ? "false" : "true"]) },
                     { id: "autostart", name: "Start at login", sub: "Opens with the session, on the workspace chosen above", badge: r.autostart ? "On" : "Off", keep: true,
                       run: () => rule(["set", r.class, "autostart", r.autostart ? "false" : "true"]) },
-                    { id: "remove", name: "Remove rule", glyph: Icons.trash, sub: r.class, run: () => rule(["remove", r.class]) } ] }))) };
+                    { id: "remove", name: "Remove rule", glyph: Icons.trash, sub: r.class, run: () => rule(["remove", r.class]) } ] });
+            const addNode = { id: "add", name: "Add an app", glyph: Icons.plus, sub: "Pick a window that is open, or an installed app", onOpen: () => fWins.refresh(),
+              children: () => [
+                { id: "open", name: "Open windows", glyph: Icons.monitor, sub: "The easiest way: open the app first", sorted: true, onOpen: () => fWins.refresh(),
+                  children: () => (fWins.data || []).map(w => pick(w.class, w.title && w.title.length < 40 ? w.title + "  ·  " + w.class : w.class)) },
+                { id: "installed", name: "Installed apps", glyph: Icons.apps, sorted: true,
+                  children: () => Apps.items().filter(a => a.kind === "app" || (a.exec && /--class\s+\S+/.test(a.exec)))
+                      .map(a => a.kind === "app" ? pick(a.wm || a.id, a.name) : pick(/--class\s+(\S+)/.exec(a.exec)[1], a.name)) },
+                { id: "typed", name: "Type a window class…", glyph: Icons.keyboard2, keep: true,
+                  run: () => ask("Window class (hyprctl clients shows it)", false, c => { if (c.trim()) rule(["set", c.trim(), "name", c.trim()]); }) } ] };
+            const out = [addNode,
+                { id: "capture", name: "Capture workspace " + ws, glyph: Icons.camera, keep: true,
+                  sub: "Every app on this workspace: where it is, floating, place and size, background, start at login. Arrange it first",
+                  run: () => { rule(["snapshot-workspace", String(ws)]); say("Saved workspace " + ws); } }];
+            const groups = {};
+            for (const r of rules) (groups[r.workspace ? String(r.workspace) : "-"] = groups[r.workspace ? String(r.workspace) : "-"] || []).push(r);
+            const keys = Object.keys(groups).sort((x, y) => x === "-" ? 1 : y === "-" ? -1 : Number(x) - Number(y));
+            for (const k of keys) {
+                const list = groups[k];
+                out.push({ id: "g:" + k, name: k === "-" ? "Not on a workspace" : "Workspace " + k, glyph: Icons.monitor, badge: String(list.length),
+                           sub: list.map(r => r.name || r.class).join(", "), sorted: false,
+                           children: () => (k === "-" ? [] : [{ id: "cap:" + k, name: "Capture workspace " + k + " again", glyph: Icons.camera, keep: true,
+                               sub: "Open it the way you want it on that workspace first", run: () => { rule(["snapshot-workspace", k]); say("Saved workspace " + k); } }])
+                               .concat(list.map(ruleNode)) });
+            }
+            return out;
+        } };
     }
 
     // ---- sounds: pick the file for reminders and for notifications (it plays as a preview)

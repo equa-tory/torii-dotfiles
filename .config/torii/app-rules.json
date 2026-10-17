@@ -13,8 +13,8 @@
     "class": "torii-app-cliamp",
     "name": "cliamp",
     "workspace": 2,
-    "float": false,
-    "remember": false,
+    "float": true,
+    "remember": true,
     "silent": true,
     "autostart": true,
     "exec": "desktop:torii-app-cliamp.desktop"
@@ -23,8 +23,8 @@
     "class": "torii-app-lava-lamp",
     "name": "Lava lamp",
     "workspace": 2,
-    "float": false,
-    "remember": false,
+    "float": true,
+    "remember": true,
     "silent": true,
     "autostart": true,
     "exec": "desktop:torii-app-lava-lamp.desktop"

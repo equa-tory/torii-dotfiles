@@ -7,6 +7,7 @@ A rule says what happens when a window of an app opens:
   float      true|false           open floating
   remember   true|false           open floating where (and how big) it was last time (implies floating)
   autostart  true|false           start the app when the session starts (needs a desktop entry or a command with that name)
+  snapshot-workspace [N]          do that for every app on workspace N (the current one by default)
   snapshot <class>                take over how the app's window is right now: its workspace, floating or not, place and size
                                   (remembered), opened in the background, and started at login
   name       text                 label shown in the launcher
@@ -104,31 +105,30 @@ def start_command(cls):
     return "cmd:" + shutil.which(low) if shutil.which(low) else ""
 
 
-def snapshot(cls):
-    """The app's open window decides: workspace, floating, place and size, background, start at login."""
+def hypr_clients():
     try:
-        clients = json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=3).stdout)
+        return json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=3).stdout)
     except (OSError, ValueError, subprocess.SubprocessError):
-        clients = []
-    c = next((x for x in clients if x.get("class") == cls and not x["workspace"]["name"].startswith("special")), None) \
-        or next((x for x in clients if x.get("class") == cls), None)
-    if not c:
-        subprocess.run(["notify-send", "-a", "torii", "No window of " + cls, "Open the app and put it where you want it first"], capture_output=True)
-        sys.exit("no open window of " + cls)
-    rules = load(RULES, [])
+        return []
+
+
+def app_label(cls):
+    if cls.startswith("torii-app-"):                 # a terminal app from ~/apps: use its launcher name
+        try:
+            apps = json.loads(subprocess.run([str(HOME / ".config/torii/bin/torii-apps"), "list"], capture_output=True, text=True, timeout=5).stdout)
+            return next((a["name"] for a in apps if "--class " + cls + " " in a["exec"] + " "), cls)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+    return cls
+
+
+def take(rules, c):
+    """Put what the window c looks like into the rule of its class (workspace, floating, place kept, background, start at login)."""
+    cls = c["class"]
     r = next((x for x in rules if x["class"] == cls), None)
     if r is None:
-        label = cls
-        if cls.startswith("torii-app-"):             # a terminal app from ~/apps: use its launcher name
-            try:
-                apps = json.loads(subprocess.run([str(HOME / ".config/torii/bin/torii-apps"), "list"], capture_output=True, text=True, timeout=5).stdout)
-                label = next((a["name"] for a in apps if "--class " + cls + " " in a["exec"] + " "), cls)
-            except (OSError, ValueError, subprocess.SubprocessError):
-                pass
-        r = {"class": cls, "name": label}
+        r = {"class": cls, "name": app_label(cls)}
         rules.append(r)
-    elif r.get("name") == cls and cls.startswith("torii-app-"):
-        pass
     ws = c["workspace"]["id"]
     if ws > 0:
         r["workspace"] = ws
@@ -138,12 +138,57 @@ def snapshot(cls):
     cmd = start_command(cls)
     if cmd:
         r["autostart"], r["exec"] = True, cmd
+    return r, bool(cmd)
+
+
+def finish(rules, classes):
     write(RULES, json.dumps(rules, indent=2, ensure_ascii=False) + "\n")
     apply()
-    if c.get("floating") and not os.environ.get("TORII_NO_HOOKS"):
-        subprocess.run(["hyprctl", "eval", 'torii_remember_class_now(%s)' % lstr(cls)], capture_output=True)
-    summary = ["workspace %s" % r.get("workspace", "-"), "floating" if r["float"] else "tiled", "background", "starts at login" if cmd else "no way found to start it"]
+    if not os.environ.get("TORII_NO_HOOKS"):
+        for cls in classes:
+            subprocess.run(["hyprctl", "eval", 'torii_remember_class_now(%s)' % lstr(cls)], capture_output=True)
+
+
+def snapshot(cls):
+    """The app's open window decides: workspace, floating, place and size, background, start at login."""
+    clients = hypr_clients()
+    c = next((x for x in clients if x.get("class") == cls and not x["workspace"]["name"].startswith("special")), None) \
+        or next((x for x in clients if x.get("class") == cls), None)
+    if not c:
+        subprocess.run(["notify-send", "-a", "torii", "No window of " + cls, "Open the app and put it where you want it first"], capture_output=True)
+        sys.exit("no open window of " + cls)
+    rules = load(RULES, [])
+    r, startable = take(rules, c)
+    finish(rules, [cls] if c.get("floating") else [])
+    summary = ["workspace %s" % r.get("workspace", "-"), "floating" if r["float"] else "tiled", "background", "starts at login" if startable else "no way found to start it"]
     subprocess.run(["notify-send", "-a", "torii", "Saved how %s is now" % r.get("name", cls), ", ".join(summary)], capture_output=True)
+
+
+def snapshot_workspace(ws=None):
+    """Every app on a workspace (the current one by default): how the workspace looks now is how login will build it."""
+    if ws is None:
+        try:
+            ws = json.loads(subprocess.run(["hyprctl", "activeworkspace", "-j"], capture_output=True, text=True, timeout=3).stdout)["id"]
+        except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+            sys.exit("no active workspace")
+    seen, wins = set(), []
+    for c in hypr_clients():
+        cls = c.get("class") or ""
+        if c["workspace"]["id"] == ws and cls and cls not in seen and (not cls.startswith("torii-") or cls.startswith("torii-app-")):
+            seen.add(cls)
+            wins.append(c)
+    if not wins:
+        subprocess.run(["notify-send", "-a", "torii", "Workspace %s is empty" % ws, "Open and arrange the apps first"], capture_output=True)
+        sys.exit("empty workspace")
+    rules = load(RULES, [])
+    names, floating = [], []
+    for c in wins:
+        r, _ = take(rules, c)
+        names.append(r.get("name", c["class"]))
+        if c.get("floating"):
+            floating.append(c["class"])
+    finish(rules, floating)
+    subprocess.run(["notify-send", "-a", "torii", "Saved workspace %s" % ws, ", ".join(names) + ": they will open like this at login"], capture_output=True)
 
 
 def autostart():
@@ -190,6 +235,9 @@ def main(a):
         return
     if len(a) == 2 and a[0] == "snapshot":
         snapshot(a[1])
+        return
+    if a[:1] == ["snapshot-workspace"] and len(a) <= 2:
+        snapshot_workspace(int(a[1]) if len(a) == 2 and a[1].isdigit() else None)
         return
     if len(a) == 4 and a[0] == "set":
         cls, key, val = a[1], a[2], a[3]
