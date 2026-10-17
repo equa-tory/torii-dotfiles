@@ -66,6 +66,18 @@ Item {
 
     // rebuild the list; keepSel keeps the highlighted row when only the data changed
     // while a slider is being dragged the rows must not be rebuilt (the mouse grab would be lost)
+    // the mouse only counts after it really moved (a cursor resting under a fresh or scrolling list does nothing),
+    // and not any more after the next key press
+    property bool mouseLive: false
+    property real lastMx: -1
+    property real lastMy: -1
+    function mouseMoved(item, x, y) {
+        const p = item.mapToItem(root, x, y);
+        if (lastMx < 0) { lastMx = p.x; lastMy = p.y; return mouseLive; }
+        if (Math.abs(p.x - lastMx) + Math.abs(p.y - lastMy) >= 3) { mouseLive = true; lastMx = p.x; lastMy = p.y; }
+        return mouseLive;
+    }
+
     property bool dragging: false
     property bool dirty: false
     onDraggingChanged: if (!dragging && dirty) { dirty = false; update(true); }
@@ -138,12 +150,14 @@ Item {
 
     // ---- actions
     function move(d) {
+        mouseLive = false;
         if (results.length === 0) return;
         selected = Math.max(0, Math.min(results.length - 1, selected + d));      // no wrapping: the ends are the ends
         ensureVisible(false);
         remember();
     }
     function jump(to) {
+        mouseLive = false;
         if (results.length === 0) return;
         selected = Math.max(0, Math.min(results.length - 1, to));
         ensureVisible(false);
@@ -258,7 +272,7 @@ Item {
                 selectedTextColor: Theme.accentFg
                 echoMode: Menus.prompt !== null && Menus.prompt.secret ? TextInput.Password : TextInput.Normal
                 clip: true
-                onTextChanged: { if (!root.asking) { root.update(false); } }
+                onTextChanged: { root.mouseLive = false; if (!root.asking) { root.update(false); } }
 
                 Keys.onDownPressed: event => {
                     if (root.asking) return;
@@ -295,6 +309,7 @@ Item {
                     else Panels.close();
                 }
                 Keys.onPressed: event => {
+                    root.mouseLive = false;
                     if (root.showList && !root.asking) {
                         if (event.key === Qt.Key_PageDown) { root.jump(root.selected + (root.gridMode ? root.cols * root.gridRows : root.maxRows - 1)); event.accepted = true; return; }
                         if (event.key === Qt.Key_PageUp) { root.jump(root.selected - (root.gridMode ? root.cols * root.gridRows : root.maxRows - 1)); event.accepted = true; return; }
@@ -405,7 +420,7 @@ Item {
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: true
-                onPositionChanged: root.selected = index
+                onPositionChanged: mouse => { if (root.mouseMoved(this, mouse.x, mouse.y)) root.selected = index; }
                 onClicked: { root.selected = index; root.activate(false); }
             }
         }
@@ -556,7 +571,7 @@ Item {
                 onCanceled: root.dragging = false
                 onPositionChanged: mouse => {
                     if (pressed && row.node.slider) drag(mouse.x);
-                    else if (root.selected !== row.index) { root.selected = row.index; root.remember(); }
+                    else if (root.mouseMoved(rowMouse, mouse.x, mouse.y) && root.selected !== row.index) { root.selected = row.index; root.remember(); }
                 }
                 onClicked: { root.selected = row.index; if (!row.node.slider) root.activate(false); }
             }
