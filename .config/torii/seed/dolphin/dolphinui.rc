@@ -1,0 +1,10 @@
+<!DOCTYPE gui SYSTEM "kpartgui.dtd">
+<gui name="dolphin" version="9999">
+ <ToolBar name="mainToolBar" noMerge="1">
+  <Action name="go_back"/>
+  <Action name="go_forward"/>
+  <Action name="go_up"/>
+  <Separator/>
+  <Action name="hamburger_menu"/>
+ </ToolBar>
+</gui>

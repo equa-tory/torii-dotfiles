@@ -9,6 +9,7 @@ ShowFullPath=false
 ShowFullPathInTitlebar=false
 ShowToolTips=false
 SplitView=false
+ShowStatusBar=false
 
 [MainWindow]
 MenuBar=Disabled
@@ -26,3 +27,6 @@ PreviewSize=64
 
 [DetailsMode]
 PreviewSize=22
+
+[Toolbar mainToolBar]
+ToolButtonStyle=IconOnly

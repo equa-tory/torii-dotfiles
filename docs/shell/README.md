@@ -227,3 +227,9 @@ that are open right now (open the app first: its window class is what a rule mat
 class. Changes are applied to the running Hyprland at once and again at every start (`hypr-rules.lua`, loaded by `hyprland.lua`).
 
 **Language**: the keyboard layout (EN / RU) is always shown left of the workspaces; click it to switch (`hyprctl switchxkblayout all next`).
+
+**Dolphin** (the default file manager, `packages/dolphin.sh` seeds it once and never overwrites your changes; `--reset` restores the shipped
+look): opens in Downloads, sidebar with Desktop / Documents / Downloads / Pictures / Videos / Root / Network and your drives under Devices
+(the Recent, Search and Tags groups are hidden), toolbar with Back / Forward / Up / menu only. Its colours come from the wallpaper theme:
+`torii-theme` writes `kdeglobals` and `torii.colors` (KDE apps ignore qt6ct for colours) and links them into `~/.config` and
+`~/.local/share/color-schemes`; the icon set follows dark/light.

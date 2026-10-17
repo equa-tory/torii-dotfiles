@@ -189,6 +189,7 @@ def build_tokens(accent_src, tint, accent_override=None, mode="dark", others=Non
         "browser": oklch_to_hex(0.16 if dark else 0.95, 0.008 + tint * 0.01, aH),
         "mode": "dark" if dark else "light",
         "gtkTheme": "adw-gtk3-dark" if dark else "adw-gtk3",
+        "iconTheme": "breeze-dark" if dark else "breeze",
         "catppuccin": "mocha" if dark else "latte",
     })
     return t
@@ -288,6 +289,8 @@ def fmt(value, how):
     rgb = [round(c * 255) for c in hex_to_rgb(value)]
     if how == "rgb":
         return ", ".join(map(str, rgb))
+    if how == "kde":                      # KDE colour settings: r,g,b
+        return ",".join(map(str, rgb))
     if how == "semi":
         return ";".join(map(str, rgb))
     if how == "qt":
@@ -357,6 +360,19 @@ def ensure_gtk_links():
             log(f"gtk.css: {e}")
 
 
+def ensure_kde_link():
+    """KDE apps (Dolphin) take their colours from ~/.config/kdeglobals and the scheme file it names, not from qt6ct:
+    link both to the generated ones (a file of your own is never replaced)."""
+    for link, target in ((HOME / ".config/kdeglobals", THEME_DIR / "kdeglobals"),
+                         (HOME / ".local/share/color-schemes/torii.colors", THEME_DIR / "torii.colors")):
+        try:
+            if not link.exists() and not link.is_symlink():
+                link.parent.mkdir(parents=True, exist_ok=True)
+                link.symlink_to(target)
+        except OSError as e:
+            log(f"{link.name}: {e}")
+
+
 def ensure_qt_conf():
     """qt6ct needs to know where the generated colour scheme lives and which icons to use (breeze or breeze-dark by
     mode). Created once; afterwards only the icon_theme line follows the mode."""
@@ -397,6 +413,7 @@ def run_hooks():
         sh("tmux", "source-file", "-q", str(THEME_DIR / "tmux.conf"))
     ensure_gtk_links()
     ensure_qt_conf()
+    ensure_kde_link()
     if os.environ.get("DBUS_SESSION_BUS_ADDRESS") or os.environ.get("XDG_RUNTIME_DIR"):
         tk = json.loads((THEME_DIR / "tokens.json").read_text())
         sh("gsettings", "set", "org.gnome.desktop.interface", "color-scheme",
