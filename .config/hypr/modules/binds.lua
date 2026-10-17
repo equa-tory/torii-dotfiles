@@ -105,7 +105,10 @@ for _, key in ipairs({ "C", "V", "X", "Z", "A" }) do
             if key ~= "C" and key ~= "V" then return end
             mods = "CTRL SHIFT"
         end
-        hl.dispatch(hl.dsp.send_shortcut({ mods = mods, key = key }))
+        -- press and release in one go: send_shortcut waits for the physical key to come up before it releases, and
+        -- when Alt is let go before the letter the app is left holding it and repeats it ("vvvv")
+        hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "down" }))
+        hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "up" }))
     end)
 end
 
