@@ -1,0 +1,18 @@
+#!/bin/sh
+# Run by hypr/modules/windowbars.lua on every Hyprland config load: load the hyprbars plugin and apply its settings.
+# Loading or unloading a plugin makes Hyprland reload its config, which runs this again, so the newest run wins
+# (older ones see a newer token and stop) and nothing is ever unloaded here. A reload clears the buttons, so one
+# apply per reload never piles them up.
+PLUGIN=/usr/lib/libhyprbars.so
+APPLY="$HOME/.config/hypr/modules/windowbars_apply.lua"
+TOKEN="${XDG_RUNTIME_DIR:-/tmp}/torii-bars-token"
+[ -r "$PLUGIN" ] || exit 0
+me="$$.$(date +%s%N)"
+echo "$me" > "$TOKEN"
+sleep 1.5
+[ "$(cat "$TOKEN" 2>/dev/null)" = "$me" ] || exit 0
+if hyprctl plugin list | grep -q hyprbars; then
+  hyprctl eval "dofile(\"$APPLY\")" >/dev/null
+else
+  hyprctl plugin load "$PLUGIN" >/dev/null
+fi

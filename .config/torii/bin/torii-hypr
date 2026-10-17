@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """torii-hypr layout <dwindle|master|scrolling> | gaps <inner> <outer> | sensitivity <-1..1>
+            | float <toggle|status> | bars height <px> | bars side <left|right>
             | scale <monitor> <factor> | monitors | opacity <0.3..1> | blur <on|off> | blur <size> <passes> <vibrancy> | status | apply
 
 Runtime choices made from the launcher. They are kept in ~/.local/state/torii/hypr-user.json, applied to the running
@@ -7,6 +8,7 @@ Hyprland at once and re-applied at every start through hypr-user.lua (hyprland.l
 """
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -42,6 +44,8 @@ def lua(s):
         "decoration={%s}" % ", ".join(decoration) if decoration else "", inp) if t]
     out = "hl.config({%s})\n" % ", ".join(tables) if tables else ""
     for name, m in s.get("scale", {}).items():
+        if float(m["scale"]) == 1.0:        # the default: no need to modeset the monitor again at every start
+            continue
         out += 'hl.monitor({ output = "%s", mode = "%s", position = "%s", scale = %s })\n' % (name, m["mode"], m["pos"], m["scale"])
     return out or "-- nothing chosen yet\n"
 
@@ -98,15 +102,65 @@ def set_scale(s, name, factor):
     s.setdefault("scale", {})[name] = spec if old is None or old != spec else old
 
 
+FLOAT_LUA, BARS_LUA = STATE / "floatmode.lua", STATE / "bars.lua"
+
+
+def float_mode():
+    try:
+        return "float" if 'mode = "float"' in FLOAT_LUA.read_text() else "tile"
+    except OSError:
+        return "tile"
+
+
+def bars():
+    out = {"height": 28, "side": "right"}
+    try:
+        t = BARS_LUA.read_text()
+        m = re.search(r"height\s*=\s*(\d+)", t)
+        if m:
+            out["height"] = int(m.group(1))
+        if re.search(r'side\s*=\s*"left"', t):
+            out["side"] = "left"
+    except OSError:
+        pass
+    return out
+
+
+def set_bars(key, value):
+    b = bars()
+    b[key] = value
+    STATE.mkdir(parents=True, exist_ok=True)
+    BARS_LUA.write_text('return { height = %d, side = "%s" }\n' % (b["height"], b["side"]))
+    if os.environ.get("TORII_NO_HOOKS"):
+        return
+    if key == "height":
+        subprocess.run(["hyprctl", "eval", "hl.config({ plugin = { hyprbars = { bar_height = %d } } })" % b["height"]], capture_output=True)
+    else:
+        subprocess.run(["hyprctl", "reload"], capture_output=True)      # the buttons are added again on the other side
+
+
 def main(a):
     s = load()
+    if a[:2] == ["float", "toggle"]:
+        subprocess.run(["hyprctl", "eval", "torii_float_toggle()"], capture_output=True)
+        return
+    if a[:2] == ["float", "status"]:
+        print(float_mode())
+        return
+    if a[:2] == ["bars", "height"] and len(a) == 3 and a[2].isdigit():
+        set_bars("height", max(16, min(64, int(a[2]))))
+        return
+    if a[:2] == ["bars", "side"] and len(a) == 3 and a[2] in ("left", "right"):
+        set_bars("side", a[2])
+        return
     if a[:1] == ["monitors"]:
         print(json.dumps([{"name": m["name"], "scale": m["scale"], "w": m["width"], "h": m["height"],
                            "desc": m.get("description", "")} for m in monitors()]))
         return
     if a[:1] == ["status"]:
         cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20, "sens": live_sensitivity(), "opacity": 1.0,
-               "blur": {"enabled": True, "size": 3, "passes": 1, "vibrancy": 0.17}}
+               "blur": {"enabled": True, "size": 3, "passes": 1, "vibrancy": 0.17},
+               "float": float_mode(), "bars": bars()}
         print(json.dumps({**cur, **s}))
         return
     if a[:1] == ["layout"] and len(a) == 2 and a[1] in LAYOUTS:

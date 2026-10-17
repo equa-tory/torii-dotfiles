@@ -586,7 +586,29 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), windowsMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+    }
+
+    // floating mode and the title bars (hyprbars)
+    function windowsMenu() {
+        fHypr.ensure();
+        const d = fHypr.data || {};
+        const bars = d.bars || { height: 28, side: "right" };
+        const floatOn = d.float === "float";
+        const refresh = () => later(fHypr, 700);
+        return { id: "windows", name: "Windows", glyph: Icons.layout, sub: (floatOn ? "Floating" : "Tiled") + "  ·  buttons " + bars.side,
+                 keywords: "float floating tile title bar buttons close minimise maximise", children: () => [
+            { id: "float", name: floatOn ? "Switch to tiled" : "Switch to floating", glyph: Icons.layout, badge: floatOn ? "Floating" : "Tiled", keep: true,
+              sub: "Alt+Shift+N  ·  every window floats with a title bar, and remembers its size and place",
+              run: () => { sh([bin("torii-hypr"), "float", "toggle"]); refresh(); } },
+            { id: "barh", name: "Title bar height", glyph: Icons.tune, sub: "On floating windows",
+              slider: { min: 16, max: 56, step: 1, value: bars.height, unit: " px", decimals: 0 },
+              onSlide: v => sh([bin("torii-hypr"), "bars", "height", String(v)]) },
+            { id: "side", name: "Buttons", glyph: Icons.layout, sub: bars.side === "left" ? "Left (close, minimise, maximise)" : "Right (minimise, maximise, close)", children: () => [
+                { id: "l", name: "Left", sub: "Like macOS: close, minimise, maximise", badge: bars.side === "left" ? "●" : "", keep: true,
+                  run: () => { sh([bin("torii-hypr"), "bars", "side", "left"]); refresh(); } },
+                { id: "r", name: "Right", sub: "Like Windows: minimise, maximise, close", badge: bars.side === "right" ? "●" : "", keep: true,
+                  run: () => { sh([bin("torii-hypr"), "bars", "side", "right"]); refresh(); } } ] } ] };
     }
 
     function calendarSetupMenu() {

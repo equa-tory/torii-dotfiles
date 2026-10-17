@@ -192,6 +192,18 @@ file or set it to `false` to reset). Lists scroll smoothly and keep a row of mar
 fractional logical size, so the slider snaps to the nearest factor the resolution allows (1920x1080: 0.5 … 1.25, 1.5, 2; the VM's 1896x1003 only 1).
 Choices are kept in `~/.local/state/torii/hypr-user.json` and replayed at every start by `hypr-user.lua`.
 
+**Windows** (Alt+Tab, Alt+Shift+N, Setup › Windows):
+- *Alt+Tab* shows a card with a live picture per open window, most recently used first. Tab / Shift+Tab / Alt+Left / Alt+Right move,
+  letting go of Alt focuses the selected window (switching workspace, or bringing back a minimised one), **Alt+Q** closes the *selected*
+  window, Esc cancels. It works the same with tiled and floating windows.
+- *Alt+Shift+N* switches the whole desktop between tiled and floating. Floating windows get a title bar (hyprbars plugin) with
+  close / minimise / maximise (drag the bar to move, double-click to maximise); tiled windows have none. Each window remembers its
+  floating size and place, also across the switch (animated), and the mode survives a restart. Windows that were floating on
+  their own (dialogs, app rules) stay floating in tiled mode. Setup › Windows has the same switch, the bar height and which side
+  the buttons are on (left: close, minimise, maximise like macOS; right: minimise, maximise, close like Windows).
+- The plugin is loaded by `torii-bars-setup` (Hyprland reloads its config whenever a plugin is loaded, so the newest run wins and
+  nothing is ever unloaded there). After Hyprland updates, rebuild it: `yay -S hyprland-plugin-hyprbars`. Without it only the bars are missing.
+
 **Night light fade** (Setup › Night light › Fade, 0–300 s, default 30, `0` = at once): with a daily schedule the colour eases in from
 nothing to your temperature after the start time and eases out again before the end. Manual on/off and the slider act at once.
 

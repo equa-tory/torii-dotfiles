@@ -22,7 +22,9 @@ Singleton {
     readonly property var player: pick()
     onPlayerChanged: if (player && player.isPlaying) sticky = player
 
-    readonly property bool active: player !== null && (player.trackTitle || "") !== ""
+    // a clip of a couple of seconds (a page looping a sound effect, an alert chirp) is not media worth an activity
+    readonly property bool tiny: player !== null && player.lengthSupported && player.length > 0 && player.length < 3
+    readonly property bool active: player !== null && (player.trackTitle || "") !== "" && !tiny
     readonly property bool playing: player !== null && player.isPlaying
     readonly property string title: player ? player.trackTitle || "" : ""
     readonly property string artist: player ? player.trackArtist || "" : ""

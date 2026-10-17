@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""torii-win close | max | min | restore [address]  -  what the title bar buttons do (on the active window).
+
+  close     close the window
+  max       maximise / restore (a floating window fills the screen area, a second press gives it back)
+  min       hide the window on the special:minimized workspace; Alt+Tab (or `restore`) brings it back
+  restore   bring the most recently minimised window (or the one at <address>) back to the current workspace
+"""
+import json
+import subprocess
+import sys
+
+
+def hc(*a):
+    return subprocess.run(["hyprctl", *a], capture_output=True, text=True).stdout
+
+
+def dispatch(expr):
+    hc("dispatch", expr)
+
+
+def clients():
+    try:
+        return json.loads(hc("clients", "-j"))
+    except ValueError:
+        return []
+
+
+def main(a):
+    cmd = a[0] if a else ""
+    if cmd == "close":
+        dispatch("hl.dsp.window.close()")
+    elif cmd == "max":
+        dispatch('hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })')
+    elif cmd == "min":
+        dispatch('hl.dsp.window.move({ workspace = "special:minimized", follow = false })')
+    elif cmd == "restore":
+        wins = [c for c in clients() if c["workspace"]["name"].startswith("special:minimized")]
+        if a[1:]:
+            wins = [c for c in wins if c["address"].lstrip("0x") == a[1].lstrip("0x")]
+        if not wins:
+            return
+        ws = json.loads(hc("activeworkspace", "-j"))["id"]
+        target = wins[-1]["address"]
+        dispatch('hl.dsp.window.move({ workspace = %d, window = "address:%s", follow = false })' % (ws, target))
+        dispatch('hl.dsp.focus({ window = "address:%s" })' % target)
+    else:
+        print(__doc__)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -44,8 +44,19 @@ end
 local cascade = 0
 -- where a window floats: its own memory, then its app's, then a cascade of 62% x 68% windows on its monitor
 local function target(w)
-    local g = geo[w.address] or class_geo[w.class]
+    local g = geo[w.address]
     if g then return g end
+    g = class_geo[w.class]
+    if g then                                   -- the app's usual place, nudged so windows of one app do not stack exactly
+        cascade = (cascade + 1) % 8
+        local mon = w.monitor or hl.get_active_monitor()
+        local mw = (mon and mon.width or 1920) / ((mon and mon.scale) or 1)
+        local mh = (mon and mon.height or 1080) / ((mon and mon.scale) or 1)
+        local mx, my = mon and mon.x or 0, mon and mon.y or 0
+        local x = math.max(mx, math.min(g.x + cascade * 28, mx + mw - g.w))      -- keep it on the screen
+        local y = math.max(my + 40, math.min(g.y + cascade * 22, my + mh - g.h))
+        return { x = x, y = y, w = g.w, h = g.h }
+    end
     local mon = w.monitor or hl.get_active_monitor()
     local mw = (mon and mon.width or 1920) / ((mon and mon.scale) or 1)
     local mh = (mon and mon.height or 1080) / ((mon and mon.scale) or 1)
@@ -114,5 +125,5 @@ hl.on("window.close", function(w)
     save()
 end)
 
--- other modules ask for the mode
-function torii_float_mode() return mode end
+-- the launcher (torii-hypr float) toggles it too
+function torii_float_toggle() set_mode(mode == "float" and "tile" or "float") end
