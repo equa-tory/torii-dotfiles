@@ -57,10 +57,14 @@ fileext = ".ics"
 CFG
 chmod 600 "$CONF"
 
+# a leftover "local" calendar (events added before iCloud was connected) must not become a collection to create
+rmdir "$CALS/local" 2>/dev/null || true
+
 echo "==> Finding your calendars"
-yes | vdirsyncer discover icloud
+printf "n\n" | vdirsyncer discover icloud
 echo "==> First sync"
 vdirsyncer sync
+vdirsyncer metasync || true     # calendar names and colours
 
 cat > "$UNITS/torii-calendar-sync.service" <<UNIT
 [Unit]

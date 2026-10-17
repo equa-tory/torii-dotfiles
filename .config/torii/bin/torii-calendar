@@ -203,7 +203,9 @@ def configured():
 def sync():
     if not configured():
         return 0
-    return subprocess.run(["vdirsyncer", "sync"], capture_output=True).returncode
+    rc = subprocess.run(["vdirsyncer", "sync"], capture_output=True).returncode
+    subprocess.run(["vdirsyncer", "metasync"], capture_output=True)      # names and colours of the calendars
+    return rc
 
 
 def esc(s):
@@ -213,7 +215,13 @@ def esc(s):
 def add(title, day, at=None, minutes=60, cal=None):
     d = datetime.strptime(day, "%Y-%m-%d").date()
     cals = calendars()
-    target = next((c["id"] for c in cals if cal in (c["id"], c["name"])), None) or (cals[0]["id"] if cals else "local")
+    target = next((c["id"] for c in cals if cal in (c["id"], c["name"])), None)
+    if not target:
+        # the calendar that is yours: not a shared one, not the reminders list (the first one when nothing else fits)
+        def skip(c):
+            n = c["name"].lower()
+            return any(w in n for w in ("shared", "общ", "напомин", "reminder"))
+        target = next((c["id"] for c in cals if not skip(c)), cals[0]["id"] if cals else "local")
     folder = ROOT / target
     folder.mkdir(parents=True, exist_ok=True)
     uid = f"{uuid.uuid4()}@torii"
