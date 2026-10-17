@@ -26,6 +26,11 @@ Scope {
         function toggle(): void { Panels.toggle("switcher"); }
     }
     IpcHandler {
+        target: "windows"
+        function next(): void { Windows.step(1); }
+        function prev(): void { Windows.step(-1); }
+    }
+    IpcHandler {
         target: "notifs"
         function dnd(): void { Notifs.toggleDnd(); }
         function clear(): void { Notifs.clear(); }

@@ -35,6 +35,9 @@ hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("$HOME/.config/torii/bin/tori
 hl.bind(mainMod .. " + SPACE",          hl.dsp.exec_cmd(qsipc .. "launcher toggle"))
 hl.bind(mainMod .. " + N",              hl.dsp.exec_cmd(qsipc .. "control toggle"))
 hl.bind(mainMod .. " + CTRL + SPACE",   hl.dsp.exec_cmd(qsipc .. "switcher toggle"))
+-- window switcher: Alt+Tab opens it on the previous window, more Tabs move on, letting go of Alt focuses
+hl.bind(mainMod .. " + TAB",            hl.dsp.exec_cmd(qsipc .. "windows next"))
+hl.bind(mainMod .. " + SHIFT + TAB",    hl.dsp.exec_cmd(qsipc .. "windows prev"))
 
 hl.bind(mainMod .. "+ SHIFT + F", function()
     hl.dispatch(hl.dsp.window.fullscreen({

@@ -124,6 +124,7 @@ PanelWindow {
             clip: true
             sourceComponent: Panels.panel === "control" ? controlPanel
                            : Panels.panel === "switcher" ? switcherPanel
+                           : Panels.panel === "windows" ? windowsPanel
                            : Panels.panel === "weather" ? weatherPanel
                            : Panels.panel === "calendar" ? calendarPanel
                            : Panels.panel === "launcher" ? launcherPanel : null
@@ -171,6 +172,7 @@ PanelWindow {
 
     Component { id: controlPanel; ControlPanel {} }
     Component { id: switcherPanel; Switcher { maxWidth: win.width - 160 } }
+    Component { id: windowsPanel; WindowSwitcher { maxWidth: win.width - 160 } }
     Component { id: weatherPanel; WeatherPanel {} }
     Component { id: calendarPanel; CalendarPanel {} }
     Component { id: launcherPanel; Launcher {} }

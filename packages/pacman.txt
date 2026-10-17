@@ -96,3 +96,7 @@ kio-extras
 breeze-icons
 git
 curl
+
+# calendar sync (iCloud over CalDAV)
+vdirsyncer
+python-icalendar

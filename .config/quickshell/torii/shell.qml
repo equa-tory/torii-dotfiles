@@ -30,5 +30,8 @@ ShellRoot {
         }
     }
 
+    // the window history for Alt+Tab has to run from the start
+    Component.onCompleted: Windows.touch("")
+
     Ipc {}
 }
