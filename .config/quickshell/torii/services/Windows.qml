@@ -51,9 +51,19 @@ Singleton {
     property bool pending: false
     Timer { id: openTimer; interval: 160; onTriggered: { root.pending = false; if (root.list.length > 0) Panels.open("windows"); } }
 
+    // The Tab and the Alt release reach us as two separate `qs ipc` calls that can arrive in either order. A release
+    // that comes first (a very quick tap) is remembered for a moment and applied by the Tab that follows it.
+    property double earlyCommit: 0
+
     function step(d) {
         const n = list.length;
         if (n === 0) return;
+        if (Panels.panel !== "windows" && !pending && Date.now() - earlyCommit < 600) {
+            earlyCommit = 0;
+            Hyprland.refreshToplevels();
+            focus(list[d > 0 ? Math.min(1, n - 1) : n - 1]);
+            return;
+        }
         if (Panels.panel === "windows") {
             index = (index + d + n) % n;
         } else if (pending) {
@@ -78,6 +88,8 @@ Singleton {
             const t = list[index];
             Panels.close();
             focus(t);
+        } else {
+            earlyCommit = Date.now();
         }
     }
 
