@@ -33,7 +33,7 @@
   "automove": {
     "from": "~/Downloads",
     "to": "/mnt/mass/Media_MASS/Photo/inbox",
-    "unzipDir": "_"
+    "unzipTo": "/mnt/mass/Media_MASS/Photo/inbox/_"
   },
   "launcher": {
     "rememberBack": true,

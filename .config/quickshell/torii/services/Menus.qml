@@ -344,7 +344,7 @@ Singleton {
                       sub: Math.max(1, Math.round(Live.remaining(r) / 60)) + " min left  ·  Enter stops it",
                       run: () => sh([bin("torii-remind"), "cancel", r.id]) }))) },
             { id: "automove", name: "File auto mover", glyph: Icons.folderMove, keywords: "downloads move inbox photos",
-              sub: t.automove.enabled ? "Moving new files to " + (t.automove.to || "").replace(home, "~") : "Downloads → " + (t.automove.to || "your inbox folder").replace(home, "~"),
+              sub: t.automove.enabled ? "Files → " + (t.automove.to || "").replace(home, "~") + "  ·  zips → " + (t.automove.unzipTo || "").replace(home, "~") : "Downloads → " + (t.automove.to || "your inbox folder").replace(home, "~"),
               badge: t.automove.enabled ? "On" : "Off", keep: true, run: () => toggle([bin("torii-automove"), t.automove.enabled ? "off" : "on"]) },
             { id: "mic", name: "Microphone", glyph: Audio.sourceMuted ? Icons.micOff : Icons.mic, keywords: "input mic mute unmute",
               sub: !Audio.sourceNode && !Audio.mock ? "No microphone found" : Audio.sourceMuted ? "Muted" : "Listening",

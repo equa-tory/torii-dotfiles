@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """torii-automove on|off|status|apply  -  move NEW files from ~/Downloads to a folder, while it is switched on.
-A .zip is unzipped (in archive order) into <to>/_/<zip name>/ and the zip is deleted; every other file is moved
-into <to> as it is. The folder name comes from "automove.unzipDir" (default "_", relative to <to> or absolute).
+A .zip is unzipped (in archive order) into <unzipTo>/<zip name>/ and the zip is deleted; every other file is moved
+into <to> as it is. unzipTo may be another path than <to>; empty means <to>/_.
 
   on       remember the time now; only files that appear after it are moved
   off      stop
-  status   JSON: {"enabled", "since", "from", "to"}
+  status   JSON: {"enabled", "since", "from", "to", "unzipTo"}
   apply    start the watcher again after login when it was left on (autostart runs this)
-Folders: "automove": {"from": "~/Downloads", "to": "/mnt/mass/Media_MASS/Photo/inbox"} in ~/.config/torii/config.json.
+Folders: "automove": {"from": "~/Downloads", "to": "/mnt/mass/Media_MASS/Photo/inbox", "unzipTo": "/mnt/mass/Media_MASS/Photo/inbox/_"}
+in ~/.config/torii/config.json.
 The watcher is a systemd user service (torii-automove) that waits on inotify, so it uses no CPU while nothing happens.
 If the destination is not there (share not mounted) nothing is moved or created and the files stay in Downloads.
 """
@@ -37,14 +38,13 @@ def cfg():
     return Path(os.path.expanduser(src)), Path(os.path.expanduser(dst))
 
 
-def unzip_dir(dst):
-    name = "_"
+def unzip_to(dst):
+    name = ""
     try:
-        name = json.loads((HOME / ".config/torii/config.json").read_text()).get("automove", {}).get("unzipDir", name) or name
+        name = json.loads((HOME / ".config/torii/config.json").read_text()).get("automove", {}).get("unzipTo", "") or ""
     except (OSError, ValueError):
         pass
-    p = Path(os.path.expanduser(name))
-    return p if p.is_absolute() else dst / p
+    return Path(os.path.expanduser(name)) if name else dst / "_"
 
 
 def extract(zpath, target):
@@ -64,8 +64,21 @@ def extract(zpath, target):
                 shutil.copyfileobj(a, b)
 
 
+UNZIP_WARNED = [False]
+
+
 def handle_zip(f, dst):
-    target = unzip_dir(dst) / f.stem
+    base = unzip_to(dst)
+    if not base.is_dir():
+        if base.parent.is_dir():
+            base.mkdir(exist_ok=True)
+        else:                                                     # another share that is not mounted: keep the zip for later
+            if not UNZIP_WARNED[0]:
+                notify("Auto mover waiting", f"{base} is not there (is the share mounted?)")
+                UNZIP_WARNED[0] = True
+            return
+    UNZIP_WARNED[0] = False
+    target = base / f.stem
     if not (target.is_dir() and any(target.iterdir())):          # already unzipped once: just drop the archive
         try:
             extract(f, target)
@@ -155,7 +168,7 @@ def main(a):
     src, dst = cfg()
     if cmd == "status":
         s = load()
-        print(json.dumps({"enabled": bool(s.get("enabled")), "since": s.get("since", 0), "from": str(src), "to": str(dst)}))
+        print(json.dumps({"enabled": bool(s.get("enabled")), "since": s.get("since", 0), "from": str(src), "to": str(dst), "unzipTo": str(unzip_to(dst))}))
     elif cmd == "on":
         save({"enabled": True, "since": time.time(), "from": str(src), "to": str(dst)})
         unit("start")
