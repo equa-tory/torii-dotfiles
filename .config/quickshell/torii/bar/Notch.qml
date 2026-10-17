@@ -100,6 +100,7 @@ PanelWindow {
             spacing: 16
 
             WidgetSlot { names: Config.widgets.left; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
+            LangWidget { anchors.verticalCenter: parent.verticalCenter }
             Workspaces { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
             Clock { anchors.verticalCenter: parent.verticalCenter }
             Weather {

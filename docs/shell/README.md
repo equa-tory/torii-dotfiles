@@ -225,3 +225,5 @@ the shell, Hyprland, systemd, D-Bus, PipeWire and v2rayN are never listed.
 opens: on a workspace (optionally in the background, without switching to it) and/or floating. *Add an app* lists the windows
 that are open right now (open the app first: its window class is what a rule matches), the installed apps, or lets you type a
 class. Changes are applied to the running Hyprland at once and again at every start (`hypr-rules.lua`, loaded by `hyprland.lua`).
+
+**Language**: the keyboard layout (EN / RU) is always shown left of the workspaces; click it to switch (`hyprctl switchxkblayout all next`).
