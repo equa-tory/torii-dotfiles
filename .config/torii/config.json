@@ -39,7 +39,19 @@
     "rememberBack": true,
     "rememberForward": false,
     "menuHistory": true,
-    "placeholder": "Search apps  \u00b7  \u2193 opens the menus"
+    "placeholder": "Search apps  \u00b7  \u2193 opens the menus",
+    "searchHidden": [
+      "setup/rules",
+      "learn",
+      "learn/lhypr",
+      "learn/ltmux",
+      "learn/lnvim",
+      "trigger/transcode",
+      "setup/widgets",
+      "remove/webapp",
+      "remove/tui",
+      "trigger/capture"
+    ]
   },
   "notifications": {
     "expand": "side"

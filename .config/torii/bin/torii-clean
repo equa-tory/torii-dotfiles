@@ -16,7 +16,8 @@ What is cleaned (nothing outside these):
   docker     unused images, stopped containers, networks and build cache (docker system prune -af)
   orphans    packages nothing needs any more (listed, removed after you confirm in the terminal)
   downloads  ~/Downloads, moved to the trash after you type yes (never part of `safe`)
-Nothing in /tmp or /var/tmp is touched.
+  tmp        files in /tmp (yours) and /var/tmp that nobody touched for 3 days; newer files and running programs' sockets stay
+Everything else (anything not in this list) is never touched.
 """
 import json
 import os
@@ -92,7 +93,7 @@ def pacman_reclaimable():
     for line in run("pacman", "-Q").stdout.splitlines():
         n, _, v = line.partition(" ")
         installed[n] = v
-    total = 0
+    total = sum(du(d) for d in cache.glob("download-*"))       # unfinished downloads pacman left behind
     for f in cache.glob("*.pkg.tar*"):
         if f.name.endswith(".sig"):
             continue
@@ -108,6 +109,15 @@ def pacman_reclaimable():
     return total
 
 
+def old_tmp(root, user_only):
+    """size of the files in a temp folder that nobody touched for 3 days (and, for /tmp, that are yours)"""
+    cmd = ["find", root, "-xdev", "-type", "f", "-mtime", "+3", "-atime", "+3"]
+    if user_only:
+        cmd += ["-user", str(os.getuid())]
+    r = run(*cmd, "-printf", "%s\n")
+    return sum(int(x) for x in r.stdout.split() if x.isdigit())
+
+
 def orphans():
     r = run("pacman", "-Qdtq")
     return [x for x in r.stdout.split() if x] if r.returncode == 0 else []
@@ -119,6 +129,8 @@ def listing():
         {"id": "cache", "name": "App caches", "size": sum(du(d) for d in cache_dirs()), "sub": "~/.cache: thumbnails, yay, pip, npm, shaders, ..."},
         {"id": "pacman", "name": "Package downloads", "size": pacman_reclaimable(), "sub": "old and uninstalled package files in the pacman cache (installed versions stay)", "root": True},
         {"id": "journal", "name": "System logs", "size": max(0, journal_size() - 200 * 1024 * 1024), "sub": "the journal above 200 MB (and older than 2 weeks) goes", "root": True},
+        {"id": "tmp", "name": "Old temp files", "size": old_tmp("/tmp", True) + old_tmp("/var/tmp", False),
+         "sub": "files in /tmp (yours) and /var/tmp that nobody touched for 3 days", "root": True},
         {"id": "coredumps", "name": "Crash dumps", "size": du("/var/lib/systemd/coredump"), "sub": "/var/lib/systemd/coredump", "root": True},
     ]
     dl = HOME / "Downloads"
@@ -177,10 +189,18 @@ def clean(cid):
         for d in cache_dirs():
             rm_contents(d)
     elif cid == "pacman":
-        # everything but the installed versions (what `pacman -Sc` does) and the repository databases stay as they are
+        # unfinished downloads (download-XXXX folders) make pacman -Sc fail with "Error reading fd": remove them first
+        sudo("sh", "-c", "rm -rf /var/cache/pacman/pkg/download-*")
+        # then everything but the installed versions (what `pacman -Sc` does); the repository databases stay as they are
         sudo("pacman", "-Sc", "--noconfirm")
     elif cid == "journal":
         sudo("journalctl", "--vacuum-size=200M", "--vacuum-time=2weeks")
+    elif cid == "tmp":
+        # only files nobody touched for 3 days: running programs keep their sockets and fresh files in /tmp
+        run("find", "/tmp", "-xdev", "-type", "f", "-user", str(os.getuid()), "-mtime", "+3", "-atime", "+3", "-delete")
+        run("find", "/tmp", "-xdev", "-mindepth", "1", "-type", "d", "-empty", "-user", str(os.getuid()), "-mtime", "+3", "-delete")
+        sudo("find", "/var/tmp", "-xdev", "-type", "f", "-mtime", "+3", "-atime", "+3", "-delete")
+        sudo("find", "/var/tmp", "-xdev", "-mindepth", "1", "-type", "d", "-empty", "-mtime", "+3", "-delete")
     elif cid == "coredumps":
         sudo("sh", "-c", "rm -rf /var/lib/systemd/coredump/*")
     elif cid == "docker":
@@ -244,7 +264,7 @@ def main(a):
         ids = a[1:]
         if ids == ["safe"]:
             have = {i["id"] for i in listing()}
-            ids = [i for i in ("trash", "cache", "pacman", "journal", "coredumps", "docker") if i in have]
+            ids = [i for i in ("trash", "cache", "pacman", "tmp", "journal", "coredumps", "docker") if i in have]
         total = sum(clean(i) for i in ids)
         print(f"\nIn total {human(total)} freed.")
     elif a[:1] == ["big"]:
