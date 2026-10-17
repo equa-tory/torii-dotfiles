@@ -29,6 +29,13 @@ browser = defaults.TORII_BROWSER or "helium-browser"
 
 local mainMod = "ALT" -- main modifier (Alt everywhere; the Super key is left free)
 
+-- true while a torii panel (launcher, control panel, Alt+Tab, ...) has the keyboard
+local function torii_panel_open()
+    for _, l in ipairs(hl.get_layers({ namespace = "torii-notch" })) do
+        if l.mapped and l.interactivity == 1 then return true end
+    end
+    return false
+end
 -- torii shell
 local qsipc = "qs -c torii ipc call "
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-shell reload"))
@@ -55,7 +62,14 @@ end)
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(browser))
-hl.bind(mainMod .. " + Q", hl.dsp.window.close())
+-- Alt+Q closes the active window, or the selected one while Alt+Tab is open
+hl.bind(mainMod .. " + Q", function()
+    if torii_panel_open() then
+        hl.exec_cmd("sh -c 'r=$(qs -c torii ipc call windows close); [ \"$r\" = ok ] || hyprctl dispatch \"hl.dsp.window.close()\"'")
+    else
+        hl.dispatch(hl.dsp.window.close())
+    end
+end)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 --hl.bind(mainMod .. " + F", hl.dsp.window.float({ action = "toggle" }))
@@ -88,12 +102,6 @@ end
 -- Text editing keys. Alt (mainMod) + C/V/X/Z/A act like the Mac's copy/paste/cut/undo/select all and Super + Left/Right
 -- jump to the start/end of the line, in every app. While a torii panel (launcher, control panel) has the keyboard these
 -- would hit the window underneath, so they are forwarded to the panel's text field instead.
-local function torii_panel_open()
-    for _, l in ipairs(hl.get_layers({ namespace = "torii-notch" })) do
-        if l.mapped and l.interactivity == 1 then return true end
-    end
-    return false
-end
 local qs_text = "qs -c torii ipc call text edit "
 
 for _, key in ipairs({ "C", "V", "X", "Z", "A" }) do
@@ -131,8 +139,16 @@ end
 
 
 -- Move focus with mainMod + arrow keys (across monitors too)
-hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
-hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
+-- (in Alt+Tab, left / right move the selection instead)
+for _, d in ipairs({ "left", "right" }) do
+    hl.bind(mainMod .. " + " .. d, function()
+        if torii_panel_open() then
+            hl.exec_cmd("sh -c 'r=$(qs -c torii ipc call windows " .. d .. "); [ \"$r\" = ok ] || hyprctl dispatch \"hl.dsp.focus({ direction = \\\"" .. d .. "\\\" })\"'")
+        else
+            hl.dispatch(hl.dsp.focus({ direction = d }))
+        end
+    end)
+end
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 

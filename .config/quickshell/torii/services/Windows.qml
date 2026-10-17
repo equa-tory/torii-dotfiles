@@ -71,4 +71,23 @@ Singleton {
         cmd += "hyprctl dispatch 'hl.dsp.focus({ " + sel + " })'";
         Quickshell.execDetached(["sh", "-c", cmd]);
     }
+
+    function arrow(d) {
+        if (Panels.panel !== "windows") return "no";
+        step(d);
+        return "ok";
+    }
+
+    // Alt+Q in the switcher: close the selected window (not the one that was focused before)
+    function closeSelected() {
+        if (Panels.panel !== "windows") return "no";
+        const t = list[index];
+        if (t) {
+            Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.window.close({ window = "address:0x' + bare(t.address) + '" })']);
+            if (index >= list.length - 1) index = Math.max(0, index - 1);
+            refreshLater.restart();
+        }
+        return "ok";
+    }
+    Timer { id: refreshLater; interval: 350; onTriggered: Hyprland.refreshToplevels() }
 }
