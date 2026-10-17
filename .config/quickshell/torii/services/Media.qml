@@ -2,6 +2,7 @@ pragma Singleton
 import qs
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Services.Mpris
 import QtQuick
 
@@ -31,6 +32,23 @@ Singleton {
     readonly property real position: player && player.positionSupported ? player.position : 0
     readonly property real progress: length > 0 ? Math.max(0, Math.min(1, position / length)) : -1
     readonly property bool canSeek: player !== null && player.canSeek
+
+    // is the player's own window the focused one? (then the notch does not need to tell you what plays)
+    property string activeClass: ""
+    readonly property string playerKey: player ? (player.desktopEntry || player.identity || "").toLowerCase() : ""
+    readonly property bool playerFocused: activeClass !== "" && playerKey !== ""
+        && (activeClass.indexOf(playerKey) >= 0 || playerKey.indexOf(activeClass) >= 0)
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event.name === "activewindow") root.activeClass = (event.data.split(",")[0] || "").toLowerCase();
+        }
+    }
+    Process {
+        running: true
+        command: ["hyprctl", "activewindow", "-j"]
+        stdout: StdioCollector { onStreamFinished: { try { root.activeClass = (JSON.parse(text).class || "").toLowerCase(); } catch (e) {} } }
+    }
 
     // the position only moves when asked
     Timer {

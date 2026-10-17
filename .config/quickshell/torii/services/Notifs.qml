@@ -32,10 +32,18 @@ Singleton {
 
         onNotification: n => {
             n.tracked = true;
+            // a shell reload hands every notification that is still open to us again: link it, don't show it twice
+            const key = Quickshell.processId + ":" + n.id;
+            const known = root.history.find(e => e.key === key);
+            if (known) {
+                root.live[known.uid] = n;
+                n.closed.connect(() => { delete root.live[known.uid]; });
+                return;
+            }
             const uid = Date.now() * 1000 + (root.seq++ % 1000);
             const urgent = n.urgency === NotificationUrgency.Critical;
             let icon = n.image || n.appIcon || "";
-            const entry = { uid: uid, app: n.appName || "", desktop: n.desktopEntry || "", summary: n.summary || "", body: n.body || "",
+            const entry = { uid: uid, key: key, app: n.appName || "", desktop: n.desktopEntry || "", summary: n.summary || "", body: n.body || "",
                             icon: icon, time: Date.now(), urgent: urgent,
                             actions: Array.from(n.actions).map(a => ({ id: a.identifier, text: a.text })) };
             root.live[uid] = n;

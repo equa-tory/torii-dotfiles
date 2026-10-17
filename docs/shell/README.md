@@ -205,7 +205,7 @@ Sounds (`torii-sound`, Setup › Sounds picks them and plays a preview): `sounds
 **Activities layout** (`config.json`): `activities.side` is `right` or `left` of the notch, `activities.style` is `pill`
 (one round pill) or `circles` (every activity on its own circle).
 
-**Media** (`Media`, MPRIS: players and browsers): whatever plays shows up as an activity, a circle with the cover and a
+**Media** (`Media`, MPRIS: players and browsers): whatever plays shows up as an activity (not while the player's own window has focus: `media.onlyWhenUnfocused`, a browser counts as focused whenever one of its windows is), a circle with the cover and a
 ring that fills with the track. Click it: title, artist and album (click them to bring the player forward), previous /
 play / next, a seek bar you can drag, wheel or Left/Right (`media.seekSeconds`, default 10) to seek. Also from a key bind:
 `qs -c torii ipc call media toggle|next|previous|seek 10`.

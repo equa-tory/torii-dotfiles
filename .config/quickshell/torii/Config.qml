@@ -90,6 +90,7 @@ Singleton {
                 property string style: "pill"          // pill (one round pill) | circles (one circle each)
             }
             property JsonObject media: JsonObject {
+                property bool onlyWhenUnfocused: true  // hide the media activity while the player's own window has focus
                 property int seekSeconds: 10           // Left/Right while the media activity is open
             }
             property JsonObject widgets: JsonObject {

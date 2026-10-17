@@ -27,7 +27,7 @@ Row {
         if (Live.dnd) return [{ kind: "dnd", key: "dnd" }];       // do not disturb: nothing else is shown
         const out = [];
         for (const r of Live.reminders) out.push({ kind: "reminder", key: "r" + r.id, r: r });
-        if (Media.active) out.push({ kind: "media", key: "media" });
+        if (Media.active && (Live.expanded === "media" || !(Config.media.onlyWhenUnfocused && Media.playerFocused))) out.push({ kind: "media", key: "media" });
         if (Live.sudoOn) out.push({ kind: "sudo", key: "sudo" });
         if (Live.recording) out.push({ kind: "rec", key: "rec" });
         if (Audio.sourceMuted) out.push({ kind: "mic", key: "mic" });
