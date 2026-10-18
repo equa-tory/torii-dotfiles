@@ -173,3 +173,7 @@ command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init "${SHELL##*/}" --cmd cd
 if [ -n "$ZSH_VERSION" ] && command -v fzf >/dev/null 2>&1; then
   source <(fzf --zsh 2>/dev/null) 2>/dev/null
 fi
+
+# open FILE: video / audio / pictures / pdf / text / json / code / databases / .exe with the right app, asks when none is set
+# (torii-open --list shows them, open -c FILE chooses again). On macOS the system `open` stays.
+[ "$(uname)" = Linux ] && command -v torii-open >/dev/null 2>&1 && alias open='torii-open'

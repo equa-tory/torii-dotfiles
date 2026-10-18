@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# open FILE...              open files with the right app: video/audio in mpv, pictures in imv, pdf in zathura,
+#                           text / markdown / json / code in nvim, databases in DB Browser, .exe in Bottles ...
+# open -c FILE              choose the app for this kind of file again (asked as well when nothing is set / installed)
+# open --list               what each kind of file opens with
+# open --apply              make Dolphin, browsers and xdg-open use the same apps (xdg-mime), run by install.sh
+# Your choices are kept in ~/.local/state/torii/open-apps.conf (kind=app). The built-in defaults are in KINDS below:
+#   "kind|extensions|apps in order of preference"; an app is a .desktop id (GUI) or tty:command (runs in this terminal).
+set -uo pipefail
+
+STATE="${TORII_STATE:-$HOME/.local/state/torii}"
+CHOICES="$STATE/open-apps.conf"
+APPDIRS=(/usr/share/applications "$HOME/.local/share/applications" /var/lib/flatpak/exports/share/applications "$HOME/.local/share/flatpak/exports/share/applications")
+
+KINDS='
+video|mp4 mkv webm avi mov flv wmv m4v mpg mpeg ts m2ts ogv 3gp|mpv.desktop vlc.desktop
+audio|mp3 flac wav ogg oga opus m4a aac wma aiff ape|mpv.desktop vlc.desktop
+image|png jpg jpeg gif webp bmp tif tiff avif ico heic svg|imv.desktop org.gnome.Loupe.desktop org.kde.gwenview.desktop
+pdf|pdf epub djvu cbz xps|org.pwmt.zathura.desktop org.kde.okular.desktop
+text|md markdown txt text log json jsonc yaml yml toml ini conf cfg env csv tsv xml html htm css scss js mjs ts tsx jsx sh bash zsh fish py pyi lua c h cpp cc cxx hpp hh cs rs go java kt qml sql vim lock gitignore|tty:nvim tty:vim tty:nano
+db|db sqlite sqlite3 db3|sqlitebrowser.desktop tty:sqlite3
+exe|exe msi bat|com.usebottles.bottles.desktop tty:wine
+archive|zip tar gz tgz xz zst 7z rar bz2|org.kde.ark.desktop tty:bsdtar
+'
+# packages that provide an app (offered when none of the apps of a kind is installed)
+PKGS='mpv.desktop=mpv vlc.desktop=vlc imv.desktop=imv org.pwmt.zathura.desktop=zathura,zathura-pdf-mupdf sqlitebrowser.desktop=sqlitebrowser org.kde.ark.desktop=ark org.kde.gwenview.desktop=gwenview org.kde.okular.desktop=okular'
+
+pkg_of() { for kv in $PKGS; do [[ ${kv%%=*} == "$1" ]] && { echo "${kv#*=}" | tr ',' ' '; return; }; done; }
+desktop_path() { for d in "${APPDIRS[@]}"; do [[ -f $d/$1 ]] && { echo "$d/$1"; return 0; }; done; return 1; }
+app_ok() { case "$1" in tty:*) command -v "${1#tty:}" >/dev/null 2>&1 ;; *) desktop_path "$1" >/dev/null ;; esac; }
+app_name() { case "$1" in tty:*) echo "${1#tty:} (in the terminal)" ;; *) p=$(desktop_path "$1") && sed -n 's/^Name=//p' "$p" | head -1 ;; esac; }
+
+kind_of() {   # file -> kind (by extension, then by mime type)
+  local f="$1" ext lower
+  lower="${f,,}"; ext="${lower##*.}"; [[ $lower == *.* ]] || ext=""
+  [[ -d $f ]] && { echo dir; return; }
+  while IFS='|' read -r k exts _; do
+    [[ -n $k ]] || continue
+    for e in $exts; do [[ $e == "$ext" ]] && { echo "$k"; return; }; done
+  done <<< "$KINDS"
+  case "$(xdg-mime query filetype "$f" 2>/dev/null)" in
+    video/*) echo video ;; audio/*) echo audio ;; image/*) echo image ;; application/pdf) echo pdf ;;
+    text/*|application/json|application/xml|application/x-shellscript) echo text ;;
+    application/vnd.sqlite3|application/x-sqlite3) echo db ;;
+    application/x-dosexec|application/vnd.microsoft.portable-executable) echo exe ;;
+    *) echo "" ;;
+  esac
+}
+
+saved() { [[ -f $CHOICES ]] && sed -n "s/^$1=//p" "$CHOICES" | tail -1; }
+save() { mkdir -p "$STATE"; { grep -v "^$1=" "$CHOICES" 2>/dev/null; echo "$1=$2"; } > "$CHOICES.tmp"; mv "$CHOICES.tmp" "$CHOICES"; }
+
+choose() {    # kind file -> prints the chosen app (asks; may offer to install)
+  local kind="$1" file="${2:-}" mime cands="" line apps="" a
+  [[ -t 0 && -t 2 ]] || { echo "" ; return 1; }
+  mime=$([[ -n $file ]] && xdg-mime query filetype "$file" 2>/dev/null)
+  # installed apps that list this mime type, plus the built-in candidates of the kind
+  line=$(grep "^$kind|" <<< "$KINDS" | cut -d'|' -f3)
+  for a in $line; do app_ok "$a" && apps+="$a"$'\n'; done
+  if [[ -n $mime ]]; then
+    for d in "${APPDIRS[@]}"; do
+      [[ -d $d ]] || continue
+      while IFS= read -r f; do apps+="$(basename "$f")"$'\n'; done < <(grep -l -s "^MimeType=.*$mime;" "$d"/*.desktop 2>/dev/null)
+    done
+  fi
+  apps=$(printf '%s' "$apps" | awk 'NF && !seen[$0]++')
+  local menu="" missing=""
+  while IFS= read -r a; do [[ -n $a ]] && menu+="$a	$(app_name "$a")"$'\n'; done <<< "$apps"
+  for a in $line; do app_ok "$a" || { p=$(pkg_of "$a"); [[ -n $p ]] && missing+="install:$a	install $p"$'\n'; }; done
+  menu+="$missing"
+  [[ -n $menu ]] || { echo "No app for .$kind files. Install one, then run: open -c FILE" >&2; return 1; }
+  local pick
+  if command -v fzf >/dev/null 2>&1; then
+    pick=$(printf '%s' "$menu" | fzf --delimiter=$'\t' --with-nth=2 --prompt="open $kind with > " --height=40% --reverse) || return 1
+  else
+    printf '%s' "$menu" | awk -F'\t' '{printf "  %d) %s\n", NR, $2}' >&2
+    read -rp "Open $kind files with (number): " n; pick=$(printf '%s' "$menu" | sed -n "${n}p")
+  fi
+  pick="${pick%%$'\t'*}"; [[ -n $pick ]] || return 1
+  if [[ $pick == install:* ]]; then
+    a="${pick#install:}"; p=$(pkg_of "$a")
+    sudo pacman -S --needed --noconfirm $p || return 1
+    pick="$a"
+  fi
+  save "$kind" "$pick"; echo "$pick"
+}
+
+app_for() {   # kind file force -> app id
+  local kind="$1" file="$2" force="${3:-}" app="" a line
+  [[ -z $force ]] && app=$(saved "$kind")
+  [[ -n $app ]] && app_ok "$app" && { echo "$app"; return; }
+  if [[ -z $force ]]; then
+    line=$(grep "^$kind|" <<< "$KINDS" | cut -d'|' -f3)
+    for a in $line; do app_ok "$a" && { echo "$a"; return; }; done
+  fi
+  choose "$kind" "$file"
+}
+
+run() {       # app file
+  local app="$1" f="$2"
+  case "$app" in
+    tty:*) "${app#tty:}" "$f" ;;
+    *) p=$(desktop_path "$app") || return 1
+       if grep -q '^Terminal=true' "$p" && [[ -t 0 ]]; then
+         cmd=$(sed -n 's/^Exec=//p' "$p" | head -1 | sed 's/ *%[a-zA-Z]//g'); eval "$cmd" '"$f"'
+       else
+         (setsid gio launch "$p" "$f" >/dev/null 2>&1 &)
+       fi ;;
+  esac
+}
+
+case "${1:-}" in
+  ""|-h|--help) sed -n '2,8p' "$0" | sed 's/^# \?//'; exit 0 ;;
+  --list)
+    while IFS='|' read -r k exts apps; do
+      [[ -n $k ]] || continue
+      a=$(app_for "$k" "" 2>/dev/null </dev/null); printf '  %-8s %-34s %s\n' "$k" "${a:+$(app_name "$a")}" "$(echo "$exts" | cut -d' ' -f1-8)..."
+    done <<< "$KINDS" ;;
+  --apply)
+    while IFS='|' read -r k exts apps; do
+      [[ -n $k ]] || continue
+      a=$(app_for "$k" "" 2>/dev/null </dev/null); [[ $a == *.desktop ]] || continue
+      [[ $k == text ]] && a=torii-app-neovim.desktop
+      desktop_path "$a" >/dev/null || continue
+      for e in $exts; do
+        m=$(grep -h -i "\.$e\$" /dev/null; xdg-mime query filetype "/dev/null.$e" 2>/dev/null) || true
+        case "$m" in ""|application/octet-stream|inode/*) continue ;; esac
+        [[ $k == text && $m != text/* && $m != application/json && $m != application/xml ]] && continue
+        xdg-mime default "$a" "$m" 2>/dev/null
+      done
+    done <<< "$KINDS"
+    echo "  xdg-open now follows the same apps" ;;
+  -c|--choose)
+    shift; [[ -n ${1:-} ]] || { echo "open -c FILE" >&2; exit 2; }
+    k=$(kind_of "$1"); [[ -n $k && $k != dir ]] || { echo "Unknown kind of file: $1" >&2; exit 1; }
+    a=$(app_for "$k" "$1" force) && run "$a" "$1" ;;
+  *)
+    rc=0
+    for f in "$@"; do
+      if [[ $f == *://* ]]; then xdg-open "$f" >/dev/null 2>&1 & continue; fi
+      [[ -e $f ]] || { echo "open: $f: no such file" >&2; rc=1; continue; }
+      k=$(kind_of "$f")
+      if [[ $k == dir ]]; then (setsid xdg-open "$f" >/dev/null 2>&1 &); continue; fi
+      if [[ -z $k ]]; then
+        # unknown kind: the system default if there is one, otherwise ask
+        m=$(xdg-mime query filetype "$f" 2>/dev/null); d=$(xdg-mime query default "$m" 2>/dev/null)
+        if [[ -n $d ]] && desktop_path "$d" >/dev/null; then (setsid gio launch "$(desktop_path "$d")" "$f" >/dev/null 2>&1 &); continue; fi
+        k=other
+        a=$(saved "ext-${f##*.}")
+        [[ -n $a ]] || { a=$(choose "ext-${f##*.}" "$f") || { rc=1; continue; }; }
+        run "$a" "$f"; continue
+      fi
+      a=$(app_for "$k" "$f") || { rc=1; continue; }
+      run "$a" "$f" || rc=1
+    done
+    exit $rc ;;
+esac

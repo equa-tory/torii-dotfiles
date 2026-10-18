@@ -11,3 +11,6 @@ wayfreeze
 
 # soft, rounded Qt style for Dolphin and other KDE/Qt apps (colours still follow the wallpaper; torii-theme picks it when installed)
 darkly
+
+# Steam tools (cards, games, idler); a debug package of one of its libraries clashes with steamworks-sdk, so build without debug packages
+steam-tools-ng

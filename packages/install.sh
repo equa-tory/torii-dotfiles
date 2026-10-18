@@ -31,6 +31,8 @@ fi
 echo "==> Installing AUR packages"
 mapfile -t aur_pkgs < <(read_list "$PKG_DIR/aur.txt")
 if ((${#aur_pkgs[@]})); then
-  yay -S --needed --noconfirm "${aur_pkgs[@]}"
+  # no debug packages: the one of python-stlib (steam-tools-ng) owns files that steamworks-sdk-debug has too
+  mk="$(mktemp)"; printf 'source /etc/makepkg.conf\nOPTIONS+=(!debug)\n' > "$mk"
+  yay -S --needed --noconfirm --makepkgconf "$mk" "${aur_pkgs[@]}"; rm -f "$mk"
 fi
  

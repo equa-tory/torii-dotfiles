@@ -80,6 +80,9 @@ UNIT
     $SUDO systemd-hwdb update && $SUDO udevadm trigger --subsystem-match=input --action=change || true
   fi
 
+  # xdg-open / Dolphin / browsers use the same apps as the `open` command
+  [ -x "$REPO/.config/torii/bin/torii-open" ] && "$REPO/.config/torii/bin/torii-open" --apply || true
+
   # Java: several JDKs are installed (Minecraft needs different ones); the system default is the 21 LTS
   if command -v archlinux-java >/dev/null 2>&1 && archlinux-java status 2>/dev/null | grep -q java-21-openjdk; then
     $SUDO archlinux-java set java-21-openjdk || true

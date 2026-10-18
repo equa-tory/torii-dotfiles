@@ -19,6 +19,11 @@ zoxide
 zsh
 translate-shell
 steam
+mpv
+imv
+zathura
+zathura-pdf-mupdf
+sqlitebrowser
 gamemode
 lib32-gamemode
 # NVIDIA driver + cuda: packages/nvidia.sh (pinned, only on machines with an NVIDIA GPU)
