@@ -55,6 +55,9 @@ UNIT
   fi
   $SUDO systemctl enable torii-sudo-reset.service >/dev/null 2>&1 || echo "!!  could not enable torii-sudo-reset.service"
 
+  # Wi-Fi + Ethernet together made boot wait ~18 s for "network online" (docker waits for it too); nothing at boot needs it
+  $SUDO systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
+
   say "Docker service"
   if command -v docker >/dev/null 2>&1; then
     $SUDO systemctl enable --now docker.service || echo "!!  could not enable docker.service"
