@@ -248,32 +248,32 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- Laptop multimedia keys for volume and LCD brightness
 -- Volume up
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"), { submap_universal = true, locked = true, repeating = true })
 -- Volume down
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),      { locked = true, repeating = true })
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),      { submap_universal = true, locked = true, repeating = true })
 -- Mute / unmute the sound
-hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),     { locked = true, repeating = true })
+hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),     { submap_universal = true, locked = true, repeating = true })
 -- Mute / unmute the microphone
-hl.bind("XF86AudioMicMute",     hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),   { locked = true, repeating = true })
+hl.bind("XF86AudioMicMute",     hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),   { submap_universal = true, locked = true, repeating = true })
 -- Brightness up
-hl.bind("XF86MonBrightnessUp",  hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"),                  { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessUp",  hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"),                  { submap_universal = true, locked = true, repeating = true })
 -- Brightness down
-hl.bind("XF86MonBrightnessDown",hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"),                  { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown",hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"),                  { submap_universal = true, locked = true, repeating = true })
 
 
 -- Media keys (need playerctl)
 -- Previous track
-hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
+hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { submap_universal = true, locked = true })
 -- Previous track
 hl.bind(mainMod .. " + comma",  hl.dsp.exec_cmd("playerctl previous"),       { locked = true })
 -- Play / pause
-hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { submap_universal = true, locked = true })
 -- Play / pause
-hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { submap_universal = true, locked = true })
 -- Play / pause
 hl.bind(mainMod .. " + period",  hl.dsp.exec_cmd("playerctl play-pause"),       { locked = true })
 -- Next track
-hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),       { locked = true })
+hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),       { submap_universal = true, locked = true })
 -- Next track
 hl.bind(mainMod .. " + slash",  hl.dsp.exec_cmd("playerctl next"),       { locked = true })
 
@@ -290,3 +290,23 @@ local switchLayout = hl.dsp.exec_cmd("hyprctl switchxkblayout all next")
 hl.bind(mainMod .. " + SHIFT + Shift_L", switchLayout, { release = true })
 -- (same, when Shift is let go first)
 hl.bind(mainMod .. " + SHIFT + " .. mainMod:sub(1, 1) .. mainMod:sub(2):lower() .. "_L", switchLayout, { release = true })
+
+-- Games: Alt is the main modifier here, so Alt+1..0 and friends would never reach a game that uses them. While a Steam game
+-- (Proton windows are "steam_app_<id>") has the focus, the normal binds are off and only these few stay (the media keys
+-- are "submap_universal", so they work as always). Alt+Shift+G switches the game keys off by hand (until the focus changes).
+hl.define_submap("game", function()
+    hl.bind(mainMod .. " + SHIFT + F", function()
+        hl.dispatch(hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
+    end)
+    hl.bind(mainMod .. " + TAB", function() tab("next") end)
+    hl.bind(mainMod .. " + SHIFT + TAB", function() tab("prev") end)
+    hl.bind(mainMod .. " + SHIFT + G", hl.dsp.submap("reset"))
+end)
+if torii_game_sub then pcall(function() torii_game_sub:remove() end) end     -- a reload runs this file again
+torii_game_sub = hl.on("window.active", function()
+    local w = hl.get_active_window()
+    local game = w and (w.class or ""):match("^steam_app_%d+$") ~= nil
+    local now = hl.get_current_submap and hl.get_current_submap() or ""
+    if game and now ~= "game" then hl.dispatch(hl.dsp.submap("game"))
+    elseif not game and now == "game" then hl.dispatch(hl.dsp.submap("reset")) end
+end)

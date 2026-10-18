@@ -7,3 +7,7 @@ export EDITOR="${EDITOR:-nvim}"
 
 # Quickshell's own reload popup does not follow the wallpaper theme
 export QS_NO_RELOAD_POPUP=1
+
+# Proton games (Steam): NVIDIA API for every game, and ntsync (kernel synchronisation, needs /dev/ntsync from torii-setup)
+export PROTON_ENABLE_NVAPI=1
+export PROTON_USE_NTSYNC=1

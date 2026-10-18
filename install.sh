@@ -49,6 +49,7 @@ personal|Desktop setup|Personal data from the home server (skipped if unreachabl
 mirrors|Desktop setup|Package mirrors on the home server (skipped if unreachable)|desktop
 limine|Desktop setup|Limine boot menu in the wallpaper colours (needs sudo, skipped without Limine)|desktop
 snapshots|Desktop setup|System snapshots in the Limine menu with rollback (btrfs + Limine only, needs sudo)|desktop
+steam|Desktop setup|Steam games: gamemode + GE-Proton defaults, ntsync (Steam must be closed)|desktop
 claude|Desktop setup|Claude Code status line|desktop
 nvidia|Desktop setup|NVIDIA driver (skipped without an NVIDIA GPU)|desktop
 ssh|Account|Authorize your GitHub SSH keys, make an SSH key|both
@@ -139,6 +140,7 @@ want setup    && { say "Torii shell (wallpapers, theme, services)"; bash package
 want personal && { say "Personal data from the home server"; bash packages/personal.sh || true; bash packages/apps-sync.sh || true; }
 want limine   && { say "Limine boot menu theme"; bash packages/limine-theme.sh || true; }
 want snapshots && { say "System snapshots (snapper, Limine entries)"; bash packages/snapshots.sh || true; }
+want steam    && { say "Steam game defaults"; bash packages/steam-defaults.sh || true; }
 want mirrors  && { say "Mirrors on the home server"; bash packages/mirrors.sh || true; }
 want claude   && { say "Claude Code status line (adds one key to ~/.claude/settings.json)"; bash packages/claude-statusline.sh || true; }
 want nvidia   && { say "NVIDIA driver"; bash packages/nvidia.sh || true; }

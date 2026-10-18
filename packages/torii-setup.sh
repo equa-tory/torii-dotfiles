@@ -58,6 +58,22 @@ UNIT
   # Wi-Fi + Ethernet together made boot wait ~18 s for "network online" (docker waits for it too); nothing at boot needs it
   $SUDO systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
 
+  # ntsync: the kernel's Windows-style synchronisation; Proton (GE) uses it when /dev/ntsync exists, which takes load off the CPU
+  if modinfo ntsync >/dev/null 2>&1; then
+    echo ntsync | $SUDO tee /etc/modules-load.d/ntsync.conf >/dev/null
+    $SUDO modprobe ntsync 2>/dev/null || true
+    [ -e /dev/ntsync ] || echo "!!  no /dev/ntsync"
+  fi
+
+  # gamemode switches the CPU to the performance governor while a game runs; its polkit action asks for a password, and nothing
+  # here shows a password dialog, so it never worked. Allow it for the admin group (wheel), and let the user renice games.
+  if command -v gamemoded >/dev/null 2>&1; then
+    printf '%s\n' 'polkit.addRule(function(action, subject) {' \
+      '    if ((action.id == "com.feralinteractive.GameMode.governor-helper" || action.id == "com.feralinteractive.GameMode.cpu-helper") && subject.isInGroup("wheel")) return polkit.Result.YES;' \
+      '});' | $SUDO tee /etc/polkit-1/rules.d/50-torii-gamemode.rules >/dev/null
+    getent group gamemode >/dev/null && ! id -nG "$USER" | grep -qw gamemode && $SUDO usermod -aG gamemode "$USER"   # at next login
+  fi
+
   # Java: several JDKs are installed (Minecraft needs different ones); the system default is the 21 LTS
   if command -v archlinux-java >/dev/null 2>&1 && archlinux-java status 2>/dev/null | grep -q java-21-openjdk; then
     $SUDO archlinux-java set java-21-openjdk || true

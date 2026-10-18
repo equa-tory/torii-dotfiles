@@ -19,6 +19,8 @@ zoxide
 zsh
 translate-shell
 steam
+gamemode
+lib32-gamemode
 # NVIDIA driver + cuda: packages/nvidia.sh (pinned, only on machines with an NVIDIA GPU)
 
 nodejs

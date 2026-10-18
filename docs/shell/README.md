@@ -315,3 +315,9 @@ refused, `personal.sh` shows the key and falls back to the backup copy on the Um
   snapshot. To make it permanent: `sudo torii-snapshots rollback` (or the launcher entry): the snapshot becomes the system again, the broken one stays as
   `@broken-<date>`, reboot. `/home`, logs and the package cache are not part of a snapshot. Snapshots are on the same disk: they undo a bad update,
   they are not a backup against a dead drive.
+
+## Games (Steam, Proton)
+- Steam games open fullscreen on the 240 Hz monitor (window rule in `hypr/modules/rules.lua`); the game itself stays windowed in its video settings, because its own fullscreen mode breaks the mouse under XWayland. **Alt+Shift+F** leaves / enters fullscreen.
+- While a game has the focus the normal binds are off, so Alt+1..0 and the other Alt keys reach the game. Kept: Alt+Shift+F, Alt+Tab, the media keys. **Alt+Shift+G** gives the window binds back until the focus changes.
+- Defaults for all games: `PROTON_ENABLE_NVAPI=1` and `PROTON_USE_NTSYNC=1` (uwsm/env, ntsync module from `torii-setup.sh`), `gamemoderun` as the launch option and GE-Proton as the compatibility tool: `bash packages/steam-defaults.sh` with Steam closed (run it again after installing new games; your own launch options are kept). gamemode switches the CPU to the performance governor while a game runs (`.config/gamemode.ini`, polkit rule from `torii-setup.sh`).
+- Deadlock: `-novid -high` in its launch options. Per game, the options are Steam > game > Properties.

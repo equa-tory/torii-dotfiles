@@ -18,8 +18,8 @@ hl.config({
         -- Set to true to enable resizing windows by clicking and dragging on borders and gaps
         resize_on_border = false,
 
-        -- Please see https://wiki.hypr.land/Configuring/Advanced-and-Cool/Tearing/ before you turn this on
-        allow_tearing = false,
+        -- Games may tear (window rule "immediate" in rules.lua): lower latency at 240 Hz. Everything else stays vsynced.
+        allow_tearing = true,
     },
 
     decoration = {
