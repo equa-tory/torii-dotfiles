@@ -292,8 +292,9 @@ hl.bind(mainMod .. " + SHIFT + Shift_L", switchLayout, { release = true })
 hl.bind(mainMod .. " + SHIFT + " .. mainMod:sub(1, 1) .. mainMod:sub(2):lower() .. "_L", switchLayout, { release = true })
 
 -- Games: Alt is the main modifier here, so Alt+1..0 and friends would never reach a game that uses them. While a Steam game
--- (Proton windows are "steam_app_<id>") has the focus, the normal binds are off and only these few stay (the media keys
--- are "submap_universal", so they work as always). Alt+Shift+G switches the game keys off by hand (until the focus changes).
+-- (Proton windows are "steam_app_<id>") is fullscreen and has the focus, the normal binds are off and only these few stay
+-- (the media keys are "submap_universal", so they work as always). Out of fullscreen (Alt+Shift+F) every bind works again.
+-- Alt+Shift+G switches the game keys off by hand (until the focus or fullscreen changes).
 hl.define_submap("game", function()
     hl.bind(mainMod .. " + SHIFT + F", function()
         hl.dispatch(hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
@@ -302,11 +303,15 @@ hl.define_submap("game", function()
     hl.bind(mainMod .. " + SHIFT + TAB", function() tab("prev") end)
     hl.bind(mainMod .. " + SHIFT + G", hl.dsp.submap("reset"))
 end)
-if torii_game_sub then pcall(function() torii_game_sub:remove() end) end     -- a reload runs this file again
-torii_game_sub = hl.on("window.active", function()
+local function game_keys()
     local w = hl.get_active_window()
-    local game = w and (w.class or ""):match("^steam_app_%d+$") ~= nil
+    local game = w ~= nil and (w.class or ""):match("^steam_app_%d+$") ~= nil and w.fullscreen ~= 0
     local now = hl.get_current_submap and hl.get_current_submap() or ""
     if game and now ~= "game" then hl.dispatch(hl.dsp.submap("game"))
     elseif not game and now == "game" then hl.dispatch(hl.dsp.submap("reset")) end
-end)
+end
+for _, ev in ipairs({ "window.active", "window.fullscreen" }) do
+    local v = "torii_game_sub_" .. ev:gsub("%.", "_")
+    if _G[v] then pcall(function() _G[v]:remove() end) end     -- a reload runs this file again
+    _G[v] = hl.on(ev, function() hl.timer(game_keys, { timeout = 50, type = "oneshot" }) end)
+end
