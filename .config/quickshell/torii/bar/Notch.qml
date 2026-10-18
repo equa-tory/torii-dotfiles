@@ -26,6 +26,8 @@ PanelWindow {
     readonly property real bodyH: barH + panelH
 
     WlrLayershell.namespace: "torii-notch"
+    // an open panel (launcher, control centre, Alt+Tab...) shows over a fullscreen window too; the bar itself stays under it
+    WlrLayershell.layer: panelHere ? WlrLayer.Overlay : WlrLayer.Top
     // an open media activity can take the keyboard (click it): Left/Right then seek
     readonly property bool mediaOpen: Svc.Live.expanded === "media" && Svc.Media.active
     WlrLayershell.keyboardFocus: panelHere ? WlrKeyboardFocus.Exclusive : (mediaOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
