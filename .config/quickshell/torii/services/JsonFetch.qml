@@ -10,7 +10,14 @@ Scope {
     property var data: null
     property bool fresh: false
 
-    function refresh() { fresh = true; proc.running = false; proc.running = true; }
+    property bool killed: false            // a run was cut short by a newer refresh: its empty output must not wipe `data`
+    // a refresh while the command still runs (Page Up/Down pressed quickly): stop it, start again a moment later
+    function refresh() {
+        fresh = true;
+        if (proc.running) { killed = true; proc.running = false; restart.restart(); }
+        else proc.running = true;
+    }
+    Timer { id: restart; interval: 30; onTriggered: proc.running = true }
     function ensure() { if (!fresh) refresh(); }
     function stale() { fresh = false; }
 
@@ -18,7 +25,10 @@ Scope {
         id: proc
         command: root.command
         stdout: StdioCollector {
-            onStreamFinished: { try { root.data = JSON.parse(text); } catch (e) { root.data = null; } }
+            onStreamFinished: {
+                if (root.killed) { root.killed = false; if (text === "") return; }
+                try { root.data = JSON.parse(text); } catch (e) { root.data = null; }
+            }
         }
     }
 }

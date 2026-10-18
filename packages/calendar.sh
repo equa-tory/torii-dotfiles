@@ -57,11 +57,11 @@ fileext = ".ics"
 CFG
 chmod 600 "$CONF"
 
-# a leftover "local" calendar (events added before iCloud was connected) must not become a collection to create
+# a leftover "local" calendar (events added before iCloud was connected) must not become a collection of its own
 rmdir "$CALS/local" 2>/dev/null || true
 
 echo "==> Finding your calendars"
-printf "n\n" | vdirsyncer discover icloud
+vdirsyncer discover icloud < <(yes y)
 echo "==> First sync"
 vdirsyncer sync
 vdirsyncer metasync || true     # calendar names and colours

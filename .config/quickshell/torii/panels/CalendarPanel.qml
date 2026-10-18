@@ -64,7 +64,7 @@ Item {
     JsonFetch {
         id: fm
         command: [root.bin, "month", root.ym]
-        onDataChanged: root.evs = data && data.days ? data.days : ({})
+        onDataChanged: if (data && data.days) root.evs = data.days
     }
     Timer { id: later; interval: 900; onTriggered: fm.refresh() }
 

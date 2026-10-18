@@ -68,5 +68,8 @@
   },
   "capture": {
     "freeze": true
+  },
+  "limine": {
+    "image": "/home/equa/Pictures/wallpapers/sig_wallpaper.jpg"
   }
 }
