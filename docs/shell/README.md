@@ -207,7 +207,7 @@ over 100 MB in Downloads, Documents, Videos, Pictures, Desktop, Music (move to t
 (`ONLY=apps bash packages/private-push.sh` just the apps; `--dry-run` shows what would go). `./install.sh` restores them through `packages/personal.sh`.
 
 **Backup copy.** The private folder is also kept on the Umbrel share (`/mnt/umbrel/Documents/torii-private`, mounted through the `Umbrel` line of `system/fstab.extra`). `private-push.sh` refreshes it at the end (or run `bash packages/private-mirror.sh`); when the home server is unreachable, `packages/personal.sh` restores from that copy instead. `ONLY=webapps` pushes just the web/terminal app lists.
-Apps shipped with the repo (`apps/*/app.json`) are not pushed. **Disk usage** (`gdu`) opens on `/` including `/home`, skipping `/mnt` and `/media` (big data drives and network shares are
+Apps shipped with the repo (`apps/*/app.json`) are not pushed. **Disk usage** (`torii-gdu`, the `gdu` alias: skips network shares below the folder and reads a spinning disk one file at a time) opens on `/` including `/home`, skipping `/mnt` and `/media` (big data drives and network shares are
 not scanned), in the theme colours.
 
 **Calendar:** Tab in the calendar walks into the day's events, `d` or Delete removes the chosen one (also on iCloud); Setup › Calendar sync has

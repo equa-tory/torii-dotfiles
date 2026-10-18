@@ -187,3 +187,6 @@ y() {
   cwd="$(cat -- "$tmp" 2>/dev/null)"; rm -f -- "$tmp"
   [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && cd -- "$cwd"
 }
+
+# gdu: skips network shares below the folder (gdu /mnt took ages walking the Samba shares) and reads a spinning disk one file at a time
+command -v torii-gdu >/dev/null 2>&1 && alias gdu='torii-gdu'

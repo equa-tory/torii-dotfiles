@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# torii-gdu [gdu options] [PATH]  -  gdu that does not crawl network shares and does not thrash a spinning disk.
+#   - `gdu /mnt` walked every Samba share under /mnt (and woke the automounts): over the network, that is the slow part.
+#     Network mounts (cifs, nfs, sshfs and the autofs entries in front of them) below PATH are skipped, unless PATH is on one itself
+#   - PATH on a single spinning disk: --sequential (parallel reads make the head jump around, which is much slower on an HDD)
+#   - colours of the wallpaper theme when torii-theme made them
+# Shell alias: gdu -> torii-gdu. The plain program: command gdu ...
+set -uo pipefail
+
+args=("$@"); path=""
+for a in "${args[@]}"; do [[ $a != -* && -e $a ]] && path="$a"; done
+path="$(readlink -f "${path:-.}")"
+
+extra=()
+theme="${TORII_STATE:-$HOME/.local/state/torii}/theme/gdu.yaml"
+[[ -f $theme ]] && ! printf '%s\n' "${args[@]}" | grep -q -- '--config-file' && extra+=(--config-file "$theme")
+
+# network mounts below the path (not the path's own share)
+skip=()
+while IFS= read -r m; do
+  [[ -n $m && $m == "$path"/* ]] && skip+=("$m")
+done < <(findmnt -rno TARGET -t cifs,smb3,nfs,nfs4,fuse.sshfs,fuse.rclone,autofs 2>/dev/null)
+((${#skip[@]})) && extra+=(--ignore-dirs "$(IFS=,; echo "${skip[*]}"),/proc,/dev,/sys,/run")
+
+# a spinning disk: one reader at a time
+src="$(findmnt -no SOURCE -T "$path" 2>/dev/null | head -1 | sed 's/\[.*//')"
+if [[ -b $src ]]; then
+  parent="$(lsblk -no PKNAME "$src" 2>/dev/null | head -1)"; parent="${parent:-$(basename "$src")}"
+  [[ "$(cat "/sys/block/$parent/queue/rotational" 2>/dev/null)" == 1 ]] && extra+=(--sequential)
+fi
+
+exec gdu "${extra[@]}" "${args[@]}"
