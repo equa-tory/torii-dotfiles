@@ -95,7 +95,7 @@ Singleton {
             }
             property JsonObject activities: JsonObject {
                 property string side: "right"          // right | left of the notch
-                property string style: "pill"          // pill (one round pill) | circles (one circle each)
+                property string style: "circles"       // circles (one circle each) | pill (one round pill)
             }
             property JsonObject media: JsonObject {
                 property bool onlyWhenUnfocused: true  // hide the media activity while the player's own window has focus
