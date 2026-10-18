@@ -5,7 +5,9 @@
   list tmux   ~/.config/tmux/tmux.conf           (prefix is taken from `set -g prefix`)
   list nvim   ~/.config/nvim/**/*.lua            (vim.keymap.set and lazy.nvim `keys` entries; <leader> shown as its key)
   files       your own notes: ~/.config/torii/learn/*.md
-Prints JSON [{"keys": "ALT + SHIFT + R", "desc": "..."}]. Nothing is cached: edit a config and it is current next time.
+Prints JSON [{"keys": "ALT + SHIFT + R", "desc": "...", "file": "...", "line": 41}] (Enter in the launcher opens file at line).
+The tip of a Hyprland bind is the comment line right above it (or a trailing comment); for binds made in a loop a line
+`-- keys: ALT + 1 … 0 | tip` above the loop describes them. tmux: bind -N "tip"; nvim: desc = "tip". Nothing is cached: edit a config and it is current next time.
 """
 import json
 import re
@@ -13,6 +15,30 @@ import sys
 from pathlib import Path
 
 HOME = Path.home()
+
+
+def pretty_key(part):
+    names = {"left": "←", "right": "→", "up": "↑", "down": "↓", "mouse_down": "scroll down", "mouse_up": "scroll up",
+             "mouse:272": "left mouse button", "mouse:273": "right mouse button", "comma": ",", "period": ".", "slash": "/"}
+    return names.get(part, part)
+
+
+def split_args(text):
+    """The first top-level argument of `hl.bind(` is the key expression; the rest is the action."""
+    depth, quote, cut = 0, "", len(text)
+    for n, ch in enumerate(text):
+        if quote:
+            quote = "" if ch == quote else quote
+        elif ch in "\"'":
+            quote = ch
+        elif ch in "({":
+            depth += 1
+        elif ch in ")}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            cut = n
+            break
+    return text[:cut].strip(), text[cut + 1:].strip()
 
 
 def hypr():
@@ -24,42 +50,35 @@ def hypr():
     lines = text.splitlines()
     for i, line in enumerate(lines):
         st = line.strip()
-        if st.startswith("--") and not st.startswith("--hl"):
+        ann = re.match(r"--\s*keys:\s*(.+?)\s*\|\s*(.+)$", st)      # -- keys: ALT + 1 … 0 | tip   (binds made in a loop)
+        if ann:
+            out.append({"keys": ann.group(1).replace("ALT", main) if main != "ALT" else ann.group(1), "desc": ann.group(2),
+                        "file": str(f), "line": i + 1})
+            continue
+        if st.startswith("--") and not st.startswith("--hl") and not st.startswith("-- ("):
             comment = st.lstrip("- ").strip()
             continue
-        mm = re.match(r"\s*hl\.bind\(\s*(.+?)\s*,\s*(hl\.dsp\..*|function.*)$", line)
-        if mm and not st.startswith("--"):
-            keys = []
-            for part in re.split(r"\s*\.\.\s*", mm.group(1)):
-                part = part.strip()
-                if part == "mainMod":
-                    keys.append(main)
-                elif part[:1] in "\"'":
-                    keys.append(part.strip("\"'"))
-                else:
-                    keys.append("N")
-            k = re.sub(r"\s*\+\s*", " + ", " ".join(keys).strip()).strip(" +")
-            k = re.sub(r"\s+", " ", k)
-            action = mm.group(2)
-            if action.startswith("function"):
-                body = "\n".join(lines[i + 1:i + 14]).split("\nend)")[0]
-                if "fullscreen" in body:
-                    desc = "toggle " + ("maximize" if "maximized" in body else "fullscreen")
-                elif "float_mode" in body:
-                    desc = "toggle float mode (new windows float)"
-                elif "send_shortcut" in body:
-                    desc = "mac-style shortcut (copy, paste, …)"
-                else:
-                    desc = "custom action"
-                desc = comment or desc
-            else:
-                desc = describe(action)
-            out.append({"keys": k, "desc": comment if comment and not comment.startswith("Example") else desc})
-        if st:
-            comment = "" if not st.startswith("--") else comment
-    if re.search(r"for\s+i\s*=\s*1\s*,\s*10", text):
-        out.append({"keys": f"{main} + 1 … 0", "desc": "go to workspace 1 … 10"})
-        out.append({"keys": f"{main} + SHIFT + 1 … 0", "desc": "move the window to workspace 1 … 10"})
+        if not st.startswith("hl.bind("):
+            comment = ""
+            continue
+        j, body = i, ""
+        while j < len(lines) and j < i + 12:                          # the bind may span several lines
+            body += lines[j].strip() + " "
+            if body.count("(") <= body.count(")"):
+                break
+            j += 1
+        key_expr, action = split_args(body[len("hl.bind("):])
+        parts = [x.strip() for x in re.split(r"\s*\.\.\s*", key_expr)]
+        if any(not (x == "mainMod" or x[:1] in "\"'") for x in parts):
+            comment = ""
+            continue                                                   # a variable key: the "-- keys:" line above it tells
+        keys = [main if x == "mainMod" else x.strip("\"'") for x in parts]
+        k = re.sub(r"\s+", " ", re.sub(r"\s*\+\s*", " + ", " ".join(keys).strip()).strip(" +"))
+        k = " + ".join(pretty_key(x.strip()) for x in k.split(" + "))
+        tail = re.search(r"--\s*(.+)$", line.split(")", 1)[-1]) if "--" in line else None
+        tip = (tail.group(1).strip() if tail else "") or (comment if not comment.startswith("Example") else "")
+        out.append({"keys": k, "desc": tip or describe(action), "file": str(f), "line": i + 1})
+        comment = ""
     seen, uniq = set(), []
     for e in out:
         if e["keys"] not in seen:
@@ -88,7 +107,7 @@ def tmux():
     import shlex
     f = HOME / ".config/tmux/tmux.conf"
     out, prefix, comment = [], "C-b", ""
-    for line in (f.read_text(errors="replace").splitlines() if f.exists() else []):
+    for ln, line in enumerate(f.read_text(errors="replace").splitlines() if f.exists() else []):
         st = line.strip()
         m = re.match(r"set(?:-option)?\s+-g\s+prefix\s+(\S+)", st)
         if m:
@@ -118,7 +137,7 @@ def tmux():
                 keys = key
             else:
                 keys = f"{prefix} then {key}"
-            out.append({"keys": keys, "desc": note or comment or cmd})
+            out.append({"keys": keys, "desc": note or comment or cmd, "file": str(f), "line": ln + 1})
         if st:
             comment = ""
     return out
@@ -137,21 +156,26 @@ def nvim():
     names = {" ": "Space", "\\": "\\", ",": ","}
     lead = names.get(leader, leader)
     for f in files:
-        for line in f.read_text(errors="replace").splitlines():
+        for ln, line in enumerate(f.read_text(errors="replace").splitlines()):
             st = line.strip()
             if st.startswith("--"):
                 continue
-            m = re.search(r'vim\.keymap\.set\(\s*(?:\{([^}]*)\}|"([^"]*)")\s*,\s*"([^"]*)"\s*,\s*(.*)', st)
+            m = re.search(r'(?:vim\.keymap|\bo)\.set\(\s*(?:\{([^}]*)\}|"([^"]*)")\s*,\s*"([^"]*)"\s*,\s*(.*)', st)
             if m:
                 modes = re.sub(r'["\s]', "", m.group(1) or m.group(2))
                 rhs = m.group(4)
                 d = re.search(r'desc\s*=\s*"([^"]*)"', rhs)
                 desc = d.group(1) if d else re.sub(r",?\s*\{.*$|\)\s*$", "", rhs).strip().strip('"')
-                out.append({"keys": m.group(3).replace("<leader>", lead + " ").replace("<Leader>", lead + " ") + (f"   [{modes}]" if modes not in ("n", "") else ""), "desc": desc})
+                out.append({"keys": m.group(3).replace("<leader>", lead + " ").replace("<Leader>", lead + " ") + (f"   [{modes}]" if modes not in ("n", "") else ""), "desc": desc,
+                            "file": str(f), "line": ln + 1})
+                continue
+            m = re.match(r'map\("([^"]+)"\s*,.*,\s*"([^"]*)"\)\s*$', st)       # the LSP helper map(keys, fn, desc)
+            if m:
+                out.append({"keys": m.group(1).replace("<leader>", lead + " "), "desc": m.group(2) + " (LSP)", "file": str(f), "line": ln + 1})
                 continue
             m = re.match(r'\{\s*"([^"]+)"\s*,.*desc\s*=\s*"([^"]*)"', st)
             if m:
-                out.append({"keys": m.group(1).replace("<leader>", lead + " "), "desc": m.group(2)})
+                out.append({"keys": m.group(1).replace("<leader>", lead + " "), "desc": m.group(2), "file": str(f), "line": ln + 1})
     return out
 
 

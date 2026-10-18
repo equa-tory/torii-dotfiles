@@ -593,9 +593,10 @@ Singleton {
 
     // ================= Learn
     function learnMenu() {
-        const keysMenu = (id, name, fetch, hint) => ({ id: id, name: name, glyph: Icons.keyboard2, sub: hint, sorted: true, children: () => {
+        const keysMenu = (id, name, fetch, hint) => ({ id: id, name: name, glyph: Icons.keyboard2, sub: hint + "  ·  Enter opens the config", sorted: true, children: () => {
             fetch.ensure();
-            const l = (fetch.data || []).map((e, i) => ({ id: id + i, name: e.keys, sub: e.desc, keywords: e.desc, glyph: Icons.keyboard }));
+            const l = (fetch.data || []).map((e, i) => ({ id: id + i, name: e.keys, sub: e.desc, keywords: e.desc, glyph: Icons.keyboard,
+                run: () => floatTerm(name + " config", ["sh", "-c", 'exec "${EDITOR:-nvim}" "+$1" "$2"', "sh", String(e.line || 1), e.file]) }));
             return l.length ? l : [{ id: "none", name: "Nothing found", sub: "No shortcuts in that config" }];
         } });
         return { id: "learn", name: "Learn", glyph: Icons.book, sub: "Your keyboard shortcuts and notes", keywords: "shortcuts keybindings cheatsheet help",

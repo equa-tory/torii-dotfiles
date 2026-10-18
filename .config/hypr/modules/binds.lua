@@ -38,9 +38,13 @@ local function torii_panel_open()
 end
 -- torii shell
 local qsipc = "qs -c torii ipc call "
+-- Reload the torii shell (after editing its config)
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-shell reload"))
+-- Open the launcher: apps, menus, search, calculator
 hl.bind(mainMod .. " + SPACE",          hl.dsp.exec_cmd(qsipc .. "launcher toggle"))
+-- Open the control panel: sound, network, bluetooth, notifications
 hl.bind(mainMod .. " + N",              hl.dsp.exec_cmd(qsipc .. "control toggle"))
+-- Open the wallpaper / theme switcher
 hl.bind(mainMod .. " + CTRL + SPACE",   hl.dsp.exec_cmd(qsipc .. "switcher toggle"))
 -- window switcher: Alt+Tab opens it on the previous window, more Tabs move on, letting go of Alt focuses
 -- A quick tap (Alt released at once) switches without the menu ever showing; the menu opens when Alt is held on.
@@ -56,7 +60,9 @@ local function tab(cmd)
     tabbing = true
     hl.exec_cmd(qsipc .. "windows " .. cmd .. " " .. gesture)
 end
+-- Alt+Tab: switch to the previous window; keep Alt held and press Tab again to walk the list
 hl.bind(mainMod .. " + TAB", function() tab("next") end)
+-- Alt+Shift+Tab: walk the window list backwards
 hl.bind(mainMod .. " + SHIFT + TAB", function() tab("prev") end)
 -- The Alt release is read from the raw key events: a release bind does not fire when Tab was pressed in between.
 if torii_tab_sub then pcall(function() torii_tab_sub:remove() end) end     -- a reload runs this file again
@@ -67,12 +73,14 @@ torii_tab_sub = hl.on("input.keyboard.key", function(code, _, state)
     end
 end)
 
+-- Toggle fullscreen
 hl.bind(mainMod .. "+ SHIFT + F", function()
     hl.dispatch(hl.dsp.window.fullscreen({
         mode = "fullscreen", -- or fullscreen
         action = "toggle"
     }))
 end)
+-- Toggle maximize (keeps the bar visible)
 hl.bind(mainMod .. " + F", function()
     hl.dispatch(hl.dsp.window.fullscreen({
         mode = "maximized", -- or fullscreen
@@ -80,11 +88,13 @@ hl.bind(mainMod .. " + F", function()
     }))
 end)
 
--- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
+-- Open a terminal
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
+-- Open the browser
 hl.bind(mainMod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(browser))
--- Alt+Q closes the active window, or the selected one while Alt+Tab is open
-hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-win min"))   -- minimise (still listed in Alt+Tab)
+-- Minimise the window (it stays in the Alt+Tab list)
+hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-win min"))
+-- Close the window (the selected one while Alt+Tab is open)
 hl.bind(mainMod .. " + Q", function()
     if torii_panel_open() then
         hl.exec_cmd("sh -c 'r=$(qs -c torii ipc call windows close); [ \"$r\" = ok ] || hyprctl dispatch \"hl.dsp.window.close()\"'")
@@ -92,14 +102,19 @@ hl.bind(mainMod .. " + Q", function()
         hl.dispatch(hl.dsp.window.close())
     end
 end)
+-- Log out of the session
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
+-- Open the file manager
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
+-- Toggle floating for this window
 hl.bind(mainMod .. " + G", hl.dsp.window.float({ action = "toggle" }))
+-- Pseudo-tile: the window keeps its own size inside its tile
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
-hl.bind(mainMod .. " + R", hl.dsp.layout("togglesplit"))    -- dwindle only
+-- Flip the split direction of the tiles (dwindle layout)
+hl.bind(mainMod .. " + R", hl.dsp.layout("togglesplit"))
 
 
--- Resize active window: mainMod + CTRL + arrow
+-- keys: ALT + CTRL + ← ↑ ↓ → | Resize the window by 50 px (hold to keep going)
 local STEP = 50
 local resize = {
     left  = { x = -STEP, y = 0 },
@@ -113,13 +128,13 @@ for key, d in pairs(resize) do
         { repeating = true })   -- hold the keys to keep resizing
 end
 
--- Big / centred window (floatmode.lua): Ctrl+Alt+Shift+Up takes 70 % of the screen (Setup > Windows), +Down centres it
+-- Make the window big (70 % of the screen, see Setup > Windows)
 hl.bind(mainMod .. " + CTRL + SHIFT + up",   function() if torii_window_big then torii_window_big() end end)
+-- Centre the window at its normal size
 hl.bind(mainMod .. " + CTRL + SHIFT + down", function() if torii_window_center then torii_window_center() end end)
 
--- Move active window: mainMod + SHIFT + arrow (past the edge of a monitor it goes to the next monitor)
+-- keys: ALT + SHIFT + ← ↑ ↓ → | Move the window; past a monitor edge it goes to the next monitor; in float mode left / right snap to a half
 local move = { left = "l", right = "r", up = "u", down = "d" }
--- In float mode the same keys snap the window to the left / right half (up: fill the screen, down: back to where it was).
 for key, dir in pairs(move) do
     hl.bind(mainMod .. " + SHIFT + " .. key, function()
         if torii_float_snap and torii_float_snap(key) then return end
@@ -128,7 +143,9 @@ for key, dir in pairs(move) do
 end
 
 
--- Text editing keys. Alt (mainMod) + C/V/X/Z/A act like the Mac's copy/paste/cut/undo/select all and Super + Left/Right
+-- keys: ALT + C / V / X / Z / A | Copy, paste, cut, undo, select all in every app (Mac style; in a terminal only copy / paste)
+-- keys: SUPER + ← / → | Jump to the start / end of the line in every app (+ SHIFT selects)
+-- (implementation) Alt + C/V/X/Z/A act like the Mac's copy/paste/cut/undo/select all and Super + Left/Right
 -- jump to the start/end of the line, in every app. While a torii panel (launcher, control panel) has the keyboard these
 -- would hit the window underneath, so they are forwarded to the panel's text field instead.
 local qs_text = "qs -c torii ipc call text edit "
@@ -167,8 +184,7 @@ for _, e in ipairs({
 end
 
 
--- Move focus with mainMod + arrow keys (across monitors too)
--- (in Alt+Tab, left / right move the selection instead)
+-- keys: ALT + ← / → | Focus the window on the left / right, across monitors (moves the selection while Alt+Tab is open)
 for _, d in ipairs({ "left", "right" }) do
     hl.bind(mainMod .. " + " .. d, function()
         if torii_panel_open() then
@@ -178,12 +194,14 @@ for _, d in ipairs({ "left", "right" }) do
         end
     end)
 end
+-- Focus the window above
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
+-- Focus the window below
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 
 
--- Switch workspaces with mainMod + [0-9]
--- Move active window to a workspace with mainMod + SHIFT + [0-9]
+-- keys: ALT + 1 … 0 | Go to workspace 1 … 10
+-- keys: ALT + SHIFT + 1 … 0 | Move the window to workspace 1 … 10
 --for i = 1, 10 do
 --    local key = i % 10 -- 10 maps to key 0
 --    hl.bind(mainMod .. " + " .. key,             hl.dsp.focus({ workspace = i}))
@@ -198,48 +216,69 @@ for i = 1, 10 do
 end
 
 -- Screenshots and recording (torii-capture): whole screen, a zone, and start/stop screen recording
+-- Screenshot of the whole screen
 hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture screen"))
+-- Screenshot of a zone you select
 hl.bind("SUPER + SHIFT + W", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture zone"))
+-- Start / stop screen recording
 hl.bind("SUPER + SHIFT + E", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture record"))
+-- Copy the text from a zone of the screen (OCR)
 hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture text"))
 
 
--- Example special workspace (scratchpad)
+-- Show / hide the special workspace (scratchpad)
 hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"))
+-- Send the window to the special workspace
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
 
 
 -- Scroll through existing workspaces with mainMod + scroll
+-- Next workspace (scroll down)
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
+-- Previous workspace (scroll up)
 hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
 
 -- Move/resize windows with mainMod + LMB/RMB and dragging
+-- Hold and drag with the left mouse button to move a window
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
+-- Hold and drag with the right mouse button to resize a window
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 
 -- Laptop multimedia keys for volume and LCD brightness
+-- Volume up
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
+-- Volume down
 hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),      { locked = true, repeating = true })
+-- Mute / unmute the sound
 hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),     { locked = true, repeating = true })
+-- Mute / unmute the microphone
 hl.bind("XF86AudioMicMute",     hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),   { locked = true, repeating = true })
+-- Brightness up
 hl.bind("XF86MonBrightnessUp",  hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"),                  { locked = true, repeating = true })
+-- Brightness down
 hl.bind("XF86MonBrightnessDown",hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"),                  { locked = true, repeating = true })
 
 
--- Requires playerctl
+-- Media keys (need playerctl)
+-- Previous track
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
+-- Previous track
 hl.bind(mainMod .. " + comma",  hl.dsp.exec_cmd("playerctl previous"),       { locked = true })
+-- Play / pause
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+-- Play / pause
 hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+-- Play / pause
 hl.bind(mainMod .. " + period",  hl.dsp.exec_cmd("playerctl play-pause"),       { locked = true })
+-- Next track
 hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),       { locked = true })
+-- Next track
 hl.bind(mainMod .. " + slash",  hl.dsp.exec_cmd("playerctl next"),       { locked = true })
 
 
--- Dark / light mode (torii-theme restyles everything; dark is the default)
--- Keyboard layout (a normal bind, so it doesn't fire on mainMod+SHIFT+<other key>)
+-- Switch between dark and light mode (torii-theme restyles everything)
 hl.bind(mainMod .. " + SHIFT + D",hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-theme mode toggle"))
 
 -- Keyboard layout: mainMod+SHIFT pressed and released on their own.
@@ -247,5 +286,7 @@ hl.bind(mainMod .. " + SHIFT + D",hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii
 -- mainMod+SHIFT+<key> binds (e.g. RETURN) are not affected.
 -- The released key has to be listed in the modifiers too, once per release order.
 local switchLayout = hl.dsp.exec_cmd("hyprctl switchxkblayout all next")
+-- Switch the keyboard layout: press and release Alt + Shift on their own
 hl.bind(mainMod .. " + SHIFT + Shift_L", switchLayout, { release = true })
+-- (same, when Shift is let go first)
 hl.bind(mainMod .. " + SHIFT + " .. mainMod:sub(1, 1) .. mainMod:sub(2):lower() .. "_L", switchLayout, { release = true })

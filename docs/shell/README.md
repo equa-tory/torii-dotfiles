@@ -120,7 +120,7 @@ command) are asked for in the launcher; their lists live in `~/.local/state/tori
 home server by `private-push.sh`, restored by `personal.sh`). `Update system` runs the full upgrade. `Update torii configs` shows
 `↓`/`↑` for commits to pull or push and `● changes` for local edits; it asks `[y/N]`, then commits, pulls and pushes.
 
-**Learn**: Hyprland, tmux and Neovim shortcuts read from your own config files (`torii-learn`), plus your notes in
+**Learn**: Hyprland, tmux and Neovim shortcuts read from your own config files (`torii-learn`; **Enter** on a shortcut opens the config at that line). The tip shown is the comment right above a Hyprland bind (or after it), `bind -N "tip"` in tmux and `desc = "tip"` in nvim; for binds made in a loop, a `-- keys: ALT + 1 … 0 | tip` line above the loop does it, plus your notes in
 `~/.config/torii/learn/*.md` (opened read-only). **Todo**: add, toggle done, edit, remove, and optionally finished items at the
 bottom; stored in `~/.local/state/torii/todo.json`. **System** (last): shut down, reboot, log out, sleep, each asks to confirm.
 
