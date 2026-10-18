@@ -256,10 +256,67 @@ def override_for(image):
 
 
 def icon_theme(dark):
-    """Papirus (soft, rounded) when it is installed, else Breeze."""
+    """Papirus (soft, rounded) when it is installed, else Breeze. "Papirus-Torii" is Papirus with folders in the accent colour
+    (made by folder_icons below)."""
     if Path("/usr/share/icons/Papirus").is_dir():
-        return "Papirus-Dark" if dark else "Papirus-Light"
+        return "Papirus-Torii"
     return "breeze-dark" if dark else "breeze"
+
+
+def folder_colour(accent):
+    """The Papirus folder colour nearest to the accent."""
+    import colorsys
+    r, g, b = hex_to_rgb(accent)
+    h, l, sat = colorsys.rgb_to_hls(r, g, b)
+    h *= 360
+    if sat < 0.18 or l < 0.12:
+        return "grey"
+    for top, name in ((12, "red"), (25, "deeporange"), (45, "orange"), (70, "yellow"), (160, "green"), (185, "teal"),
+                      (205, "cyan"), (235, "blue"), (255, "indigo"), (285, "violet"), (345, "magenta")):
+        if h < top:
+            return name
+    return "red"
+
+
+def folder_icons(tokens):
+    """~/.local/share/icons/Papirus-Torii: inherits Papirus-Dark/Light and points every blue folder icon at the folder colour
+    that matches the accent (what papirus-folders does, but in your home, no root needed)."""
+    base = "Papirus-Dark" if tokens.get("mode") != "light" else "Papirus-Light"
+    src = Path("/usr/share/icons") / base
+    dst = HOME / ".local/share/icons/Papirus-Torii"
+    colour = folder_colour(tokens["accent"])
+    marker = dst / ".torii-folder"
+    want = f"{base} {colour}"
+    try:
+        if marker.read_text() == want:
+            return
+    except OSError:
+        pass
+    if not src.is_dir():
+        return
+    import shutil as _sh
+    _sh.rmtree(dst, ignore_errors=True)
+    try:
+        for places in sorted(src.glob("*/places")):
+            out = dst / places.parent.name / "places"
+            out.mkdir(parents=True, exist_ok=True)
+            for f in places.iterdir():
+                if not f.is_symlink():
+                    continue
+                final = Path(os.path.realpath(f)).name          # folder.svg -> folder-blue.svg: follow the whole chain
+                m = re.match(r"^(folder|user)-blue(.*)$", final)
+                new = places / (m.group(1) + "-" + colour + m.group(2)) if m else None
+                if new is not None and new.exists():
+                    (out / f.name).symlink_to(new)
+        index = (src / "index.theme").read_text()
+        index = re.sub(r"^Name=.*$", "Name=Papirus-Torii", index, count=1, flags=re.M)
+        index = re.sub(r"^Comment=.*$", "Comment=Papirus with folders in the torii accent colour", index, count=1, flags=re.M)
+        index = re.sub(r"^Inherits=.*$", "Inherits=" + base + ",breeze-dark,hicolor", index, count=1, flags=re.M)
+        (dst / "index.theme").write_text(index)
+        marker.write_text(want)
+        sh("gtk-update-icon-cache", "-f", "-t", str(dst), timeout=30)
+    except OSError as e:
+        log(f"folder icons: {e}")
 
 
 def widget_style():
@@ -340,6 +397,8 @@ def render_all(tokens):
     if write_if_changed(THEME_DIR / "tokens.json", json.dumps(tokens, indent=2) + "\n"):
         changed.append("tokens.json")
     limine_wallpaper(tokens)
+    if icon_theme(True) == "Papirus-Torii":
+        folder_icons(tokens)
     return changed
 
 

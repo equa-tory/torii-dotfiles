@@ -294,3 +294,14 @@ from `torii-private` on the home server. *Push overwrites the saved copy with th
 (replaced private files stay next to the new one as `*.bak`). Close Helium and the web apps before pushing or pulling its profile.
 The server is reached over ssh with this computer's key (add it to GitHub, then run `update-ssh-keys.sh` from the Umbrel share); when ssh is
 refused, `personal.sh` shows the key and falls back to the backup copy on the Umbrel share over SMB (you only type the Umbrel password).
+
+### Qt style and icon themes: install, remove, test
+- **Folders in the accent colour:** `torii-theme` builds `~/.local/share/icons/Papirus-Torii` (Papirus with every blue folder icon swapped for the Papirus
+  colour nearest to the wallpaper accent: red, orange, yellow, green, teal, cyan, blue, indigo, violet, magenta, grey). It changes with the wallpaper
+  (run `torii-theme restore -f` to rebuild by hand, restart Dolphin to see it).
+- **Install** a style or icons: `yay -S darkly papirus-icon-theme` (or any other from the AUR / `pacman -S`); icon themes are folders in `/usr/share/icons`
+  or `~/.local/share/icons`, Qt styles are plugins in `/usr/lib/qt6/plugins/styles`. **Remove**: `yay -Rns darkly`; torii-theme falls back to Fusion and
+  Breeze by itself. **Test** without changing anything: `QT_STYLE_OVERRIDE=Fusion dolphin` (style), `dolphin` after `kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze-dark` (icons, undo with the old name), or look at what is installed: `ls /usr/lib/qt6/plugins/styles /usr/share/icons`.
+- **Make torii colour another style / icon theme:** the colours already reach every Qt app through `~/.config/kdeglobals` (the `torii` colour scheme) and qt6ct;
+  set the name in `torii-theme` (`widget_style()` and `icon_theme()`). Styles that draw their own colours (Kvantum themes) ignore the scheme: use Kvantum's
+  "Kvantum" style with a theme made from `~/.local/state/torii/theme/tokens.json`, or keep a scheme-following one like Darkly.
