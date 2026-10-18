@@ -41,8 +41,8 @@ hl.window_rule({
 })
 
 -- Steam games (Proton windows are "steam_app_<id>"): open on the 240 Hz monitor, not wherever the focus was (the HDMI one
--- only offers 60 Hz, so a game that opened there could not pick 240). Fullscreen is left to the game's own setting, so you can
--- still switch it in the options. immediate = no vsync wait, lowest latency.
+-- only offers 60 Hz, so a game that opened there could not pick 240). Fullscreen: see the window.open hook below.
+-- immediate = no vsync wait, lowest latency.
 hl.window_rule({
     name  = "torii-steam-games",
     match = { class = "^steam_app_[0-9]+$" },
@@ -50,3 +50,15 @@ hl.window_rule({
     monitor   = "DP-2",
     immediate = true,
 })
+
+-- The game's own fullscreen mode breaks the mouse under XWayland (buttons do not click, and the game takes fullscreen back
+-- whenever you leave it), so the game stays windowed (video.txt "setting.fullscreen" 0) and Hyprland makes it fullscreen once
+-- when it opens. Alt+Shift+F then leaves and enters fullscreen as for any window.
+if torii_steam_sub then pcall(function() torii_steam_sub:remove() end) end     -- a reload runs this file again
+torii_steam_sub = hl.on("window.open", function(w)
+    if not (w.class or ""):match("^steam_app_%d+$") then return end
+    local addr = w.address
+    hl.timer(function()
+        os.execute(string.format("hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = \"fullscreen\", action = \"set\", window = \"address:%s\" })' >/dev/null 2>&1 &", addr))
+    end, { timeout = 1500, type = "oneshot" })
+end)
