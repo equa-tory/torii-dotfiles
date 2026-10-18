@@ -65,6 +65,7 @@ Singleton {
                     root.bump(); } }
     JsonFetch { id: fProcs;    command: [root.bin("torii-sys"), "procs"];             onDataChanged: root.bump() }
     JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: root.bump() }
+    JsonFetch { id: fSyncStatus; command: [root.bin("torii-sync"), "status"];          onDataChanged: root.bump() }
     JsonFetch { id: fSyncApps; command: [root.bin("torii-sync"), "apps"];              onDataChanged: root.bump() }
     JsonFetch { id: fSpecials; command: [root.bin("torii-rules"), "specials"];        onDataChanged: root.bump() }
     JsonFetch { id: fWins;     command: [root.bin("torii-rules"), "windows"];         onDataChanged: root.bump() }
@@ -83,7 +84,7 @@ Singleton {
     JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
@@ -579,18 +580,25 @@ Singleton {
         { k: "webapps", name: "Web apps and logins", sub: "Telegram, Discord… and that they stay signed in (torii-private)" },
         { k: "apps", name: "My desktop apps", sub: "Only the apps ticked below, with the ~/apps folder they use (torii-private)" },
         { k: "localsend", name: "LocalSend settings", sub: "Name, port and key (torii-private)" } ]
+    // "↑ 3  ↓ 1": files newer here (would be pushed) and newer on GitHub / the server (would be pulled); "…" while it is being checked
+    function syncBadge(k) {
+        const st = fSyncStatus.data ? fSyncStatus.data[k] : null;
+        const part = v => v === null || v === undefined ? "?" : String(v);
+        const counts = st ? (st.up === 0 && st.down === 0 ? "in sync" : "↑ " + part(st.up) + "  ↓ " + part(st.down)) : "…";
+        return (syncSel[k] ? "✓  " : "") + counts;
+    }
     function syncChosen() { return syncItems.filter(i => syncSel[i.k]).map(i => i.k); }
     function syncMenu(g, gitBadge) {
         const chosen = syncChosen();
-        const tick = i => ({ id: "t:" + i.k, name: i.name, sub: i.sub, badge: syncSel[i.k] ? "✓" : "", keep: true, glyph: i.k === "configs" ? Icons.git : Icons.apps,
+        const tick = i => ({ id: "t:" + i.k, name: i.name, sub: i.sub, badge: syncBadge(i.k), keep: true, glyph: i.k === "configs" ? Icons.git : Icons.apps,
             run: () => { const n = Object.assign({}, syncSel); n[i.k] = !n[i.k]; syncSel = n; bump(); } });
         const run = (verb, label, sub) => ({ id: verb, name: label, sub: chosen.length ? sub : "Tick something above first", glyph: verb === "push" ? Icons.upload : Icons.download,
             run: () => { if (chosen.length) floatTerm("Sync " + verb, [bin("torii-sync"), verb].concat(chosen)); else say("Tick something first"); } });
         return { id: "dotfiles", name: "Sync torii", glyph: Icons.git, keywords: "dotfiles git pull push sync update configs backup helium private",
                  sub: g.error ? "No remote to compare with" : g.dirty ? "Local changes not pushed" : g.behind ? g.behind + " new commits to pull" : g.ahead ? g.ahead + " commits to push" : "Configs are up to date",
-                 badge: gitBadge, onOpen: () => { fGit.refresh(); fSyncApps.refresh(); },
+                 badge: gitBadge, onOpen: () => { fGit.refresh(); fSyncApps.refresh(); fSyncStatus.refresh(); },
                  children: () => {
-            fGit.ensure(); fSyncApps.ensure();
+            fGit.ensure(); fSyncApps.ensure(); fSyncStatus.ensure();
             const apps = (fSyncApps.data || []).map(a => ({ id: "a:" + a.file, name: a.file.replace(/\.desktop$/, ""), badge: a.on ? "✓" : "", keep: true, glyph: Icons.apps,
                 run: () => { sh([bin("torii-sync"), "toggle-app", a.file]); later(fSyncApps, 300); } }));
             return syncItems.map(tick).concat([

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# torii-sync apps | toggle-app FILE | push ITEM... | pull ITEM...   -  what the launcher's Install > Sync menu runs.
+# torii-sync apps | status | toggle-app FILE | push ITEM... | pull ITEM...   -  what the launcher's Install > Sync menu runs.
 #
 # Items (you tick them in the menu):
 #   configs    the dotfiles repo (GitHub): push = commit + push, pull = pull (your uncommitted changes are kept)
@@ -31,6 +31,32 @@ try:
 except OSError:
     pass
 print(json.dumps([{"file": n, "on": n in chosen} for n in sys.argv[2:]]))' "$LIST" $(own)
+    ;;
+  status)
+    # per item {"up": files newer here, "down": files newer on the server / GitHub}; null = could not be checked
+    t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+    for it in helium webapps apps localsend; do
+      for d in up down; do ( ONLY=$it COUNT=$d bash "$REPO/packages/private-push.sh" > "$t/$it.$d" 2>/dev/null ) & done
+    done
+    git -C "$REPO" fetch --quiet 2>/dev/null
+    ahead=0; behind=0
+    if git -C "$REPO" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then read -r ahead behind < <(git -C "$REPO" rev-list --left-right --count "HEAD...@{u}"); fi
+    dirty=$(git -C "$REPO" status --porcelain | wc -l)
+    wait
+    python3 - "$t" "$((dirty + ahead))" "$behind" <<'PY'
+import json, sys, os
+t = sys.argv[1]
+def rd(it, d):
+    try:
+        v = open(os.path.join(t, it + "." + d)).read().strip()
+        return int(v) if v.isdigit() else None
+    except OSError:
+        return None
+out = {"configs": {"up": int(sys.argv[2]), "down": int(sys.argv[3])}}
+for it in ("helium", "webapps", "apps", "localsend"):
+    out[it] = {"up": rd(it, "up"), "down": rd(it, "down")}
+print(json.dumps(out))
+PY
     ;;
   toggle-app)
     [ -n "${2:-}" ] || exit 2

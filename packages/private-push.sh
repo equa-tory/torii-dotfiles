@@ -21,7 +21,7 @@ extra=(); [[ ${1:-} == --dry-run ]] && extra=(--dry-run)
 command -v rsync >/dev/null || { echo "rsync is not installed" >&2; exit 1; }
 
 ONLY="${ONLY:-all}"
-if [[ $ONLY != localsend && $ONLY != apps ]] && ps -eo comm= | grep -qxE 'helium(-browser)?'; then
+if [[ -z ${COUNT:-} && $ONLY != localsend && $ONLY != apps ]] && ps -eo comm= | grep -qxE 'helium(-browser)?'; then
   echo "!!  Helium is running (the web apps like Telegram and Discord are Helium windows too): the copy may be" >&2
   echo "!!  inconsistent (databases open). Close them and run again," >&2
   echo "!!  or continue anyway with  FORCE=1 bash packages/private-push.sh" >&2
@@ -63,6 +63,29 @@ case $ONLY in
   *)         mapfile -t mine < <(own_apps)
              paths=(.config/net.imput.helium .local/share/org.localsend.localsend_app .local/state/torii/webapps.json .local/state/torii/tuis.json "${mine[@]}") ;;
 esac
+excl=(--exclude='Cache/' --exclude='Code Cache/' --exclude='GPUCache/' --exclude='GrShaderCache/'
+      --exclude='ShaderCache/' --exclude='component_crx_cache/' --exclude='Crash Reports/'
+      --exclude='BrowserMetrics*' --exclude='DeferredBrowserMetrics/' --exclude='GPUPersistentCache/'
+      --exclude='DawnGraphiteCache/' --exclude='DawnWebGPUCache/' --exclude='CacheStorage/'
+      --exclude='SingletonLock' --exclude='SingletonCookie' --exclude='SingletonSocket')
+
+# COUNT=up|down  (the launcher's Sync menu): only print how many files of this ONLY=... part would go up (newer here or
+# missing on the server) or come down (newer on the server or missing here); nothing is copied. "?" when the server is not reachable.
+if [[ -n ${COUNT:-} ]]; then
+  DST="${DSTS%% *}"; DST="${DST%/}/"; total=0
+  ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o BatchMode=yes "${DST%%:*}" true 2>/dev/null || { echo "?"; exit 0; }
+  for p in "${paths[@]}"; do
+    if [[ $COUNT == up ]]; then
+      [[ -e $p ]] || continue
+      n=$(rsync -aRn --update --out-format='%n' "${excl[@]}" -e "ssh -o ConnectTimeout=5 -o BatchMode=yes" "$p" "$DST" 2>/dev/null | grep -vc '/$' || true)
+    else
+      n=$(rsync -aRn --update --out-format='%n' "${excl[@]}" -e "ssh -o ConnectTimeout=5 -o BatchMode=yes" "${DST}./$p" "$HOME/" 2>/dev/null | grep -vc '/$' || true)
+    fi
+    total=$((total + ${n:-0}))
+  done
+  echo "$total"; exit 0
+fi
+
 pushed=0 first=""
 for DST in $DSTS; do
   DST="${DST%/}/"
@@ -75,12 +98,7 @@ for DST in $DSTS; do
     echo "==> $p"
     # relative paths (-R) keep the layout, caches are rebuilt by the browser and just waste time
     rsync -aR --chmod=Dgo-rwx,Fgo-rwx "${extra[@]}" -e "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8" \
-      --exclude='Cache/' --exclude='Code Cache/' --exclude='GPUCache/' --exclude='GrShaderCache/' \
-      --exclude='ShaderCache/' --exclude='component_crx_cache/' --exclude='Crash Reports/' \
-      --exclude='BrowserMetrics*' --exclude='DeferredBrowserMetrics/' --exclude='GPUPersistentCache/' \
-      --exclude='DawnGraphiteCache/' --exclude='DawnWebGPUCache/' --exclude='CacheStorage/' \
-      --exclude='SingletonLock' --exclude='SingletonCookie' --exclude='SingletonSocket' \
-      "$p" "$DST"
+      "${excl[@]}" "$p" "$DST"
   done
   pushed=$((pushed + 1)); [[ -n $first ]] || first=$DST
 done
