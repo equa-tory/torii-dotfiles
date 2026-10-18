@@ -580,11 +580,11 @@ Singleton {
         { k: "webapps", name: "Web apps and logins", sub: "Telegram, Discord… and that they stay signed in (torii-private)" },
         { k: "apps", name: "My desktop apps", sub: "Only the apps ticked below, with the ~/apps folder they use (torii-private)" },
         { k: "localsend", name: "LocalSend settings", sub: "Name, port and key (torii-private)" } ]
-    // "↑ 3  ↓ 1": files newer here (would be pushed) and newer on GitHub / the server (would be pulled); "…" while it is being checked
+    // "(up icon) 3  (down icon) 1": files newer here (would be pushed) and newer on GitHub / the server (would be pulled); "…" while it is being checked
     function syncBadge(k) {
         const st = fSyncStatus.data ? fSyncStatus.data[k] : null;
         const part = v => v === null || v === undefined ? "?" : String(v);
-        const counts = st ? (st.up === 0 && st.down === 0 ? "in sync" : "↑ " + part(st.up) + "  ↓ " + part(st.down)) : "…";
+        const counts = st ? (st.up === 0 && st.down === 0 ? "in sync" : Icons.upload + " " + part(st.up) + "   " + Icons.download + " " + part(st.down)) : "…";
         return (syncSel[k] ? "✓  " : "") + counts;
     }
     function syncChosen() { return syncItems.filter(i => syncSel[i.k]).map(i => i.k); }
