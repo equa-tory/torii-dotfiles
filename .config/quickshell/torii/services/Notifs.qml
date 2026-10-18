@@ -23,6 +23,40 @@ Singleton {
     readonly property string bin: Config.home + "/.config/torii/bin/"
     readonly property string stateFile: Config.stateDir + "/notifications.json"
 
+    // the saved history loads a moment after start: until then "was this one already shown before the reload?" can't be answered
+    property bool ready: false
+    property var early: []
+    function flushEarly() {
+        ready = true;
+        const l = early; early = [];
+        for (const n of l) handle(n);
+    }
+    function handle(n) {
+        // a shell reload hands every notification that is still open to us again: link it, don't show it twice
+        const key = Quickshell.processId + ":" + n.id;
+        const known = root.history.find(e => e.key === key);
+        if (known) {
+            root.live[known.uid] = n;
+            n.closed.connect(() => { delete root.live[known.uid]; });
+            return;
+        }
+        const uid = Date.now() * 1000 + (root.seq++ % 1000);
+        const urgent = n.urgency === NotificationUrgency.Critical;
+        let icon = n.image || n.appIcon || "";
+        const entry = { uid: uid, key: key, app: n.appName || "", desktop: n.desktopEntry || "", summary: n.summary || "", body: n.body || "",
+                        icon: icon, time: Date.now(), urgent: urgent,
+                        actions: Array.from(n.actions).map(a => ({ id: a.identifier, text: a.text })) };
+        root.live[uid] = n;
+        n.closed.connect(() => { delete root.live[uid]; });
+        root.history = [entry].concat(root.history).slice(0, 100);
+        root.unread += 1;
+        root.save();
+        if (root.dnd && !urgent) return;
+        if (entry.app !== "torii") Quickshell.execDetached([root.bin + "torii-sound", "notification"]);   // reminders play their own
+        root.queue = root.queue.concat([entry]);
+        if (root.current === null) root.next();
+    }
+
     NotificationServer {
         keepOnReload: true
         actionsSupported: true
@@ -32,29 +66,8 @@ Singleton {
 
         onNotification: n => {
             n.tracked = true;
-            // a shell reload hands every notification that is still open to us again: link it, don't show it twice
-            const key = Quickshell.processId + ":" + n.id;
-            const known = root.history.find(e => e.key === key);
-            if (known) {
-                root.live[known.uid] = n;
-                n.closed.connect(() => { delete root.live[known.uid]; });
-                return;
-            }
-            const uid = Date.now() * 1000 + (root.seq++ % 1000);
-            const urgent = n.urgency === NotificationUrgency.Critical;
-            let icon = n.image || n.appIcon || "";
-            const entry = { uid: uid, key: key, app: n.appName || "", desktop: n.desktopEntry || "", summary: n.summary || "", body: n.body || "",
-                            icon: icon, time: Date.now(), urgent: urgent,
-                            actions: Array.from(n.actions).map(a => ({ id: a.identifier, text: a.text })) };
-            root.live[uid] = n;
-            n.closed.connect(() => { delete root.live[uid]; });
-            root.history = [entry].concat(root.history).slice(0, 100);
-            root.unread += 1;
-            root.save();
-            if (root.dnd && !urgent) return;
-            if (entry.app !== "torii") Quickshell.execDetached([root.bin + "torii-sound", "notification"]);   // reminders play their own
-            root.queue = root.queue.concat([entry]);
-            if (root.current === null) root.next();
+            if (!root.ready) { root.early = root.early.concat([n]); return; }
+            root.handle(n);
         }
     }
 
@@ -148,6 +161,8 @@ Singleton {
                 root.history = Array.isArray(d.history) ? d.history : [];
                 root.unread = d.unread || 0;
             } catch (e) {}
+            root.flushEarly();
         }
+        onLoadFailed: root.flushEarly()
     }
 }
