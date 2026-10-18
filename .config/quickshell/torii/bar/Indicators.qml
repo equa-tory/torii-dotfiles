@@ -9,7 +9,7 @@ import QtQuick
 Row {
     id: root
 
-    spacing: 8
+    spacing: pad > 0 ? 14 : 8             // circles style: a clear gap between the round backings
     property real pad: 0                  // circles style: padding of each activity's own round backing
     property color backing: "transparent"
     readonly property int count: repeater.count

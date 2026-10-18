@@ -32,5 +32,19 @@
     "title": "Steam Settings",
     "float": true,
     "silent": true
+  },
+  {
+    "class": "steam",
+    "name": "The Outlast Trials  ·  popup of steam",
+    "title": "The Outlast Trials",
+    "float": true,
+    "silent": true
+  },
+  {
+    "class": "steam",
+    "name": "Friends List  ·  popup of steam",
+    "title": "Friends List",
+    "silent": true,
+    "float": true
   }
 ]
