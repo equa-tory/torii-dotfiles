@@ -177,3 +177,12 @@ fi
 # open FILE: video / audio / pictures / pdf / text / json / code / databases / .exe with the right app, asks when none is set
 # (torii-open --list shows them, open -c FILE chooses again). On macOS the system `open` stays.
 [ "$(uname)" = Linux ] && command -v torii-open >/dev/null 2>&1 && alias open='torii-open'
+
+# y: file manager in the terminal (yazi). Arrows / h j k l move, Enter opens (through `open`), q leaves and cd's to where you were.
+y() {
+  command -v yazi >/dev/null 2>&1 || { echo "yazi is not installed"; return 1; }
+  local tmp cwd; tmp="$(mktemp -t yazi-cwd.XXXXXX)"
+  yazi "$@" --cwd-file="$tmp"
+  cwd="$(cat -- "$tmp" 2>/dev/null)"; rm -f -- "$tmp"
+  [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && cd -- "$cwd"
+}

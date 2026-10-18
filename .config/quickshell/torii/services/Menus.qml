@@ -60,6 +60,7 @@ Singleton {
     JsonFetch { id: fFiles;    command: [root.bin("torii-default"), "list", "files"];    onDataChanged: root.bump() }
     JsonFetch { id: fTerminal; command: [root.bin("torii-default"), "list", "terminal"]; onDataChanged: root.bump() }
     JsonFetch { id: fEditor;   command: [root.bin("torii-default"), "list", "editor"];   onDataChanged: root.bump() }
+    JsonFetch { id: fOpen;     command: [root.bin("torii-open"), "--json"];              onDataChanged: root.bump() }
     JsonFetch { id: fEmoji;    command: [root.bin("torii-emoji"), "list"];
                 onDataChanged: { root.emojiNodes = (data || []).map(e => ({ id: "e:" + e.c, name: e.n, sub: e.g, glyph: e.c, run: () => app([root.bin("torii-emoji"), "copy", e.c]) }));
                     root.bump(); } }
@@ -911,13 +912,28 @@ Singleton {
             return list.length ? list : [{ id: "none", name: "Nothing installed for this", sub: "" }];
         } };
     }
+    // which app opens each kind of file (the `open` command, Dolphin, mc, xdg-open): torii-open
+    function defaultsOpen() {
+        const label = { video: "Video", audio: "Audio", image: "Pictures", pdf: "PDF and books", markdown: "Markdown (.md)", text: "Text, json, code", db: "Databases", exe: "Windows programs (.exe)", archive: "Archives" };
+        return { id: "openwith", name: "Open files with", glyph: Icons.folder, sub: "Video, pictures, text, .exe ...", keywords: "open default app mpv imv zathura nvim exe video audio picture pdf", children: () => {
+            fOpen.ensure();
+            return (fOpen.data || []).map(k => ({
+                id: k.kind, name: label[k.kind] || k.kind, sub: (k.options.find(o => o.current) || {}).name || "Nothing installed",
+                children: () => k.options.length ? k.options.map(o => ({
+                    id: o.id, name: o.name, badge: o.current ? "●" : "", keep: true,
+                    run: () => { sh([bin("torii-open"), "--set", k.kind, o.id]); fOpen.data = (fOpen.data || []).map(x => x.kind !== k.kind ? x : Object.assign({}, x, { options: x.options.map(y => Object.assign({}, y, { current: y.id === o.id })) })); later(fOpen, 800); say((label[k.kind] || k.kind) + ": " + o.name); }
+                })) : [{ id: "none", name: "Nothing installed for this", sub: "Run  open FILE  in a terminal to install one" }]
+            }));
+        } };
+    }
     function defaultsMenu() {
         for (const f of [fBrowser, fEditor, fFiles, fTerminal]) f.ensure();
-        return { id: "defaults", name: "Defaults", glyph: Icons.tune, sub: "Browser, editor, files, terminal", children: () => [
+        return { id: "defaults", name: "Defaults", glyph: Icons.tune, sub: "Browser, editor, files, terminal, open with", children: () => [
             defaultsKind("browser", "Browser", Icons.web, fBrowser, "browser"),
             defaultsKind("editor", "Editor", Icons.pencil, fEditor, "editor"),
             defaultsKind("files", "Files", Icons.folder, fFiles, "files"),
-            defaultsKind("terminal", "Terminal", Icons.terminal, fTerminal, "terminal") ] };
+            defaultsKind("terminal", "Terminal", Icons.terminal, fTerminal, "terminal"),
+            defaultsOpen() ] };
     }
 
     // night light: hyprsunset (GPU) or a warm overlay drawn by the shell, through torii-nightlight

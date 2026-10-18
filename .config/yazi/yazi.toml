@@ -1,0 +1,19 @@
+# yazi: arrows (or h j k l) move around, Left = parent folder, Right / Enter = open the folder or the file.
+# Files open through torii-open (the same apps as `open`, Dolphin and mc: Setup > Defaults > Open files with).
+[mgr]
+show_hidden = false
+sort_dir_first = true
+
+[opener]
+torii = [
+  { run = 'torii-open "$@"', desc = "Open", for = "unix", orphan = true },
+]
+edit = [
+  { run = '${EDITOR:-nvim} "$@"', desc = "Edit", for = "unix", block = true },
+]
+
+[open]
+rules = [
+  { name = "*/", use = ["torii"] },
+  { mime = "*", use = ["torii", "edit"] },
+]

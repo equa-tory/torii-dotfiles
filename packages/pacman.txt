@@ -24,6 +24,8 @@ imv
 zathura
 zathura-pdf-mupdf
 sqlitebrowser
+yazi
+ffmpegthumbnailer
 umu-launcher
 gamemode
 lib32-gamemode
@@ -112,3 +114,4 @@ jdk21-openjdk
 jdk-openjdk
 openal
 glfw
+mc
