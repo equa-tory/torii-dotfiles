@@ -187,8 +187,7 @@ local function bar_height()
     return (ok and type(b) == "table" and tonumber(b.height)) or 28
 end
 
-local function work_area(w)
-    local mon = w.monitor or hl.get_active_monitor()
+local function area_of(mon)
     local r = mon.reserved or {}
     local sc = mon.scale or 1
     local go = hl.get_config("general.gaps_out")
@@ -202,6 +201,33 @@ local function work_area(w)
         h = mon.height / sc - top - (r.bottom or 0) - (go.bottom or 0),
         gap = go.left or 8,
     }
+end
+
+-- the monitor the window is on by where it is (w.monitor lags behind right after the window was moved to another monitor)
+local function monitor_of(w)
+    local cx, cy = xy(w.at, "x", 1) + xy(w.size, "x", 1) / 2, xy(w.at, "y", 2) + xy(w.size, "y", 2) / 2
+    for _, m in ipairs(hl.get_monitors()) do
+        local sc = m.scale or 1
+        if cx >= m.x and cx < m.x + m.width / sc and cy >= m.y and cy < m.y + m.height / sc then return m end
+    end
+    return w.monitor or hl.get_active_monitor()
+end
+
+local function work_area(w)
+    return area_of(monitor_of(w))
+end
+
+-- the nearest monitor on that side (left / right) of mon, or nil
+local function neighbour(mon, dir)
+    local best, dist
+    local edge = mon.x + mon.width / (mon.scale or 1)
+    for _, m in ipairs(hl.get_monitors()) do
+        if m.name ~= mon.name then
+            local d = dir == "right" and (m.x - edge) or (mon.x - (m.x + m.width / (m.scale or 1)))
+            if d >= -2 and (not dist or d < dist) then best, dist = m, d end
+        end
+    end
+    return best
 end
 
 local function place(w, g)
@@ -219,19 +245,33 @@ function torii_float_snap(dir)
     if mode ~= "float" then return false end
     local w = hl.get_active_window()
     if not w or not w.floating then return false end
+    local mon = monitor_of(w)
     local a = work_area(w)
     local half = (a.w - a.gap) / 2
     local g
     if dir == "left" then g = { x = a.x, y = a.y, w = half, h = a.h }
-    elseif dir == "right" then g = { x = a.x + a.w - half, y = a.y, w = half, h = a.h }
-    elseif dir == "up" then g = { x = a.x, y = a.y, w = a.w, h = a.h }
+    elseif dir == "right" then g = { x = a.x + a.w - half, y = a.y, w = half, h = a.h } end
+    -- already on that half: the next press sends it to the monitor on that side, onto the half next to the edge it came from
+    if g and (dir == "left" or dir == "right") then
+        local function near(v, t) return math.abs(v - t) <= 6 end
+        if near(xy(w.at, "x", 1), g.x) and near(xy(w.at, "y", 2), g.y) and near(xy(w.size, "x", 1), g.w) then
+            local n = neighbour(mon, dir)
+            if n then
+                local a2 = area_of(n)
+                local half2 = (a2.w - a2.gap) / 2
+                place(w, { x = dir == "left" and (a2.x + a2.w - half2) or a2.x, y = a2.y, w = half2, h = a2.h })
+            end
+            return true
+        end
+    end
+    if dir == "up" then g = { x = a.x, y = a.y, w = a.w, h = a.h }
     elseif dir == "down" then
         g = before_snap[w.address]
         before_snap[w.address] = nil
         if not g then return true end
         place(w, g)
         return true
-    else return false end
+    elseif not g then return false end
     remember_before(w)
     place(w, g)
     return true
