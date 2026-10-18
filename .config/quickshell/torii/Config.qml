@@ -19,6 +19,7 @@ Singleton {
     readonly property var theme: adapter.theme
     readonly property var font: adapter.font
     readonly property var launcher: adapter.launcher
+    readonly property var limine: adapter.limine
     readonly property var notifications: adapter.notifications
     readonly property var sounds: adapter.sounds
     readonly property var activities: adapter.activities
@@ -107,6 +108,12 @@ Singleton {
             }
             property JsonObject features: JsonObject {
                 property bool systemInfo: false        // CPU/RAM/GPU widget and the Processes menu: switched off for now, the code is kept
+            }
+            property JsonObject limine: JsonObject {
+                property string image: ""              // boot menu picture; empty = the desktop wallpaper
+                property real brightness: 0            // -100..100 %
+                property real blur: 1.5                // pixels
+                property real panel: 0.3               // 0..1: how solid the dark panel behind the menu text is
             }
             property string quicklinks: "~/.config/torii/quicklinks.json"
         }

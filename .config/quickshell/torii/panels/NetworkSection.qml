@@ -1,6 +1,8 @@
 import qs
 import qs.services
 import qs.widgets
+import Quickshell
+import Quickshell.Io
 import Quickshell.Networking
 import QtQuick
 import QtQuick.Layouts
@@ -21,7 +23,33 @@ Section {
     onAskingChanged: if (asking === "") shown = Net.wifiNetworks
     Component.onCompleted: shown = Net.wifiNetworks
 
+    // the "what is my IP" button: addresses of every interface that is up, and the public one (asked from the internet when pressed)
+    property bool ipOpen: false
+    property var localIps: []
+    property string publicIp: ""
+    function checkIp() {
+        localIps = []; publicIp = "…";
+        localProc.running = true;
+        pubProc.running = true;
+    }
+    Process {
+        id: localProc
+        command: ["sh", "-c", "ip -4 -o addr show scope global | awk '{print $2, $4}'"]
+        stdout: StdioCollector { onStreamFinished: root.localIps = text.trim().split("\n").filter(l => l !== "").map(l => l.split(" ")) }
+    }
+    Process {
+        id: pubProc
+        command: ["sh", "-c", "curl -fsS --max-time 5 https://api.ipify.org || echo unavailable"]
+        stdout: StdioCollector { onStreamFinished: root.publicIp = text.trim() }
+    }
+
     actions: [
+        IconButton {
+            glyph: Icons.web
+            size: 14
+            active: root.ipOpen
+            onClicked: { root.ipOpen = !root.ipOpen; if (root.ipOpen) root.checkIp(); }
+        },
         IconButton {
             visible: Net.wifiAvailable
             glyph: Icons.refresh
@@ -40,6 +68,31 @@ Section {
         title: Net.activeKind === "" ? "Not connected" : Net.activeName
         titleColor: Net.activeKind === "" ? Theme.muted : Theme.fg
         subtitle: Net.activeKind === "" ? "" : (Net.ip !== "" ? Net.ip : "Getting address…")
+    }
+
+    ColumnLayout {
+        visible: root.ipOpen
+        Layout.fillWidth: true
+        spacing: 2
+
+        Repeater {
+            model: root.localIps
+            delegate: ListRow {
+                required property var modelData
+                Layout.fillWidth: true
+                glyph: modelData[0].indexOf("wl") === 0 ? Icons.wifiOff : Icons.ethernet
+                title: modelData[1].split("/")[0]
+                subtitle: modelData[0] + "  ·  click to copy"
+                onClicked: Quickshell.execDetached(["wl-copy", modelData[1].split("/")[0]])
+            }
+        }
+        ListRow {
+            Layout.fillWidth: true
+            glyph: Icons.web
+            title: root.publicIp
+            subtitle: "Public address  ·  click to copy"
+            onClicked: if (root.publicIp !== "" && root.publicIp !== "…" && root.publicIp !== "unavailable") Quickshell.execDetached(["wl-copy", root.publicIp])
+        }
     }
 
     Flickable {

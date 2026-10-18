@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """torii-theme: derive one token set from a wallpaper and apply it to the whole desktop.
 
-  torii-theme set <image> | next | prev | random | restore | mode [dark|light|toggle] | palette <image> | current | check [image...]
+  torii-theme set <image> | next | prev | random | restore | limine | mode [dark|light|toggle] | palette <image> | current | check [image...]
 
 Generated files go to ~/.local/state/torii (never into the repo or stow-managed dirs).
 """
@@ -391,8 +391,9 @@ def write_if_changed(path, data):
 
 def render_all(tokens):
     changed = []
+    extra = dict(tokens, limineTT="%02x" % round(255 * (1 - limine_settings()["panel"])))   # Limine: TT is transparency, not opacity
     for tpl in sorted(TEMPLATES.iterdir()):
-        if tpl.is_file() and write_if_changed(THEME_DIR / tpl.name, render(tpl.read_text(), tokens)):
+        if tpl.is_file() and write_if_changed(THEME_DIR / tpl.name, render(tpl.read_text(), extra)):
             changed.append(tpl.name)
     if write_if_changed(THEME_DIR / "tokens.json", json.dumps(tokens, indent=2) + "\n"):
         changed.append("tokens.json")
@@ -402,12 +403,28 @@ def render_all(tokens):
     return changed
 
 
+def limine_settings():
+    """The boot menu look (config.json "limine"): image ("" = the desktop wallpaper, or a file), brightness -100..100 (%),
+    blur (pixels), panel (0..1: how solid the dark panel behind the menu text is)."""
+    c = read_config().get("limine", {})
+    def num(k, d, lo, hi):
+        try:
+            return max(lo, min(hi, float(c.get(k, d))))
+        except (TypeError, ValueError):
+            return d
+    return {"image": str(c.get("image") or ""), "brightness": num("brightness", 0, -100, 100),
+            "blur": num("blur", 1.5, 0, 20), "panel": num("panel", 0.3, 0, 1)}
+
+
 def limine_wallpaper(tokens):
-    """The boot menu background: the wallpaper, 1920x1080, blurred and darkened (packages/limine-theme.sh copies it to /boot)."""
-    src, dst = tokens.get("wallpaper") or "", THEME_DIR / "limine-wallpaper.jpg"
+    """The boot menu background: the chosen image (or the wallpaper), 1920x1080, blurred and dimmed to taste
+    (packages/limine-theme.sh copies it to /boot)."""
+    st = limine_settings()
+    src = os.path.expanduser(st["image"]) if st["image"] else (tokens.get("wallpaper") or "")
+    dst = THEME_DIR / "limine-wallpaper.jpg"
     marker = THEME_DIR / "limine-wallpaper.src"
     try:
-        want = "%s %s" % (src, os.path.getmtime(src))
+        want = "%s %s %s %s" % (src, os.path.getmtime(src), st["brightness"], st["blur"])
     except OSError:
         return
     try:
@@ -417,7 +434,7 @@ def limine_wallpaper(tokens):
         pass
     tool = shutil.which("magick") or shutil.which("convert")
     if tool and sh(tool, src + "[0]", "-resize", "1920x1080^", "-gravity", "center", "-extent", "1920x1080",
-                   "-blur", "0x5", "-brightness-contrast", "-30x0", "-quality", "85", str(dst), timeout=60):
+                   "-blur", "0x%s" % st["blur"], "-brightness-contrast", "%dx0" % st["brightness"], "-quality", "88", str(dst), timeout=60):
         marker.write_text(want)
 
 
@@ -600,6 +617,11 @@ def main(argv):
         except (OSError, ValueError):
             stale = True                     # e.g. Darkly or Papirus was installed after the last run
         apply(img, force=stale)
+    elif cmd == "limine":                 # redo the boot menu files (after changing the "limine" settings)
+        try:
+            render_all(json.loads((THEME_DIR / "tokens.json").read_text()))
+        except (OSError, ValueError):
+            raise SystemExit("no theme yet: run torii-theme restore first")
     elif cmd == "mode":
         want = rest[0] if rest else None
         if want is None:

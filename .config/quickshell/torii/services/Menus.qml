@@ -65,6 +65,7 @@ Singleton {
                     root.bump(); } }
     JsonFetch { id: fProcs;    command: [root.bin("torii-sys"), "procs"];             onDataChanged: root.bump() }
     JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: root.bump() }
+    JsonFetch { id: fBootImgs; command: ["sh", "-c", "ls -1 \"$HOME\"/Pictures/wallpapers/* 2>/dev/null | jq -R -s -c 'split(\"\\n\")[:-1]'"]; onDataChanged: root.bump() }
     JsonFetch { id: fSyncStatus; command: [root.bin("torii-sync"), "status"];          onDataChanged: root.bump() }
     JsonFetch { id: fSyncApps; command: [root.bin("torii-sync"), "apps"];              onDataChanged: root.bump() }
     JsonFetch { id: fSpecials; command: [root.bin("torii-rules"), "specials"];        onDataChanged: root.bump() }
@@ -84,7 +85,7 @@ Singleton {
     JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fBootImgs, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
@@ -692,7 +693,7 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), bootMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
     }
 
     // ================= Clean up: caches, logs, Docker, big files (torii-clean)
@@ -808,6 +809,26 @@ Singleton {
         return { id: id, name: name, sub: sub || "", glyph: Icons.tune, keywords: "window look appearance",
                  slider: { min: min, max: max, step: step, value: value, unit: unit, decimals: decimals },
                  onSlide: v => sh([bin("torii-hypr")].concat(args(v))) };
+    }
+    // ---- boot menu (Limine) look: picture, brightness, blur, how solid the text panel is; "Apply" copies it to /boot (sudo)
+    function bootMenu() {
+        const set = (key, json) => sh([bin("torii-config"), "set", key, json]);
+        const img = Config.limine.image;
+        return { id: "boot", name: "Boot menu", glyph: Icons.tune, keywords: "limine grub boot loader picture image wallpaper skin theme",
+                 sub: (img ? img.split("/").pop() : "Desktop wallpaper") + "  ·  press Apply after changes", onOpen: () => fBootImgs.refresh(),
+                 children: () => [
+            { id: "bimg", name: "Picture", glyph: Icons.image || Icons.apps, sub: img ? img.replace(home, "~") : "Same as the desktop wallpaper", children: () =>
+                [{ id: "same", name: "Same as the desktop wallpaper", badge: img ? "" : "●", keep: true, run: () => set("limine.image", '""') }]
+                    .concat((fBootImgs.data || []).map(f => ({ id: "i:" + f, name: f.split("/").pop(), sub: f.replace(home, "~"), badge: img === f ? "●" : "", keep: true,
+                        run: () => set("limine.image", JSON.stringify(f)) })))
+                    .concat([{ id: "type", name: "Type a path…", keep: true,
+                        run: () => ask("Image file (png/jpg), empty = desktop wallpaper", false, t => set("limine.image", JSON.stringify(t.trim().replace(/^~/, home)))) }]) },
+            cfgSlider("bbright", "Brightness", "limine.brightness", -60, 40, 5, Config.limine.brightness, " %", 0, "Lower is darker; the picture is dimmed this much"),
+            cfgSlider("bblur", "Blur", "limine.blur", 0, 10, 0.5, Config.limine.blur, " px", 1, "0 keeps the picture sharp"),
+            cfgSlider("bpanel", "Text panel", "limine.panel", 0, 1, 0.05, Config.limine.panel, "", 2, "The dark glass behind the menu text: 0 none, 1 solid"),
+            { id: "bapply", name: "Apply to the boot menu", glyph: Icons.upload, keep: true,
+              sub: "Writes the picture and colours to /boot (asks for your password). Takes effect at the next boot",
+              run: () => floatTerm("Boot menu", ["sh", "-c", 'bash "$(dirname "$(readlink -f ~/.config/quickshell)")/../packages/limine-theme.sh"; printf "\\nPress Enter to close "; read _']) } ] };
     }
     function appearanceMenu() {
         fMons.ensure(); fHypr.ensure();

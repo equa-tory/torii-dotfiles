@@ -11,6 +11,9 @@ THEME="${TORII_STATE:-$HOME/.local/state/torii}/theme"
 CONF="${LIMINE_CONF:-/boot/limine.conf}"
 SUDO="${SUDO-sudo}"; if [[ $EUID -eq 0 ]]; then SUDO=""; fi
 
+# make the files from the current settings first (config.json "limine": image, brightness, blur, panel)
+if [[ $EUID -ne 0 && -x $HOME/.config/torii/bin/torii-theme ]]; then "$HOME/.config/torii/bin/torii-theme" limine || true; fi
+
 [[ -f $CONF ]] || { echo "  no $CONF (not booted with Limine), skipping"; exit 0; }
 [[ -f $THEME/limine.conf && -f $THEME/limine-wallpaper.jpg ]] || { echo "  no generated Limine theme yet: run torii-theme restore first" >&2; exit 1; }
 
