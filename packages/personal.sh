@@ -8,11 +8,11 @@
 #
 # If the server cannot be reached (away from home, no LAN) this skips quietly. Run it again later:
 #   bash packages/personal.sh
-# Option (environment): PRIVATE_SRC=user@host:path/   rsync source, default below
+# Option (environment): PRIVATE_SRC="user@host:path/ ..."   rsync sources, tried in order (default: the two home servers)
 set -euo pipefail
 
-PRIVATE_SRC="${PRIVATE_SRC:-equa@192.168.1.50:torii-private/}"   # user@host:path (path is relative to the server's home)
-PRIVATE_SRC="${PRIVATE_SRC%/}/"
+# user@host:path (path is relative to the server's home). Tried in this order; the first that answers is used
+PRIVATE_SRCS="${PRIVATE_SRC:-equa@192.168.1.50:torii-private/ equa@192.168.1.23:torii-private/}"
 FSTAB="${FSTAB:-/etc/fstab}"
 ROOT_HOME="${ROOT_HOME:-/root}"
 DEV_ROOT="${DEV_ROOT:-/dev/disk}"
@@ -28,8 +28,13 @@ trap 'rm -rf "$stage" "${tmp_files[@]}"' EXIT
 
 # Where the data lives: the home server first, then the backup copy on the Umbrel share (mounted at /mnt/umbrel)
 BACKUP_DIR="${PRIVATE_BACKUP:-/mnt/umbrel/Documents/torii-private}"
-say "Fetching private data from $PRIVATE_SRC"
-if ! rsync -a -e "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8" "$PRIVATE_SRC" "$stage/"; then
+got=0
+for PRIVATE_SRC in $PRIVATE_SRCS; do
+  PRIVATE_SRC="${PRIVATE_SRC%/}/"
+  say "Fetching private data from $PRIVATE_SRC"
+  if rsync -a -e "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8" "$PRIVATE_SRC" "$stage/"; then got=1; break; fi
+done
+if ((!got)); then
   warn "Home server not reachable (or wrong login/path)."
   if ls "$BACKUP_DIR" >/dev/null 2>&1 && [[ -n $(ls -A "$BACKUP_DIR" 2>/dev/null) ]]; then
     say "Using the backup copy in $BACKUP_DIR"

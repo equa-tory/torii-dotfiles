@@ -69,6 +69,10 @@ UNIT
   say "Helium: theme colour policy + default browser"
   if command -v helium-browser >/dev/null 2>&1; then
     bash "$REPO/packages/helium-policy.sh"
+    # keep the cookies in the browser's own store (not KWallet, which Dolphin pulls in): then a copy of the profile
+    # (private-push.sh) still signs you in to Telegram / Discord on a fresh install
+    flags="${XDG_CONFIG_HOME:-$HOME/.config}/helium-browser-flags.conf"
+    grep -qs -- '--password-store=basic' "$flags" || echo '--password-store=basic' >> "$flags"
     if [[ $(xdg-settings get default-web-browser 2>/dev/null) != helium.desktop ]]; then
       xdg-settings set default-web-browser helium.desktop || echo "!!  could not set the default browser"
     fi
