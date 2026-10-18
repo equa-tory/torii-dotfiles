@@ -76,6 +76,9 @@ for lib in libs:
         a = load(m).get("AppState", {})
         if a.get("appid") and a.get("name") and not skip.search(a["name"]): games[a["appid"]] = a["name"]
 
+# games with their own preferred options (Deadlock: skip the intro video, high priority)
+special = {"1422450": "gamemoderun %command% -novid -high"}
+
 # 1. launch options
 for lc in glob.glob(os.path.join(steam, "userdata", "*", "config", "localconfig.vdf")):
     data = load(lc)
@@ -83,8 +86,8 @@ for lc in glob.glob(os.path.join(steam, "userdata", "*", "config", "localconfig.
     for appid, name in sorted(games.items(), key=lambda x: x[1]):
         app = child(apps, appid)
         if not app.get("LaunchOptions", "").strip():
-            app["LaunchOptions"] = "gamemoderun %command%"
-            print(f"  {name}: gamemoderun %command%")
+            app["LaunchOptions"] = special.get(appid, "gamemoderun %command%")
+            print(f"  {name}: {app['LaunchOptions']}")
     save(lc, data)
 
 # 2. default compatibility tool
@@ -97,5 +100,15 @@ if tools and os.path.exists(cfg):
         mapping["0"] = {"name": os.path.basename(tools[-1]), "config": "", "priority": "75"}
         print(f"  default compatibility tool: {os.path.basename(tools[-1])}")
         save(cfg, data)
+# 3. Deadlock video: windowed in the game (Hyprland makes it fullscreen: its own fullscreen mode breaks the mouse under XWayland),
+# 240 Hz. Only when the game has written its settings once (it rewrites them on every start, so they are kept)
+for vt in glob.glob(os.path.join(steam, "userdata", "*", "1422450", "local", "cfg", "video.txt")):
+    t = open(vt, encoding="utf-8").read()
+    n = re.sub(r'("setting\.fullscreen"\s+)"\d+"', r'\1"0"', t)
+    n = re.sub(r'("setting\.refreshrate_numerator"\s+)"\d+"', r'\1"240000"', n)
+    n = re.sub(r'("setting\.refreshrate_denominator"\s+)"\d+"', r'\1"1000"', n)
+    if n != t:
+        open(vt, "w", encoding="utf-8").write(n)
+        print("  Deadlock video: windowed, 240 Hz")
 print("  done")
 PY
