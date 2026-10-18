@@ -4,7 +4,7 @@
     "name": "chrome-web.telegram.org__-Default",
     "workspace": "special:magic",
     "float": false,
-    "remember": false,
+    "remember": true,
     "silent": true,
     "autostart": true,
     "exec": "desktop:torii-web-telegram.desktop"
@@ -14,7 +14,7 @@
     "name": "chrome-discord.com__channels_679588785989746688_679589015971954717-Default",
     "workspace": "special:magic",
     "float": false,
-    "remember": false,
+    "remember": true,
     "silent": true,
     "autostart": true,
     "exec": "desktop:torii-web-discord.desktop"

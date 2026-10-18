@@ -69,9 +69,10 @@ Section {
                             : d.connected ? "Connected" + (d.batteryAvailable ? "  ·  " + Math.round(d.battery * 100) + "%" : "")
                             : d.paired ? "Paired" : "Available"
                     onClicked: {
-                        if (!d.paired) d.pair();
+                        // trusted: without it bluez (no agent here) refuses the audio profiles of headphones after pairing
+                        if (!d.paired) { d.trusted = true; d.pair(); }
                         else if (d.connected) d.disconnect();
-                        else d.connect();
+                        else { d.trusted = true; d.connect(); }
                     }
                     IconButton {
                         visible: row.d.paired
