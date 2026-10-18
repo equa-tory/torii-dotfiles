@@ -293,7 +293,7 @@ hl.bind(mainMod .. " + SHIFT + " .. mainMod:sub(1, 1) .. mainMod:sub(2):lower() 
 
 -- Games: Alt is the main modifier here, so Alt+1..0 and friends would never reach a game that uses them. While a Steam game
 -- (Proton windows are "steam_app_<id>") is fullscreen and has the focus, the normal binds are off and only these few stay
--- (the media keys are "submap_universal", so they work as always). Out of fullscreen (Alt+Shift+F) every bind works again.
+-- (Alt+Space launcher, Alt+N control centre, Alt+Tab; the media keys are "submap_universal", so they work as always). Out of fullscreen (Alt+Shift+F) every bind works again.
 -- Alt+Shift+G switches the game keys off by hand (until the focus or fullscreen changes).
 hl.define_submap("game", function()
     hl.bind(mainMod .. " + SHIFT + F", function()
@@ -301,6 +301,8 @@ hl.define_submap("game", function()
     end)
     hl.bind(mainMod .. " + TAB", function() tab("next") end)
     hl.bind(mainMod .. " + SHIFT + TAB", function() tab("prev") end)
+    hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd(qsipc .. "launcher toggle"))
+    hl.bind(mainMod .. " + N",     hl.dsp.exec_cmd(qsipc .. "control toggle"))
     hl.bind(mainMod .. " + SHIFT + G", hl.dsp.submap("reset"))
 end)
 local function game_keys()
