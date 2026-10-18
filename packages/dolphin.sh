@@ -21,6 +21,7 @@ seed dolphinrc "$HOME/.config/dolphinrc"
 seed user-places.xbel "$HOME/.local/share/user-places.xbel"
 mkdir -p "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/Pictures" "$HOME/Videos"
 [[ -f $SEED/dolphinui.rc ]] && seed dolphinui.rc "$HOME/.local/share/kxmlgui5/dolphin/dolphinui.rc"
+[[ -f $SEED/../darkly/darklyrc ]] && SEED=$SEED/../darkly seed darklyrc "$HOME/.config/darklyrc"
 
 # make it the default for folders (the launcher's Setup > Defaults does the same)
 if [[ -e /usr/share/applications/org.kde.dolphin.desktop ]]; then

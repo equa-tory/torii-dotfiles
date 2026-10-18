@@ -8,3 +8,6 @@ lavat
 # title bars for floating windows (must match the Hyprland version, rebuilt by yay on updates)
 hyprland-plugin-hyprbars
 wayfreeze
+
+# soft, rounded Qt style for Dolphin and other KDE/Qt apps (colours still follow the wallpaper; torii-theme picks it when installed)
+darkly

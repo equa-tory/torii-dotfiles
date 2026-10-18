@@ -189,7 +189,8 @@ def build_tokens(accent_src, tint, accent_override=None, mode="dark", others=Non
         "browser": oklch_to_hex(0.16 if dark else 0.95, 0.008 + tint * 0.01, aH),
         "mode": "dark" if dark else "light",
         "gtkTheme": "adw-gtk3-dark" if dark else "adw-gtk3",
-        "iconTheme": "breeze-dark" if dark else "breeze",
+        "iconTheme": icon_theme(dark),
+        "widgetStyle": widget_style(),
         "catppuccin": "mocha" if dark else "latte",
     })
     return t
@@ -251,6 +252,21 @@ def override_for(image):
         return acc if acc and re.fullmatch(r"#[0-9a-fA-F]{6}", acc) else None
     except (OSError, ValueError):
         return None
+
+
+def icon_theme(dark):
+    """Papirus (soft, rounded) when it is installed, else Breeze."""
+    if Path("/usr/share/icons/Papirus").is_dir():
+        return "Papirus-Dark" if dark else "Papirus-Light"
+    return "breeze-dark" if dark else "breeze"
+
+
+def widget_style():
+    """Darkly (rounded, soft Qt style that follows the KDE colour scheme) when it is installed, else Fusion."""
+    for d in ("/usr/lib/qt6/plugins/styles", "/usr/lib64/qt6/plugins/styles"):
+        if any(Path(d).glob("darkly*")):
+            return "Darkly"
+    return "Fusion"
 
 
 def get_mode():
@@ -377,18 +393,19 @@ def ensure_qt_conf():
     """qt6ct needs to know where the generated colour scheme lives and which icons to use (breeze or breeze-dark by
     mode). Created once; afterwards only the icon_theme line follows the mode."""
     f = HOME / ".config/qt6ct/qt6ct.conf"
-    icons = "breeze" if get_mode() == "light" else "breeze-dark"
+    icons = icon_theme(get_mode() != "light")
     try:
         f.parent.mkdir(parents=True, exist_ok=True)
         if not f.exists():
-            f.write_text("[Appearance]\ncolor_scheme_path=%s\ncustom_palette=true\nstyle=Fusion\nicon_theme=%s\n"
-                         % (THEME_DIR / "qt6ct-colors.conf", icons))
+            f.write_text("[Appearance]\ncolor_scheme_path=%s\ncustom_palette=true\nstyle=%s\nicon_theme=%s\n"
+                         % (THEME_DIR / "qt6ct-colors.conf", widget_style(), icons))
             return
         text = f.read_text()
         if re.search(r"^icon_theme=", text, re.M):
             new = re.sub(r"^icon_theme=.*$", "icon_theme=" + icons, text, flags=re.M)
         else:
             new = re.sub(r"^\[Appearance\]\n", "[Appearance]\nicon_theme=" + icons + "\n", text, count=1, flags=re.M) if "[Appearance]" in text else text + "\n[Appearance]\nicon_theme=" + icons + "\n"
+        new = re.sub(r"^style=.*$", "style=" + widget_style(), new, flags=re.M)
         if new != text:
             f.write_text(new)
     except OSError as e:

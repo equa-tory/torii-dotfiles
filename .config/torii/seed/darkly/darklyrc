@@ -1,0 +1,10 @@
+[Common]
+ButtonRadius=10
+FrameRadius=8
+ScrollBarAddLineButtons=0
+ScrollBarSubLineButtons=0
+ShadowSize=ShadowLarge
+MenuOpacity=100
+
+[Windeco]
+DrawBorderOnMaximizedWindows=false

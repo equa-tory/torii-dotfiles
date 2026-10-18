@@ -46,19 +46,6 @@ playerctl
 python
 uwsm
 
-quickshell
-matugen
-grim
-slurp
-jq
-imagemagick
-fastfetch
-adw-gtk-theme
-qt6ct
-brightnessctl
-bluez
-bluez-utils
-
 # testing (synthetic keypresses for shell checks)
 wtype
 ydotool
@@ -95,6 +82,7 @@ asciiquarium
 dolphin
 kio-extras
 breeze-icons
+papirus-icon-theme
 git
 curl
 

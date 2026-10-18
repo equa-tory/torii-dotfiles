@@ -23,10 +23,14 @@ Plugins=
 ShowCopyMoveMenu=false
 
 [IconsMode]
-PreviewSize=64
+PreviewSize=72
+IconSize=56
+TextWidthIndex=3
 
 [DetailsMode]
-PreviewSize=22
+PreviewSize=28
+IconSize=24
+UseSystemFont=true
 
 [Toolbar mainToolBar]
 ToolButtonStyle=IconOnly
