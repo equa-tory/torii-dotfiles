@@ -7,7 +7,7 @@
 #   folders in ~/apps that the repo does not ship (v2rayN, your own tools)
 # They go to ~/torii-private/home/ on the server, never into the public repo. This only READS the local profile.
 #   bash packages/private-push.sh [--dry-run]
-# The server folder is also copied to the Umbrel share afterwards (packages/private-mirror.sh).
+# What was pushed is also copied (only those paths, straight from here) to the Umbrel share, the backup without ssh.
 # Close Helium first for a consistent copy. Options (environment): PRIVATE_DST=user@host:path/
 #   ONLY=localsend   push just LocalSend (works while Helium is open);  ONLY=helium  just the browser
 #   ONLY=apps        push just your own apps and .desktop files
@@ -63,6 +63,9 @@ case $ONLY in
   *)         mapfile -t mine < <(own_apps)
              paths=(.config/net.imput.helium .local/share/org.localsend.localsend_app .local/state/torii/webapps.json .local/state/torii/tuis.json "${mine[@]}") ;;
 esac
+# one ssh connection for everything (each rsync used to log in again)
+mkdir -p "$HOME/.ssh"
+SSH="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 -o BatchMode=yes -o ControlMaster=auto -o ControlPath=$HOME/.ssh/cm-torii-%C -o ControlPersist=60 -c aes128-gcm@openssh.com"
 excl=(--exclude='Cache/' --exclude='Code Cache/' --exclude='GPUCache/' --exclude='GrShaderCache/'
       --exclude='ShaderCache/' --exclude='component_crx_cache/' --exclude='Crash Reports/'
       --exclude='BrowserMetrics*' --exclude='DeferredBrowserMetrics/' --exclude='GPUPersistentCache/'
@@ -73,13 +76,13 @@ excl=(--exclude='Cache/' --exclude='Code Cache/' --exclude='GPUCache/' --exclude
 # missing on the server) or come down (newer on the server or missing here); nothing is copied. "?" when the server is not reachable.
 if [[ -n ${COUNT:-} ]]; then
   DST="${DSTS%% *}"; DST="${DST%/}/"; total=0
-  ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o BatchMode=yes "${DST%%:*}" true 2>/dev/null || { echo "?"; exit 0; }
+  $SSH "${DST%%:*}" true 2>/dev/null || { echo "?"; exit 0; }
   for p in "${paths[@]}"; do
     if [[ $COUNT == up ]]; then
       [[ -e $p ]] || continue
-      n=$(rsync -aRn --update --out-format='%n' "${excl[@]}" -e "ssh -o ConnectTimeout=5 -o BatchMode=yes" "$p" "$DST" 2>/dev/null | grep -vc '/$' || true)
+      n=$(rsync -aRn --update --out-format='%n' "${excl[@]}" -e "$SSH" "$p" "$DST" 2>/dev/null | grep -vc '/$' || true)
     else
-      n=$(rsync -aRn --update --out-format='%n' "${excl[@]}" -e "ssh -o ConnectTimeout=5 -o BatchMode=yes" "${DST}./$p" "$HOME/" 2>/dev/null | grep -vc '/$' || true)
+      n=$(rsync -aRn --update --out-format='%n' "${excl[@]}" -e "$SSH" "${DST}./$p" "$HOME/" 2>/dev/null | grep -vc '/$' || true)
     fi
     total=$((total + ${n:-0}))
   done
@@ -90,18 +93,28 @@ pushed=0 first=""
 for DST in $DSTS; do
   DST="${DST%/}/"
   echo "##  $DST"
-  if ! ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 -o BatchMode=yes "${DST%%:*}" true 2>/dev/null; then
+  if ! $SSH "${DST%%:*}" true 2>/dev/null; then
     echo "!!  ${DST%%:*} is not reachable, skipped" >&2; continue
   fi
   for p in "${paths[@]}"; do
     [[ -e $p ]] || { echo "skip $p (not there)"; continue; }
     echo "==> $p"
     # relative paths (-R) keep the layout, caches are rebuilt by the browser and just waste time
-    rsync -aR --chmod=Dgo-rwx,Fgo-rwx "${extra[@]}" -e "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8" \
+    rsync -aR --chmod=Dgo-rwx,Fgo-rwx "${extra[@]}" -e "$SSH" \
       "${excl[@]}" "$p" "$DST"
   done
   pushed=$((pushed + 1)); [[ -n $first ]] || first=$DST
 done
 ((pushed)) || { echo "No server could be reached, nothing was pushed" >&2; exit 1; }
-PRIVATE_SRC="${first%home/}" bash "$REPO/packages/private-mirror.sh" || echo "(backup copy on the Umbrel share was not updated)" >&2
+$SSH -O exit "${first%%:*}" 2>/dev/null || true
+# backup copy on the Umbrel share (cifs: no unix permissions): just the pushed paths, no round trip through the server
+BACKUP_HOME="${PRIVATE_BACKUP:-/mnt/umbrel/Documents/torii-private}/home"
+if [[ -z ${NO_MIRROR:-} ]] && ls "$(dirname "${BACKUP_HOME%/home}")" >/dev/null 2>&1; then
+  mkdir -p "$BACKUP_HOME" 2>/dev/null
+  for p in "${paths[@]}"; do
+    [[ -e $p ]] && rsync -rltDR --no-perms "${extra[@]}" "${excl[@]}" "$p" "$BACKUP_HOME/"
+  done && echo "Backup copy on the Umbrel share updated" || echo "(backup copy on the Umbrel share was not updated)" >&2
+else
+  echo "(Umbrel share not mounted: backup copy skipped)" >&2
+fi
 echo "Pushed to $pushed server(s). Restore on a new machine with: bash packages/personal.sh"
