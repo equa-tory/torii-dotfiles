@@ -25,5 +25,12 @@
     "title": "Deadlock",
     "float": true,
     "silent": true
+  },
+  {
+    "class": "steam",
+    "name": "Steam Settings  ·  popup of steam",
+    "title": "Steam Settings",
+    "float": true,
+    "silent": true
   }
 ]

@@ -94,3 +94,13 @@ telegram-desktop
 obsidian
 gdu
 pacman-contrib
+
+# Minecraft: Prism Launcher and the Java versions the game versions need (it picks the right one per instance;
+# 8 = up to 1.16, 17 = 1.17-1.20.4, 21 = 1.20.5 and newer, the newest JDK for what comes next); openal + glfw are for its "system library" options
+prismlauncher
+jdk8-openjdk
+jdk17-openjdk
+jdk21-openjdk
+jdk-openjdk
+openal
+glfw

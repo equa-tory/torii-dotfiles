@@ -58,6 +58,11 @@ UNIT
   # Wi-Fi + Ethernet together made boot wait ~18 s for "network online" (docker waits for it too); nothing at boot needs it
   $SUDO systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
 
+  # Java: several JDKs are installed (Minecraft needs different ones); the system default is the 21 LTS
+  if command -v archlinux-java >/dev/null 2>&1 && archlinux-java status 2>/dev/null | grep -q java-21-openjdk; then
+    $SUDO archlinux-java set java-21-openjdk || true
+  fi
+
   say "Docker service"
   if command -v docker >/dev/null 2>&1; then
     $SUDO systemctl enable --now docker.service || echo "!!  could not enable docker.service"
@@ -76,6 +81,12 @@ UNIT
     # (private-push.sh) still signs you in to Telegram / Discord on a fresh install
     flags="${XDG_CONFIG_HOME:-$HOME/.config}/helium-browser-flags.conf"
     grep -qs -- '--password-store=basic' "$flags" || echo '--password-store=basic' >> "$flags"
+    # the local proxy (v2rayN / xray on 127.0.0.1:10808): used first, a direct connection when it is not running;
+    # the home network and local names never go through it. Edit ~/.config/helium-browser-flags.conf to change or remove.
+    grep -qs -- '--proxy-server' "$flags" || {
+      echo '--proxy-server=socks5://127.0.0.1:10808,direct://' >> "$flags"
+      echo '--proxy-bypass-list="<local>;localhost;127.0.0.1;192.168.0.0/16;10.0.0.0/8;172.16.0.0/12;*.local"' >> "$flags"
+    }
     if [[ $(xdg-settings get default-web-browser 2>/dev/null) != helium.desktop ]]; then
       xdg-settings set default-web-browser helium.desktop || echo "!!  could not set the default browser"
     fi
