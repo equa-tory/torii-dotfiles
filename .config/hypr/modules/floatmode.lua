@@ -103,6 +103,7 @@ local function set_mode(m)
     if m == mode then return end
     mode = m
     if mode == "float" then
+        was_floating = {}      -- a fresh look each time: a window that was floating once must not stay floating for good
         every_window(function(w)
             if w.floating then
                 was_floating[w.address] = true
