@@ -47,6 +47,7 @@ torii|Configs|Torii shell: notch, launcher, theme (quickshell, torii, waybar)|de
 setup|Desktop setup|Wallpapers, services, Dolphin, app launcher entries|desktop
 personal|Desktop setup|Personal data from the home server (skipped if unreachable)|desktop
 mirrors|Desktop setup|Package mirrors on the home server (skipped if unreachable)|desktop
+limine|Desktop setup|Limine boot menu in the wallpaper colours (needs sudo, skipped without Limine)|desktop
 claude|Desktop setup|Claude Code status line|desktop
 nvidia|Desktop setup|NVIDIA driver (skipped without an NVIDIA GPU)|desktop
 ssh|Account|Authorize your GitHub SSH keys, make an SSH key|both
@@ -103,9 +104,6 @@ if [ "$PROFILE" = desktop ]; then
   if want pkg-pacman; then
     say "pacman packages"
     PKG_ONLY=pacman bash packages/install.sh
-    if [ -f /boot/limine.conf ] && ! grep -q '^quiet:' /boot/limine.conf; then
-      sudo sed -i '/^timeout:.*/a quiet: yes' /boot/limine.conf
-    fi
   fi
   if want pkg-aur; then
     say "AUR packages"
@@ -138,6 +136,7 @@ fi
 # ---- desktop setup
 want setup    && { say "Torii shell (wallpapers, theme, services)"; bash packages/torii-setup.sh; }
 want personal && { say "Personal data from the home server"; bash packages/personal.sh || true; bash packages/apps-sync.sh || true; }
+want limine   && { say "Limine boot menu theme"; bash packages/limine-theme.sh || true; }
 want mirrors  && { say "Mirrors on the home server"; bash packages/mirrors.sh || true; }
 want claude   && { say "Claude Code status line (adds one key to ~/.claude/settings.json)"; bash packages/claude-statusline.sh || true; }
 want nvidia   && { say "NVIDIA driver"; bash packages/nvidia.sh || true; }

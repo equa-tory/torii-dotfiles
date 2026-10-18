@@ -276,3 +276,12 @@ look): opens in Downloads, sidebar with Desktop / Documents / Downloads / Pictur
 (the Recent, Search and Tags groups are hidden), toolbar with Back / Forward / Up / menu only. Its colours come from the wallpaper theme:
 `torii-theme` writes `kdeglobals` and `torii.colors` (KDE apps ignore qt6ct for colours) and links them into `~/.config` and
 `~/.local/share/color-schemes`; the icon set follows dark/light.
+
+## Boot menu and Dolphin look
+- **Limine** (`packages/limine-theme.sh`, install part `limine`): `torii-theme` renders `limine.conf` (colours from the wallpaper palette) and a
+  blurred, darkened `limine-wallpaper.jpg` into `~/.local/state/torii/theme/`; the script copies them to `/boot/torii/` and keeps a
+  `# torii-theme begin/end` block at the top of `/boot/limine.conf` (the boot entries are never touched; `quiet: yes` is removed so the menu shows;
+  the first original is `/boot/limine.conf.torii-bak`). It needs sudo and runs when you run it, so run `bash packages/limine-theme.sh`
+  again after you change the wallpaper if you want the boot menu to follow.
+- **Dolphin / Qt apps**: with `darkly` (AUR, rounded soft Qt style) and `papirus-icon-theme` installed, `torii-theme` uses them (style Darkly, Papirus icons)
+  and softer surfaces in the generated colour scheme; without them it falls back to Fusion + Breeze icons.
