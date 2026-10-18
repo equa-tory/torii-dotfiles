@@ -8,7 +8,7 @@
 #   apps       your own .desktop apps ticked in the menu (list: ~/.local/state/torii/backup-apps.txt) and the ~/apps folders they use
 #   localsend  LocalSend settings                                                       (torii-private)
 # Push OVERWRITES the saved copy with what is on this computer; pull OVERWRITES files here with the saved copy
-# (a replaced private file is kept next to it as *.bak). Close Helium (and the web apps) before pushing or pulling it.
+# (a replaced private file is kept next to it as *.bak). Helium and the web apps are closed for it and opened again after.
 set -uo pipefail
 
 cfg="$(readlink -f "$HOME/.config/torii" 2>/dev/null || true)"
@@ -17,6 +17,38 @@ LIST="${TORII_STATE:-$HOME/.local/state/torii}/backup-apps.txt"
 APPS="$HOME/.local/share/applications"
 pause() { printf '\n%s ' "${1:-Press Enter to close}"; read -r _; }
 say() { printf '\n==> %s\n' "$*"; }
+
+# Helium and the web apps (Telegram, Discord...) are Helium windows with the profile open: close them for a consistent copy
+# (a clean exit writes everything out), and open the same windows again afterwards.
+REOPEN="$(mktemp)"
+close_helium() {
+  # which Helium windows are open: web apps (their desktop entry has the window class) and a plain browser window
+  : > "$REOPEN"
+  classes=$(hyprctl clients -j 2>/dev/null | jq -r '.[].class')
+  for f in "$APPS"/torii-web-*.desktop; do
+    [ -f "$f" ] || continue
+    wm=$(sed -n 's/^StartupWMClass=//p' "$f" | head -1)
+    [ -n "$wm" ] && printf '%s\n' "$classes" | grep -qxF "$wm" && echo "desktop:$(basename "$f")" >> "$REOPEN"
+  done
+  printf '%s\n' "$classes" | grep -qxF helium && echo "plain" >> "$REOPEN"
+  pgrep -x helium >/dev/null || return 0
+  say "Closing Helium and the web apps"
+  pkill -TERM -x helium
+  for _ in $(seq 1 40); do pgrep -x helium >/dev/null || return 0; sleep 0.5; done
+  echo "  Helium did not close, stopping it"; pkill -KILL -x helium; sleep 1
+}
+reopen_helium() {
+  [ -s "$REOPEN" ] || return 0
+  say "Opening Helium and the web apps again"
+  while IFS= read -r what; do
+    case "$what" in
+      desktop:*) "$HOME/.config/torii/bin/torii-apps" open "${what#desktop:}" >/dev/null 2>&1 ;;
+      plain) (setsid helium-browser >/dev/null 2>&1 &) ;;
+    esac
+    sleep 1
+  done < "$REOPEN"
+}
+needs_helium() { case " $* " in *" helium "*|*" webapps "*) return 0 ;; *) return 1 ;; esac; }
 
 # your own .desktop files (what torii or packages generate is not backed up: it is rebuilt)
 own() { for f in "$APPS"/*.desktop; do [ -f "$f" ] || continue; case "$(basename "$f")" in torii-*|claude-code-url-handler.desktop) ;; *) basename "$f" ;; esac; done; }
@@ -66,11 +98,12 @@ PY
     shift; items="$*"; [ -n "$items" ] || { echo "Nothing ticked."; pause; exit 0; }
     say "Push: this computer -> saved copy (overwrites the copy)"
     echo "  $items"
-    case " $items " in *" helium "*|*" webapps "*) echo "  Close Helium and the web apps (Telegram, Discord) first, or the copy may be inconsistent." ;; esac
+    needs_helium $items && echo "  Helium and the web apps (Telegram, Discord) will be closed for the copy and opened again after it."
     case " $items " in *" configs "*)
       echo; echo "  Changed config files:"; git -C "$REPO" status --short | head -20 | sed 's/^/    /'
       echo "  (all of them are committed and pushed to GitHub, replacing what is there)" ;; esac
     printf '\nContinue? [y/N] '; read -r yn; case "$yn" in y|Y) ;; *) echo "Nothing was changed."; pause; exit 0 ;; esac
+    needs_helium $items && { close_helium; export FORCE=1; }
     for it in $items; do
       case "$it" in
         configs)
@@ -86,16 +119,18 @@ PY
         *) echo "unknown item $it" ;;
       esac
     done
+    needs_helium $items && reopen_helium
     say "Done"; pause ;;
   pull)
     shift; items="$*"; [ "$items" = all ] && items="configs helium webapps apps localsend"
     [ -n "$items" ] || { echo "Nothing to pull."; pause; exit 0; }
     say "Pull: saved copy -> this computer (overwrites files here)"
     echo "  $items"
-    case " $items " in *" helium "*|*" webapps "*) echo "  Close Helium and the web apps first: it replaces the profile files (old ones are kept as *.bak)." ;; esac
+    needs_helium $items && echo "  Helium and the web apps will be closed while it replaces the profile files (old ones are kept as *.bak) and opened again after."
     case " $items " in *" configs "*) echo "  Configs: new commits from GitHub are applied; your uncommitted changes are kept on top." ;; esac
     printf '\nContinue? [y/N] '; read -r yn; case "$yn" in y|Y) ;; *) echo "Nothing was changed."; pause; exit 0 ;; esac
     private=""
+    needs_helium $items && close_helium
     for it in $items; do
       case "$it" in
         configs)
@@ -108,7 +143,7 @@ PY
       esac
     done
     if [ -n "$private" ]; then say "torii-private <-$private"; PULL_ONLY="${private# }" bash "$REPO/packages/personal.sh"; fi
-    command -v torii-apps >/dev/null 2>&1 || true
+    needs_helium $items && reopen_helium
     case " $private " in *" apps "*|*" webapps "*) "$HOME/.config/torii/bin/torii-apps" generate >/dev/null 2>&1; "$HOME/.config/torii/bin/torii-apps" webapp sync >/dev/null 2>&1 ;; esac
     say "Done"; pause ;;
   *) sed -n '2,13p' "$0" | sed 's/^# \?//'; exit 2 ;;
