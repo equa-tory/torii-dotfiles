@@ -27,6 +27,13 @@ precmd_functions+=(_torii_p10k_sync)
 
 # suggestions as you type (grey, accept with right arrow) and command colours; syntax-highlighting must be last
 # plugin locations: Arch, Debian/Ubuntu, Homebrew (Apple silicon, Intel), a manual clone
+# command history that survives a reboot (kept in your home only: it can hold secrets, it is not synced anywhere)
+HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
+[[ -d ${HISTFILE:h} ]] || mkdir -p "${HISTFILE:h}"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt APPEND_HISTORY SHARE_HISTORY EXTENDED_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_SPACE HIST_REDUCE_BLANKS HIST_FIND_NO_DUPS
+
 _torii_plugin() {
   local p
   for p in /usr/share/zsh/plugins/$1/$1.zsh /usr/share/$1/$1.zsh /opt/homebrew/share/$1/$1.zsh \
