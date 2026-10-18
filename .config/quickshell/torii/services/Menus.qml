@@ -571,7 +571,7 @@ Singleton {
         } };
     }
 
-    // ---- Sync: tick what to push to (or pull from) GitHub and the private server torii-private
+    // ---- Sync: tick what to push to GitHub and the private server torii-private; pull always brings everything
     property var syncSel: ({ configs: true, helium: false, webapps: false, apps: false, localsend: false })
     readonly property var syncItems: [
         { k: "configs", name: "Configs", sub: "Hyprland, shell, app rules, notch look… (the dotfiles repo on GitHub)" },
@@ -597,7 +597,8 @@ Singleton {
                 { id: "appslist", name: "Choose desktop apps…", sub: "Which of your .desktop apps “My desktop apps” saves", glyph: Icons.apps, onOpen: () => fSyncApps.refresh(),
                   children: () => apps.length ? apps : [{ id: "none", name: "No own .desktop apps", sub: "Apps made by torii are rebuilt on install and not listed" }] },
                 run("push", "Push ticked now", "Saves this computer's version, replacing the copy on GitHub / the server. Asks first"),
-                run("pull", "Pull ticked now", "Replaces files here with the saved copy (private files: old ones kept as .bak; configs: your uncommitted changes stay). Asks first") ]);
+                { id: "pull", name: "Pull everything now", sub: "Brings all of it from GitHub and torii-private, whatever is ticked. Replaces files here (private ones: old copies kept as .bak; configs: your uncommitted changes stay). Asks first",
+                  glyph: Icons.download, run: () => floatTerm("Sync pull", [bin("torii-sync"), "pull", "all"]) } ]);
         } };
     }
 

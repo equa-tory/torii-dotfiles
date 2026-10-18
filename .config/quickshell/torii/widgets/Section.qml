@@ -21,7 +21,7 @@ ColumnLayout {
         Label {
             text: root.title.toUpperCase()
             color: Theme.muted
-            font.pixelSize: Config.font.size - 3
+            font.pixelSize: Config.font.size - 2
             font.letterSpacing: 1.2
             font.weight: Font.Medium
             Layout.fillWidth: true

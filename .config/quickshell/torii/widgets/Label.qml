@@ -6,5 +6,5 @@ Text {
     color: Theme.fg
     font.family: Config.font.family
     font.pixelSize: Config.font.size
-    renderType: Text.CurveRendering
+    renderType: font.pixelSize < 17 ? Text.NativeRendering : Text.CurveRendering   // hinted text is sharper at small sizes on a 1080p screen
 }

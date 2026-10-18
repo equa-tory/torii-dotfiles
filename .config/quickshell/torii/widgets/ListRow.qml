@@ -54,7 +54,7 @@ Rectangle {
                 visible: root.subtitle !== ""
                 text: root.subtitle
                 color: Theme.subtle
-                font.pixelSize: Config.font.size - 3
+                font.pixelSize: Config.font.size - 1
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }

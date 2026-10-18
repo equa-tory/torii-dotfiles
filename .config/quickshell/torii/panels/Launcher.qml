@@ -346,7 +346,7 @@ Item {
         anchors { left: parent.left; right: parent.right; top: field.bottom; topMargin: 6; leftMargin: 28; rightMargin: 28 }
         text: Menus.notice
         color: Theme.accent
-        font.pixelSize: Config.font.size - 2
+        font.pixelSize: Config.font.size - 1
         elide: Text.ElideRight
     }
 
@@ -539,7 +539,7 @@ Item {
                         visible: line !== "" && row.node.slider === undefined
                         text: line
                         color: Theme.subtle
-                        font.pixelSize: Config.font.size - 3
+                        font.pixelSize: Config.font.size - 1
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }

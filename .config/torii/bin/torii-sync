@@ -62,7 +62,8 @@ print(json.dumps([{"file": n, "on": n in chosen} for n in sys.argv[2:]]))' "$LIS
     done
     say "Done"; pause ;;
   pull)
-    shift; items="$*"; [ -n "$items" ] || { echo "Nothing ticked."; pause; exit 0; }
+    shift; items="$*"; [ "$items" = all ] && items="configs helium webapps apps localsend"
+    [ -n "$items" ] || { echo "Nothing to pull."; pause; exit 0; }
     say "Pull: saved copy -> this computer (overwrites files here)"
     echo "  $items"
     case " $items " in *" helium "*|*" webapps "*) echo "  Close Helium and the web apps first: it replaces the profile files (old ones are kept as *.bak)." ;; esac
