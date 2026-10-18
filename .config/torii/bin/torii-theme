@@ -535,7 +535,12 @@ def main(argv):
             if not imgs:
                 raise SystemExit(f"no wallpapers in {wallpaper_dir()}")
             img = imgs[0]
-        apply(img, force=not (THEME_DIR / "tokens.json").exists())
+        try:
+            tk = json.loads((THEME_DIR / "tokens.json").read_text())
+            stale = tk.get("widgetStyle") != widget_style() or tk.get("iconTheme") != icon_theme(tk.get("mode") != "light")
+        except (OSError, ValueError):
+            stale = True                     # e.g. Darkly or Papirus was installed after the last run
+        apply(img, force=stale)
     elif cmd == "mode":
         want = rest[0] if rest else None
         if want is None:

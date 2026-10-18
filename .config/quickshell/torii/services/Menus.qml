@@ -65,6 +65,7 @@ Singleton {
                     root.bump(); } }
     JsonFetch { id: fProcs;    command: [root.bin("torii-sys"), "procs"];             onDataChanged: root.bump() }
     JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: root.bump() }
+    JsonFetch { id: fSyncApps; command: [root.bin("torii-sync"), "apps"];              onDataChanged: root.bump() }
     JsonFetch { id: fSpecials; command: [root.bin("torii-rules"), "specials"];        onDataChanged: root.bump() }
     JsonFetch { id: fWins;     command: [root.bin("torii-rules"), "windows"];         onDataChanged: root.bump() }
     JsonFetch { id: fSounds;   command: [root.bin("torii-sound"), "list"];             onDataChanged: root.bump() }
@@ -82,7 +83,7 @@ Singleton {
     JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
@@ -565,10 +566,38 @@ Singleton {
                   }) },
                 { id: "update", name: "Update system", sub: "pacman and AUR upgrade", glyph: Icons.update, keywords: "upgrade yay pacman -Syu",
                   run: () => floatTerm("Update", [bin("torii-install"), "update"]) },
-                { id: "dotfiles", name: "Update torii configs", glyph: Icons.git, keywords: "dotfiles git pull push sync",
-                  sub: g.error ? "No remote to compare with" : g.dirty ? "Local changes: commit and push" : g.behind ? "Pull " + g.behind + " new commits" : g.ahead ? "Push " + g.ahead + " commits" : "Up to date",
-                  badge: gitBadge, run: () => floatTerm("Torii configs", [bin("torii-install"), "git-sync"]) }
+                syncMenu(g, gitBadge)
             ];
+        } };
+    }
+
+    // ---- Sync: tick what to push to (or pull from) GitHub and the private server torii-private
+    property var syncSel: ({ configs: true, helium: false, webapps: false, apps: false, localsend: false })
+    readonly property var syncItems: [
+        { k: "configs", name: "Configs", sub: "Hyprland, shell, app rules, notch look… (the dotfiles repo on GitHub)" },
+        { k: "helium", name: "Helium profile", sub: "Cookies, extensions, bookmarks, settings (about 400 MB, torii-private)" },
+        { k: "webapps", name: "Web apps and logins", sub: "Telegram, Discord… and that they stay signed in (torii-private)" },
+        { k: "apps", name: "My desktop apps", sub: "Only the apps ticked below, with the ~/apps folder they use (torii-private)" },
+        { k: "localsend", name: "LocalSend settings", sub: "Name, port and key (torii-private)" } ]
+    function syncChosen() { return syncItems.filter(i => syncSel[i.k]).map(i => i.k); }
+    function syncMenu(g, gitBadge) {
+        const chosen = syncChosen();
+        const tick = i => ({ id: "t:" + i.k, name: i.name, sub: i.sub, badge: syncSel[i.k] ? "✓" : "", keep: true, glyph: i.k === "configs" ? Icons.git : Icons.apps,
+            run: () => { const n = Object.assign({}, syncSel); n[i.k] = !n[i.k]; syncSel = n; bump(); } });
+        const run = (verb, label, sub) => ({ id: verb, name: label, sub: chosen.length ? sub : "Tick something above first", glyph: verb === "push" ? Icons.upload : Icons.download,
+            run: () => { if (chosen.length) floatTerm("Sync " + verb, [bin("torii-sync"), verb].concat(chosen)); else say("Tick something first"); } });
+        return { id: "dotfiles", name: "Sync torii", glyph: Icons.git, keywords: "dotfiles git pull push sync update configs backup helium private",
+                 sub: g.error ? "No remote to compare with" : g.dirty ? "Local changes not pushed" : g.behind ? g.behind + " new commits to pull" : g.ahead ? g.ahead + " commits to push" : "Configs are up to date",
+                 badge: gitBadge, onOpen: () => { fGit.refresh(); fSyncApps.refresh(); },
+                 children: () => {
+            fGit.ensure(); fSyncApps.ensure();
+            const apps = (fSyncApps.data || []).map(a => ({ id: "a:" + a.file, name: a.file.replace(/\.desktop$/, ""), badge: a.on ? "✓" : "", keep: true, glyph: Icons.apps,
+                run: () => { sh([bin("torii-sync"), "toggle-app", a.file]); later(fSyncApps, 300); } }));
+            return syncItems.map(tick).concat([
+                { id: "appslist", name: "Choose desktop apps…", sub: "Which of your .desktop apps “My desktop apps” saves", glyph: Icons.apps, onOpen: () => fSyncApps.refresh(),
+                  children: () => apps.length ? apps : [{ id: "none", name: "No own .desktop apps", sub: "Apps made by torii are rebuilt on install and not listed" }] },
+                run("push", "Push ticked now", "Saves this computer's version, replacing the copy on GitHub / the server. Asks first"),
+                run("pull", "Pull ticked now", "Replaces files here with the saved copy (private files: old ones kept as .bak; configs: your uncommitted changes stay). Asks first") ]);
         } };
     }
 

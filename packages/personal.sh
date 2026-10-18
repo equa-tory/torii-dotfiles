@@ -8,11 +8,15 @@
 #
 # If the server cannot be reached (away from home, no LAN) this skips quietly. Run it again later:
 #   bash packages/personal.sh
-# Option (environment): PRIVATE_SRC="user@host:path/ ..."   rsync sources, tried in order (default: the two home servers)
+# Option (environment): PRIVATE_SRC=user@host:path/   rsync source, default below
+#   PULL_ONLY="helium webapps apps localsend"   restore just these parts into $HOME (the launcher's Sync menu uses it), nothing else
+#
+# Where it comes from: the home server over ssh (its authorized_keys must have this computer's key: the key is shown below
+# when ssh is refused; put it on GitHub, then run update-ssh-keys.sh from the Umbrel share). If ssh does not work, the
+# copy on the Umbrel share (SMB, no ssh): mounted by itself, you only type the Umbrel password.
 set -euo pipefail
 
-# user@host:path (path is relative to the server's home). Tried in this order; the first that answers is used
-PRIVATE_SRCS="${PRIVATE_SRC:-equa@192.168.1.50:torii-private/ equa@192.168.1.23:torii-private/}"
+PRIVATE_SRCS="${PRIVATE_SRC:-equa@192.168.1.50:torii-private/}"   # user@host:path (path is relative to the server's home)
 FSTAB="${FSTAB:-/etc/fstab}"
 ROOT_HOME="${ROOT_HOME:-/root}"
 DEV_ROOT="${DEV_ROOT:-/dev/disk}"
@@ -28,14 +32,34 @@ trap 'rm -rf "$stage" "${tmp_files[@]}"' EXIT
 
 # Where the data lives: the home server first, then the backup copy on the Umbrel share (mounted at /mnt/umbrel)
 BACKUP_DIR="${PRIVATE_BACKUP:-/mnt/umbrel/Documents/torii-private}"
+umbrel_share="//192.168.1.23/equa's Umbrel"
 got=0
 for PRIVATE_SRC in $PRIVATE_SRCS; do
   PRIVATE_SRC="${PRIVATE_SRC%/}/"
   say "Fetching private data from $PRIVATE_SRC"
-  if rsync -a -e "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8" "$PRIVATE_SRC" "$stage/"; then got=1; break; fi
+  if rsync -a -e "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 -o BatchMode=yes" "$PRIVATE_SRC" "$stage/"; then got=1; break; fi
 done
 if ((!got)); then
-  warn "Home server not reachable (or wrong login/path)."
+  warn "Home server not reachable by ssh (no key accepted, or it is off)."
+  [[ -f $HOME/.ssh/id_ed25519 ]] || ssh-keygen -q -N "" -t ed25519 -f "$HOME/.ssh/id_ed25519"
+  warn "This computer's key (add it at https://github.com/settings/keys, then run update-ssh-keys.sh from the Umbrel share):"
+  cut -d' ' -f1,2 "$HOME/.ssh/id_ed25519.pub" >&2
+  # the Umbrel share is not in /etc/fstab yet on a fresh install (that comes from this very folder): mount it for now
+  if ! ls "$BACKUP_DIR" >/dev/null 2>&1 && [[ -t 0 && -z ${UMBREL_NO_MOUNT:-} ]] && command -v mount.cifs >/dev/null; then
+    say "Mounting the Umbrel share (SMB) to use the backup copy"
+    read -rsp "Umbrel password for ${UMBREL_USER:-umbrel} (empty = skip): " upw; echo
+    if [[ -n $upw ]]; then
+      umount_dir=$(mktemp -d)
+      if $SUDO mount -t cifs "${UMBREL_SHARE:-$umbrel_share}" "$umount_dir" \
+           -o "username=${UMBREL_USER:-umbrel},password=$upw,vers=3.0,uid=$(id -u),gid=$(id -g),file_mode=0664,dir_mode=0775"; then
+        BACKUP_DIR="$umount_dir/Documents/torii-private"
+        trap '$SUDO umount "$umount_dir" 2>/dev/null; rmdir "$umount_dir" 2>/dev/null; rm -rf "$stage" "${tmp_files[@]}"' EXIT
+      else
+        warn "Could not mount the Umbrel share"
+      fi
+    fi
+    unset upw
+  fi
   if ls "$BACKUP_DIR" >/dev/null 2>&1 && [[ -n $(ls -A "$BACKUP_DIR" 2>/dev/null) ]]; then
     say "Using the backup copy in $BACKUP_DIR"
     rsync -rltD --no-perms "$BACKUP_DIR/" "$stage/"          # a cifs share has no unix modes: private folders are made 700 below
@@ -51,7 +75,25 @@ fi
 # ---- 1. files for your home folder (apps, browser profile, launchers) ----
 if [[ -d $stage/home ]]; then
   say "Restoring files into $HOME"
-  rsync -a --backup --suffix=.bak "$stage/home/" "$HOME/"      # permissions kept, replaced files saved as *.bak
+  filter=()
+  if [[ -n ${PULL_ONLY:-} ]]; then          # only some parts: keep the parent folders, then just these paths
+    filter=(--include=/.config/ --include=/.local/ --include=/.local/share/ --include=/.local/share/applications/ --include=/.local/state/ --include=/.local/state/torii/ --include=/.config/net.imput.helium/ --include=/.config/net.imput.helium/Default/ "--include=/.config/net.imput.helium/Default/Service Worker/")
+    for part in $PULL_ONLY; do
+      case $part in
+        helium)    filter+=("--include=/.config/net.imput.helium/***") ;;
+        webapps)   filter+=(--include=/.local/state/torii/webapps.json --include=/.local/state/torii/tuis.json "--include=/.config/net.imput.helium/Local State"
+                            --include='/.config/net.imput.helium/Default/Cookies*' --include=/.config/net.imput.helium/Default/Preferences
+                            "--include=/.config/net.imput.helium/Default/Local Storage/***" "--include=/.config/net.imput.helium/Default/Session Storage/***"
+                            "--include=/.config/net.imput.helium/Default/IndexedDB/***" "--include=/.config/net.imput.helium/Default/Service Worker/Database/***"
+                            "--include=/.config/net.imput.helium/Default/Service Worker/ScriptCache/***") ;;
+        apps)      filter+=("--include=/.local/share/applications/*.desktop" --include=/.local/state/torii/backup-apps.txt "--include=/apps/***") ;;
+        localsend) filter+=(--include=/.local/share/org.localsend.localsend_app/***) ;;
+        *) warn "unknown part: $part" ;;
+      esac
+    done
+    filter+=(--exclude='*')
+  fi
+  rsync -a --backup --suffix=.bak "${filter[@]}" "$stage/home/" "$HOME/"      # permissions kept, replaced files saved as *.bak
   # apps kept at the top of the server's home folder belong in ~/apps, where the launcher looks (v2rayN-linux-64, ...)
   for d in "$stage"/home/*-linux-64 "$stage"/home/v2rayN*; do
     [[ -d $d ]] || continue
@@ -61,6 +103,8 @@ if [[ -d $stage/home ]]; then
     fi
   done
 fi
+
+[[ -z ${PULL_ONLY:-} ]] || exit 0          # a partial pull stops here (no root credentials, no fstab)
 
 # ---- 2. credentials for root (SMB logins) ----
 if [[ -d $stage/system/root ]]; then

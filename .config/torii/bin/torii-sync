@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# torii-sync apps | toggle-app FILE | push ITEM... | pull ITEM...   -  what the launcher's Install > Sync menu runs.
+#
+# Items (you tick them in the menu):
+#   configs    the dotfiles repo (GitHub): push = commit + push, pull = pull (your uncommitted changes are kept)
+#   helium     the whole Helium profile: cookies, extensions, bookmarks, settings       (torii-private on the home server)
+#   webapps    the web apps list and their logins (Telegram, Discord, ...)             (torii-private)
+#   apps       your own .desktop apps ticked in the menu (list: ~/.local/state/torii/backup-apps.txt) and the ~/apps folders they use
+#   localsend  LocalSend settings                                                       (torii-private)
+# Push OVERWRITES the saved copy with what is on this computer; pull OVERWRITES files here with the saved copy
+# (a replaced private file is kept next to it as *.bak). Close Helium (and the web apps) before pushing or pulling it.
+set -uo pipefail
+
+cfg="$(readlink -f "$HOME/.config/torii" 2>/dev/null || true)"
+REPO="${TORII_REPO:-$( [ -n "$cfg" ] && dirname "$(dirname "$cfg")" || echo "$HOME/torii-dotfiles" )}"
+LIST="${TORII_STATE:-$HOME/.local/state/torii}/backup-apps.txt"
+APPS="$HOME/.local/share/applications"
+pause() { printf '\n%s ' "${1:-Press Enter to close}"; read -r _; }
+say() { printf '\n==> %s\n' "$*"; }
+
+# your own .desktop files (what torii or packages generate is not backed up: it is rebuilt)
+own() { for f in "$APPS"/*.desktop; do [ -f "$f" ] || continue; case "$(basename "$f")" in torii-*|claude-code-url-handler.desktop) ;; *) basename "$f" ;; esac; done; }
+
+case "${1:-}" in
+  apps)
+    python3 -c '
+import json, sys
+chosen = set()
+try:
+    chosen = {l.strip() for l in open(sys.argv[1]) if l.strip() and not l.startswith("#")}
+except OSError:
+    pass
+print(json.dumps([{"file": n, "on": n in chosen} for n in sys.argv[2:]]))' "$LIST" $(own)
+    ;;
+  toggle-app)
+    [ -n "${2:-}" ] || exit 2
+    mkdir -p "$(dirname "$LIST")"; touch "$LIST"
+    if grep -qxF "$2" "$LIST"; then grep -vxF "$2" "$LIST" > "$LIST.tmp"; mv "$LIST.tmp" "$LIST"; else echo "$2" >> "$LIST"; fi ;;
+  push)
+    shift; items="$*"; [ -n "$items" ] || { echo "Nothing ticked."; pause; exit 0; }
+    say "Push: this computer -> saved copy (overwrites the copy)"
+    echo "  $items"
+    case " $items " in *" helium "*|*" webapps "*) echo "  Close Helium and the web apps (Telegram, Discord) first, or the copy may be inconsistent." ;; esac
+    case " $items " in *" configs "*)
+      echo; echo "  Changed config files:"; git -C "$REPO" status --short | head -20 | sed 's/^/    /'
+      echo "  (all of them are committed and pushed to GitHub, replacing what is there)" ;; esac
+    printf '\nContinue? [y/N] '; read -r yn; case "$yn" in y|Y) ;; *) echo "Nothing was changed."; pause; exit 0 ;; esac
+    for it in $items; do
+      case "$it" in
+        configs)
+          cd "$REPO" || continue
+          say "Configs -> GitHub"
+          [ -z "$(git status --porcelain)" ] || { git add -A && git commit -q -m "Update configs from $(uname -n)"; }
+          git pull --rebase --autostash -q || { echo "Pull failed, configs were not pushed."; continue; }
+          git push || echo "Push failed" ;;
+        helium)    say "Helium profile -> torii-private"; FORCE=${FORCE:-0} ONLY=helium bash "$REPO/packages/private-push.sh" ;;
+        webapps)   say "Web apps and logins -> torii-private"; ONLY=webapps bash "$REPO/packages/private-push.sh" ;;
+        apps)      say "Your apps -> torii-private"; ONLY=apps bash "$REPO/packages/private-push.sh" ;;
+        localsend) say "LocalSend -> torii-private"; ONLY=localsend bash "$REPO/packages/private-push.sh" ;;
+        *) echo "unknown item $it" ;;
+      esac
+    done
+    say "Done"; pause ;;
+  pull)
+    shift; items="$*"; [ -n "$items" ] || { echo "Nothing ticked."; pause; exit 0; }
+    say "Pull: saved copy -> this computer (overwrites files here)"
+    echo "  $items"
+    case " $items " in *" helium "*|*" webapps "*) echo "  Close Helium and the web apps first: it replaces the profile files (old ones are kept as *.bak)." ;; esac
+    case " $items " in *" configs "*) echo "  Configs: new commits from GitHub are applied; your uncommitted changes are kept on top." ;; esac
+    printf '\nContinue? [y/N] '; read -r yn; case "$yn" in y|Y) ;; *) echo "Nothing was changed."; pause; exit 0 ;; esac
+    private=""
+    for it in $items; do
+      case "$it" in
+        configs)
+          cd "$REPO" || continue
+          say "Configs <- GitHub"
+          git pull --rebase --autostash || echo "Pull failed"
+          command -v stow >/dev/null && [ "$(readlink -f "$HOME/.config/torii")" = "$(readlink -f "$REPO/.config/torii")" ] && stow . 2>&1 | tail -3 ;;
+        helium|webapps|apps|localsend) private="$private $it" ;;
+        *) echo "unknown item $it" ;;
+      esac
+    done
+    if [ -n "$private" ]; then say "torii-private <-$private"; PULL_ONLY="${private# }" bash "$REPO/packages/personal.sh"; fi
+    command -v torii-apps >/dev/null 2>&1 || true
+    case " $private " in *" apps "*|*" webapps "*) "$HOME/.config/torii/bin/torii-apps" generate >/dev/null 2>&1; "$HOME/.config/torii/bin/torii-apps" webapp sync >/dev/null 2>&1 ;; esac
+    say "Done"; pause ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac

@@ -4,3 +4,4 @@
 .config/torii/sounds/*
 !.config/torii/sounds/reminder.ogg
 !.config/torii/sounds/notification.ogg
+__pycache__/

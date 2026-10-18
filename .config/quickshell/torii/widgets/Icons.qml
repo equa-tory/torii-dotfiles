@@ -80,6 +80,7 @@ Singleton {
     readonly property string download: g(0xF01DA)
     readonly property string update: g(0xF06B0)
     readonly property string git: g(0xF02A2)
+    readonly property string upload: g(0xF0552)
     readonly property string book: g(0xF00BA)
     readonly property string keyboard2: g(0xF0313)
     readonly property string poweroff: g(0xF0425)

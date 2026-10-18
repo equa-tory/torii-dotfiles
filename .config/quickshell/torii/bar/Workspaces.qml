@@ -159,7 +159,7 @@ Row {
 
             Rectangle {
                 anchors.centerIn: parent
-                width: sp.open ? 15 : 13
+                width: sp.open ? 14 : 12
                 height: width
                 radius: width / 2
                 color: sp.open ? Theme.accent : "transparent"
@@ -169,11 +169,12 @@ Row {
                 Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
                 Behavior on color { ColorAnimation { duration: 180 } }
 
-                Text {
+                // a window lives here: dot in the ring
+                Rectangle {
                     anchors.centerIn: parent
-                    text: sp.modelData.substring(8, 9).toUpperCase()
-                    font.pixelSize: 8
-                    font.bold: true
+                    width: 4
+                    height: 4
+                    radius: 2
                     color: sp.open ? Theme.accentFg : Theme.subtle
                 }
             }

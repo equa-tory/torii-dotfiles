@@ -285,3 +285,12 @@ look): opens in Downloads, sidebar with Desktop / Documents / Downloads / Pictur
   again after you change the wallpaper if you want the boot menu to follow.
 - **Dolphin / Qt apps**: with `darkly` (AUR, rounded soft Qt style) and `papirus-icon-theme` installed, `torii-theme` uses them (style Darkly, Papirus icons)
   and softer surfaces in the generated colour scheme; without them it falls back to Fusion + Breeze icons.
+
+## Sync (Install > Sync torii)
+Tick what to move and press *Push ticked now* or *Pull ticked now* (`torii-sync`; both show what will happen and ask first):
+**Configs** (the dotfiles repo on GitHub: commit + push / pull, uncommitted changes are kept), **Helium profile**, **Web apps and logins**,
+**My desktop apps** (the ones ticked under *Choose desktop apps…*, list in `~/.local/state/torii/backup-apps.txt`) and **LocalSend** go to / come
+from `torii-private` on the home server. *Push overwrites the saved copy with this computer; pull overwrites files here with the saved copy*
+(replaced private files stay next to the new one as `*.bak`). Close Helium and the web apps before pushing or pulling its profile.
+The server is reached over ssh with this computer's key (add it to GitHub, then run `update-ssh-keys.sh` from the Umbrel share); when ssh is
+refused, `personal.sh` shows the key and falls back to the backup copy on the Umbrel share over SMB (you only type the Umbrel password).
