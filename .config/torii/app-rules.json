@@ -18,5 +18,12 @@
     "silent": true,
     "autostart": true,
     "exec": "desktop:torii-web-discord.desktop"
+  },
+  {
+    "class": "steam",
+    "name": "Deadlock  ·  popup of steam",
+    "title": "Deadlock",
+    "float": true,
+    "silent": true
   }
 ]
