@@ -585,7 +585,9 @@ Singleton {
         const st = fSyncStatus.data ? fSyncStatus.data[k] : null;
         const part = v => v === null || v === undefined ? "?" : String(v);
         const counts = st ? (st.up === 0 && st.down === 0 ? "in sync" : Icons.upload + " " + part(st.up) + "   " + Icons.download + " " + part(st.down)) : "…";
-        return (syncSel[k] ? "✓  " : "") + counts;
+        // an open browser keeps changing its files: the "up" count then is not a real difference
+        const open = fSyncStatus.data && fSyncStatus.data.heliumOpen && (k === "helium" || k === "webapps") && st && st.up > 0 ? "  (Helium is open)" : "";
+        return (syncSel[k] ? "✓  " : "") + counts + open;
     }
     function syncChosen() { return syncItems.filter(i => syncSel[i.k]).map(i => i.k); }
     function syncMenu(g, gitBadge) {

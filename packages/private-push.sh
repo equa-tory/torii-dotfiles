@@ -73,16 +73,18 @@ excl=(--exclude='Cache/' --exclude='Code Cache/' --exclude='GPUCache/' --exclude
       --exclude='SingletonLock' --exclude='SingletonCookie' --exclude='SingletonSocket')
 
 # COUNT=up|down  (the launcher's Sync menu): only print how many files of this ONLY=... part would go up (newer here or
-# missing on the server) or come down (newer on the server or missing here); nothing is copied. "?" when the server is not reachable.
+# missing on the server) or come down (newer on the server, or missing here when this computer has none of that part); nothing is copied. "?" when the server is not reachable.
 if [[ -n ${COUNT:-} ]]; then
   DST="${DSTS%% *}"; DST="${DST%/}/"; total=0
   $SSH "${DST%%:*}" true 2>/dev/null || { echo "?"; exit 0; }
   for p in "${paths[@]}"; do
     if [[ $COUNT == up ]]; then
       [[ -e $p ]] || continue
-      n=$(rsync -aRn --update --out-format='%n' "${excl[@]}" -e "$SSH" "$p" "$DST" 2>/dev/null | grep -vc '/$' || true)
+      n=$(rsync -aRn --no-perms --no-owner --no-group --update --out-format='%n' "${excl[@]}" -e "$SSH" "$p" "$DST" 2>/dev/null | grep -vc '/$' || true)
     else
-      n=$(rsync -aRn --update --out-format='%n' "${excl[@]}" -e "$SSH" "${DST}./$p" "$HOME/" 2>/dev/null | grep -vc '/$' || true)
+      # files that only exist on the server (left over from an older machine) are not "changes to pull" while this one has the part
+      only=(); [[ -e $p ]] && only=(--existing)
+      n=$(rsync -aRn --no-perms --no-owner --no-group --update "${only[@]}" --out-format='%n' "${excl[@]}" -e "$SSH" "${DST}./$p" "$HOME/" 2>/dev/null | grep -vc '/$' || true)
     fi
     total=$((total + ${n:-0}))
   done

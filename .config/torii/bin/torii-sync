@@ -52,7 +52,7 @@ def rd(it, d):
         return int(v) if v.isdigit() else None
     except OSError:
         return None
-out = {"configs": {"up": int(sys.argv[2]), "down": int(sys.argv[3])}}
+out = {"configs": {"up": int(sys.argv[2]), "down": int(sys.argv[3])}, "heliumOpen": os.system("pgrep -x helium >/dev/null") == 0}
 for it in ("helium", "webapps", "apps", "localsend"):
     out[it] = {"up": rd(it, "up"), "down": rd(it, "down")}
 print(json.dumps(out))
