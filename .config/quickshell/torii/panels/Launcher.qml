@@ -21,6 +21,7 @@ Item {
     property string lastNav: "other"      // how the list was reached: back | forward | other
     property bool hintShown: false        // the placeholder fades in a moment after the launcher has opened
     property var pending: null            // slider value shown while a change is on its way: { id, value }
+    property var committed: ({})          // the last value set on each slider (by menu path): the menu data behind it may be stale for a while
 
     readonly property var scope: path.length ? path[path.length - 1] : null
     readonly property bool asking: Menus.prompt !== null
@@ -186,7 +187,12 @@ Item {
     NumberAnimation { id: scrollAnim; target: list; property: "contentY"; duration: 160; easing.type: Easing.OutCubic }
 
     // ---- sliders (night light temperature, mouse speed): Left/Right change them while the row is selected
-    function sliderValue(n) { return pending && pending.id === n.id ? pending.value : n.slider.value; }
+    function sliderKey(n) { return pathIds.join("/") + "/" + n.id; }
+    function sliderValue(n) {
+        if (pending && pending.id === n.id) return pending.value;
+        const c = committed[sliderKey(n)];
+        return c !== undefined ? c : n.slider.value;
+    }
     function sliderText(n) { const v = sliderValue(n); return v.toFixed(n.slider.decimals || 0) + (n.slider.unit || ""); }
     function selectedSlider() { return results[selected] && results[selected].node.slider ? results[selected].node : null; }
     function setSlider(n, v) {
@@ -197,6 +203,7 @@ Item {
         v = Math.max(sl.min, Math.min(sl.max, v));
         v = Number(v.toFixed(sl.decimals || 0));
         pending = { id: n.id, value: v };
+        const c = Object.assign({}, committed); c[sliderKey(n)] = v; committed = c;
         commit.node = n; commit.value = v; commit.restart();
         clearPending.restart();
     }
