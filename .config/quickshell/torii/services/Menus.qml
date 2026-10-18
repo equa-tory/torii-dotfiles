@@ -65,6 +65,7 @@ Singleton {
                     root.bump(); } }
     JsonFetch { id: fProcs;    command: [root.bin("torii-sys"), "procs"];             onDataChanged: root.bump() }
     JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: root.bump() }
+    JsonFetch { id: fSpecials; command: [root.bin("torii-rules"), "specials"];        onDataChanged: root.bump() }
     JsonFetch { id: fWins;     command: [root.bin("torii-rules"), "windows"];         onDataChanged: root.bump() }
     JsonFetch { id: fSounds;   command: [root.bin("torii-sound"), "list"];             onDataChanged: root.bump() }
     JsonFetch { id: fGit;      command: [root.bin("torii-install"), "git-status"];        onDataChanged: root.bump() }
@@ -81,7 +82,7 @@ Singleton {
     JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
@@ -250,7 +251,7 @@ Singleton {
     function rule(args) { sh([bin("torii-rules")].concat(args)); rulesRefresh.restart(); }
     function ruleSummary(r) {
         const p = [];
-        if (r.workspace) p.push("workspace " + r.workspace + (r.silent ? " (background)" : ""));
+        if (r.workspace) p.push((typeof r.workspace === "string" ? r.workspace.replace(":", " ") : "workspace " + r.workspace) + (r.silent ? " (background)" : ""));
         if (r.float && !r.remember) p.push("floating");
         if (r.remember) p.push("remembers place and size");
         if (r.autostart) p.push("starts at login");
@@ -258,35 +259,44 @@ Singleton {
     }
     function rulesMenu() {
         const rules = fRules.data || [];
-        const have = c => rules.some(r => r.class === c);
-        const pick = (cls, name) => ({ id: "add:" + cls, name: name || cls, sub: cls, badge: have(cls) ? "●" : "", keep: true,
+        const have = c => rules.some(r => r.key === c);
+        const pick = (cls, name) => ({ id: "add:" + cls, name: name || cls, sub: cls.replace("|", "  ·  popup: "), badge: have(cls) ? "●" : "", keep: true,
             run: () => { if (!have(cls)) rule(["set", cls, "name", name || cls]); say("Added " + (name || cls) + ": open App rules to set it up"); } });
+        const specials = (fSpecials.data || []).map(w => w.name);
+        const wsLabel = w => typeof w === "string" ? w.replace("special:", "Special ") : "Workspace " + w;
         return { id: "rules", name: "App rules", glyph: Icons.apps, keywords: "window workspace float background open rule deadlock steam",
                  sub: rules.length ? rules.length + " app" + (rules.length > 1 ? "s" : "") : "Workspace, background or floating per app",
-                 onOpen: () => fRules.refresh(),
+                 onOpen: () => { fRules.refresh(); fSpecials.refresh(); },
                  children: () => {
             const ws = Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 1;
-            const ruleNode = r => ({ id: "r:" + r.class, name: r.name || r.class, sub: ruleSummary(r), glyph: Icons.apps, sorted: true,
+            const ruleNode = r => ({ id: "r:" + r.key, name: r.name || r.class, sub: ruleSummary(r), glyph: Icons.apps, sorted: true,
                     badge: r.workspace ? String(r.workspace) : "",
                     children: () => [
                     { id: "ws", name: "Workspace", glyph: Icons.monitor, badge: r.workspace ? String(r.workspace) : "None", children: () =>
-                        [{ id: "none", name: "None", badge: r.workspace ? "" : "●", keep: true, run: () => rule(["set", r.class, "workspace", "none"]) }].concat(
+                        [{ id: "none", name: "None", badge: r.workspace ? "" : "●", keep: true, run: () => rule(["set", r.key, "workspace", "none"]) }].concat(
                             [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => ({ id: "w" + n, name: "Workspace " + n, badge: r.workspace === n ? "●" : "", keep: true,
-                                run: () => rule(["set", r.class, "workspace", String(n)]) }))) },
+                                run: () => rule(["set", r.key, "workspace", String(n)]) })),
+                            (specials.indexOf("special:magic") < 0 ? ["special:magic"] : []).concat(specials).map(n => ({ id: "s:" + n, name: wsLabel(n),
+                                sub: "Hidden workspace you toggle with a key", badge: r.workspace === n ? "●" : "", keep: true,
+                                run: () => rule(["set", r.key, "workspace", n]) })),
+                            [{ id: "newspecial", name: "New special workspace…", keep: true,
+                               run: () => ask("Name of the special workspace (letters, digits)", false, t => { if (/^[A-Za-z0-9_-]+$/.test(t.trim())) rule(["set", r.key, "workspace", "special:" + t.trim()]); }) }]) },
                     { id: "silent", name: "Open in the background", sub: "Don't switch to its workspace", badge: r.silent ? "On" : "Off", keep: true,
-                      run: () => rule(["set", r.class, "silent", r.silent ? "false" : "true"]) },
-                    { id: "float", name: "Open floating", badge: r.float ? "On" : "Off", keep: true, run: () => rule(["set", r.class, "float", r.float ? "false" : "true"]) },
+                      run: () => rule(["set", r.key, "silent", r.silent ? "false" : "true"]) },
+                    { id: "float", name: "Open floating", badge: r.float ? "On" : "Off", keep: true, run: () => rule(["set", r.key, "float", r.float ? "false" : "true"]) },
                     { id: "snapshot", name: "Use how it is now", glyph: Icons.camera, sub: "Open the app first: saves its workspace, floating, place and size, background and start at login", keep: true,
                       run: () => { rule(["snapshot", r.class]); say("Saved how " + (r.name || r.class) + " is now"); } },
                     { id: "remember", name: "Remember position and size", sub: "Opens floating where you left it (move and resize it once)", badge: r.remember ? "On" : "Off", keep: true,
                       run: () => rule(["set", r.class, "remember", r.remember ? "false" : "true"]) },
                     { id: "autostart", name: "Start at login", sub: "Opens with the session, on the workspace chosen above", badge: r.autostart ? "On" : "Off", keep: true,
                       run: () => rule(["set", r.class, "autostart", r.autostart ? "false" : "true"]) },
-                    { id: "remove", name: "Remove rule", glyph: Icons.trash, sub: r.class, run: () => rule(["remove", r.class]) } ] });
+                    { id: "remove", name: "Remove rule", glyph: Icons.trash, sub: r.key.replace("|", "  ·  popup: "), run: () => rule(["remove", r.key]) } ].filter(e => !r.title || ["ws", "silent", "float", "remove"].indexOf(e.id) >= 0) });
             const addNode = { id: "add", name: "Add an app", glyph: Icons.plus, sub: "Pick a window that is open, or an installed app", onOpen: () => fWins.refresh(),
               children: () => [
                 { id: "open", name: "Open windows", glyph: Icons.monitor, sub: "The easiest way: open the app first", sorted: true, onOpen: () => fWins.refresh(),
-                  children: () => (fWins.data || []).map(w => pick(w.class, w.title && w.title.length < 40 ? w.title + "  ·  " + w.class : w.class)) },
+                  children: () => (fWins.data || []).map(w => w.popup
+                      ? pick(w.class + "|" + w.initialTitle, (w.title || w.initialTitle).slice(0, 40) + "  ·  popup of " + w.class)
+                      : pick(w.class, w.title && w.title.length < 40 ? w.title + "  ·  " + w.class : w.class)) },
                 { id: "installed", name: "Installed apps", glyph: Icons.apps, sorted: true,
                   children: () => Apps.items().filter(a => a.kind === "app" || (a.exec && /--class\s+\S+/.test(a.exec)))
                       .map(a => a.kind === "app" ? pick(a.wm || a.id, a.name) : pick(/--class\s+(\S+)/.exec(a.exec)[1], a.name)) },
@@ -299,18 +309,24 @@ Singleton {
                 { id: "capture", name: "Capture workspace " + ws, glyph: Icons.camera, keep: true,
                   sub: "Replaces what was saved for it: every app here, where it is, floating, place and size, background, start at login",
                   run: () => { rule(["snapshot-workspace", String(ws)]); say("Saved workspace " + ws); } }];
+            for (const n of (fSpecials.data || []).filter(w => w.windows > 0).map(w => w.name))
+                out.push({ id: "capsp:" + n, name: "Capture " + wsLabel(n).toLowerCase(), glyph: Icons.camera, keep: true,
+                           sub: "Same, for the apps on this special workspace (" + n + ")",
+                           run: () => { rule(["snapshot-workspace", n]); say("Saved " + wsLabel(n).toLowerCase()); } });
             const groups = {};
             for (const r of rules) (groups[r.workspace ? String(r.workspace) : "-"] = groups[r.workspace ? String(r.workspace) : "-"] || []).push(r);
-            const keys = Object.keys(groups).sort((x, y) => x === "-" ? 1 : y === "-" ? -1 : Number(x) - Number(y));
+            const order = k => k === "-" ? 1e9 : isNaN(Number(k)) ? 1000 : Number(k);
+            const keys = Object.keys(groups).sort((x, y) => order(x) - order(y) || (x < y ? -1 : 1));
             for (const k of keys) {
                 const list = groups[k];
-                out.push({ id: "g:" + k, name: k === "-" ? "Not on a workspace" : "Workspace " + k, glyph: Icons.monitor, badge: String(list.length),
+                out.push({ id: "g:" + k, name: k === "-" ? "Not on a workspace" : wsLabel(isNaN(Number(k)) ? k : Number(k)), glyph: Icons.monitor, badge: String(list.length),
                            sub: list.map(r => r.name || r.class).join(", "), sorted: false,
                            children: () => (k === "-" ? [] : [
                                { id: "cap:" + k, name: "Capture workspace " + k + " again", glyph: Icons.camera, keep: true,
                                  sub: "Replaces what is saved for it with the apps on it now (open it the way you want first)", run: () => { rule(["snapshot-workspace", k]); say("Saved workspace " + k); } },
                                { id: "open:" + k, name: "Open workspace " + k + " apps", glyph: Icons.apps, keep: true,
-                                 sub: "Starts the saved apps that are not open", run: () => { rule(["reopen", k]); say("Opening workspace " + k); } }])
+                                 sub: "Starts the saved apps that are not open", run: () => { rule(["reopen", k]); say("Opening workspace " + k); } }]
+                               .filter(e => !isNaN(Number(k)) || e.id.indexOf("cap") === 0))
                                .concat(list.map(ruleNode)) });
             }
             return out;

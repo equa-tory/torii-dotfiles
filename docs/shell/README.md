@@ -262,6 +262,8 @@ the Processes menu are switched off for now: set `features.systemInfo` to `true`
 CPU / RAM / GPU with the first row, type to filter by name or pid, Enter asks `y` (stop) or `9` (force kill). The session,
 the shell, Hyprland, systemd, D-Bus, PipeWire and v2rayN are never listed.
 
+**Popup windows and special workspaces in App rules:** *Add an app › Open windows* lists a browser's popups (for example the Google sign-in window) as their own rows ("… · popup of helium"); such a rule matches the title the popup opened with, so the next popup is caught too (it only has workspace, background and floating). The workspace picker also offers special workspaces (*Special magic*, any other existing one, or a new name), and *Capture special …* saves the apps on a special workspace. In the config a rule is `{"class": "helium", "title": "Sign in", "workspace": "special:magic"}`.
+
 **App rules** (Setup › App rules, `torii-rules`, saved in `~/.config/torii/app-rules.json`): what happens when a window of an app
 opens: on a workspace (optionally in the background, without switching to it) and/or floating. *Add an app* lists the windows
 that are open right now (open the app first: its window class is what a rule matches), the installed apps, or lets you type a
