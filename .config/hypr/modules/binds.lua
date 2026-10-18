@@ -294,7 +294,7 @@ hl.bind(mainMod .. " + SHIFT + " .. mainMod:sub(1, 1) .. mainMod:sub(2):lower() 
 -- Games: Alt is the main modifier here, so Alt+1..0 and friends would never reach a game that uses them. While a Steam game
 -- (Proton windows are "steam_app_<id>") is fullscreen and has the focus, the normal binds are off and only these few stay
 -- (Alt+Space launcher, Alt+N control centre, Alt+Tab; the media keys are "submap_universal", so they work as always). Out of fullscreen (Alt+Shift+F) every bind works again.
--- Alt+Shift+G switches the game keys off by hand (until the focus or fullscreen changes).
+-- While a panel (launcher, control centre, Alt+Tab) is open every bind works too. Alt+Shift+G switches the game keys off by hand (until the focus or fullscreen changes).
 hl.define_submap("game", function()
     hl.bind(mainMod .. " + SHIFT + F", function()
         hl.dispatch(hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
@@ -307,11 +307,17 @@ hl.define_submap("game", function()
 end)
 local function game_keys()
     local w = hl.get_active_window()
-    local game = w ~= nil and (w.class or ""):match("^steam_app_%d+$") ~= nil and w.fullscreen ~= 0
+    local game = w ~= nil and (w.class or ""):match("^steam_app_%d+$") ~= nil and w.fullscreen ~= 0 and not torii_panel_open()
     local now = hl.get_current_submap and hl.get_current_submap() or ""
     if game and now ~= "game" then hl.dispatch(hl.dsp.submap("game"))
     elseif not game and now == "game" then hl.dispatch(hl.dsp.submap("reset")) end
 end
+-- an open panel (launcher...) gives every bind back; its closing is not an event, so the state is looked at a few times a second
+if torii_game_poll then pcall(function() torii_game_poll:stop() end) end
+torii_game_poll = hl.timer(function()
+    local now = hl.get_current_submap and hl.get_current_submap() or ""
+    if now == "game" or hl.get_active_window() ~= nil then game_keys() end
+end, { timeout = 300, type = "repeat" })
 for _, ev in ipairs({ "window.active", "window.fullscreen" }) do
     local v = "torii_game_sub_" .. ev:gsub("%.", "_")
     if _G[v] then pcall(function() _G[v]:remove() end) end     -- a reload runs this file again
