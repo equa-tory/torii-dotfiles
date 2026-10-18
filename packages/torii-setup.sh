@@ -74,6 +74,12 @@ UNIT
     getent group gamemode >/dev/null && ! id -nG "$USER" | grep -qw gamemode && $SUDO usermod -aG gamemode "$USER"   # at next login
   fi
 
+  # Caps Lock = Escape in the keyboard itself (games read the physical key, XKB's caps:escape does not reach them)
+  if [ -f "$REPO/packages/capslock-esc.hwdb" ]; then
+    $SUDO install -m 644 "$REPO/packages/capslock-esc.hwdb" /etc/udev/hwdb.d/90-torii-capslock.hwdb
+    $SUDO systemd-hwdb update && $SUDO udevadm trigger --subsystem-match=input --action=change || true
+  fi
+
   # Java: several JDKs are installed (Minecraft needs different ones); the system default is the 21 LTS
   if command -v archlinux-java >/dev/null 2>&1 && archlinux-java status 2>/dev/null | grep -q java-21-openjdk; then
     $SUDO archlinux-java set java-21-openjdk || true

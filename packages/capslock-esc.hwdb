@@ -1,0 +1,14 @@
+# Caps Lock is Escape for the whole system, at the device level (installed by packages/torii-setup.sh).
+# The XKB option caps:escape (hypr/modules/input.lua) only changes what the compositor sends; games that read the physical
+# key (Deadlock, SDL / Proton) still saw Caps Lock. Here the keyboard itself reports Escape.
+# USB keyboards: HID usage 0x70039 (Caps Lock)
+evdev:input:b0003*
+ KEYBOARD_KEY_70039=esc
+
+# built-in laptop keyboards: scancode 0x3a
+evdev:atkbd:*
+ KEYBOARD_KEY_3a=esc
+
+# Bluetooth keyboards
+evdev:input:b0005*
+ KEYBOARD_KEY_70039=esc
