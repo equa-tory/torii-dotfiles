@@ -32,7 +32,7 @@ Item {
 
     opacity: 0
     focus: true
-    Component.onCompleted: { opacity = 1; forceActiveFocus(); fm.refresh(); }
+    Component.onCompleted: { opacity = 1; forceActiveFocus(); loadMonth(); }
     Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
     Behavior on implicitHeight { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
@@ -60,13 +60,14 @@ Item {
 
     readonly property string bin: Config.home + "/.config/torii/bin/torii-calendar"
     readonly property string ym: cursor.getFullYear() + "-" + String(cursor.getMonth() + 1).padStart(2, "0")
-    onYmChanged: fm.refresh()
+    // set the command and run it in one go: the binding to `ym` may not have caught up when the change signal fires
+    function loadMonth() { fm.command = [root.bin, "month", root.ym]; fm.refresh(); }
+    onYmChanged: loadMonth()
     JsonFetch {
         id: fm
-        command: [root.bin, "month", root.ym]
         onDataChanged: if (data && data.days) root.evs = data.days
     }
-    Timer { id: later; interval: 900; onTriggered: fm.refresh() }
+    Timer { id: later; interval: 900; onTriggered: root.loadMonth() }
 
     function removeSelected() {
         const e = selEvents[evSel];
