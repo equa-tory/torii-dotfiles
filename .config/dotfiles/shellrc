@@ -156,7 +156,7 @@ alias v='$EDITOR'
 [ "$EDITOR" = nvim ] && alias vim='nvim'
 alias n='nano'
 alias rc='$EDITOR ~/.config/dotfiles/shellrc'
-alas mc='yazi'
+alias mc='yazi'
 
 # ==============================
 # STARTUP
