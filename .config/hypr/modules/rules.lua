@@ -39,3 +39,14 @@ hl.window_rule({
     center = true,
     size   = { 960, 620 },
 })
+
+-- Steam games (Proton windows are "steam_app_<id>"): open fullscreen on the 240 Hz monitor, not wherever the focus was
+-- (the HDMI one only offers 60 Hz, so a game that opened there could not pick 240). immediate = no vsync wait, lowest latency.
+hl.window_rule({
+    name  = "torii-steam-games",
+    match = { class = "^steam_app_[0-9]+$" },
+
+    monitor    = "DP-2",
+    fullscreen = true,
+    immediate  = true,
+})
