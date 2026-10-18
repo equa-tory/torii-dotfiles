@@ -693,7 +693,7 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), bootMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), bootMenu(), snapshotsMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
     }
 
     // ================= Clean up: caches, logs, Docker, big files (torii-clean)
@@ -829,6 +829,21 @@ Singleton {
             { id: "bapply", name: "Apply to the boot menu", glyph: Icons.upload, keep: true,
               sub: "Writes the picture and colours to /boot (asks for your password). Takes effect at the next boot",
               run: () => floatTerm("Boot menu", ["sh", "-c", 'bash "$(dirname "$(readlink -f ~/.config/quickshell)")/../packages/limine-theme.sh"; printf "\\nPress Enter to close "; read _']) } ] };
+    }
+    // ---- system snapshots (btrfs + snapper, packages/snapshots.sh): the newest three are in the Limine menu under "Snapshots"
+    function snapshotsMenu() {
+        const term = (title, cmd) => floatTerm(title, ["sh", "-c", cmd + '; printf "\\nPress Enter to close "; read _']);
+        return { id: "snaps", name: "System snapshots", glyph: Icons.update, keywords: "snapshot rollback restore backup btrfs snapper undo",
+                 sub: "Boot an older state of the system from the boot menu, or roll back to it",
+                 children: () => [
+            { id: "snew", name: "Take a snapshot now", glyph: Icons.camera, keep: true,
+              sub: "Saves the system (not /home) as it is: it appears in the boot menu. One is also taken around every update",
+              run: () => term("Snapshot", 'sudo torii-snapshots create "taken by hand"') },
+            { id: "sroll", name: "Roll back to a snapshot…", glyph: Icons.update, keep: true,
+              sub: "Makes the chosen snapshot the system again; the current one is kept aside. Asks first, then reboot",
+              run: () => term("Roll back", "sudo torii-snapshots rollback") },
+            { id: "slist", name: "Show all snapshots", glyph: Icons.apps, keep: true, run: () => term("Snapshots", "sudo torii-snapshots list") },
+            { id: "ssync", name: "Refresh the boot menu entries", glyph: Icons.refresh, keep: true, run: () => term("Boot menu", "sudo torii-snapshots sync") } ] };
     }
     function appearanceMenu() {
         fMons.ensure(); fHypr.ensure();

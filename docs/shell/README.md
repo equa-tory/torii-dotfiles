@@ -305,3 +305,13 @@ refused, `personal.sh` shows the key and falls back to the backup copy on the Um
 - **Make torii colour another style / icon theme:** the colours already reach every Qt app through `~/.config/kdeglobals` (the `torii` colour scheme) and qt6ct;
   set the name in `torii-theme` (`widget_style()` and `icon_theme()`). Styles that draw their own colours (Kvantum themes) ignore the scheme: use Kvantum's
   "Kvantum" style with a theme made from `~/.local/state/torii/theme/tokens.json`, or keep a scheme-following one like Darkly.
+
+## Boot menu look and system snapshots
+- **Boot menu look** (Setup > Boot menu, `limine` in `~/.config/torii/config.json`): picture (the desktop wallpaper or any image), brightness, blur and how solid
+  the dark panel behind the text is. *Apply* runs `packages/limine-theme.sh` (sudo) and takes effect at the next boot.
+- **Snapshots** (`packages/snapshots.sh`, install part `snapshots`; btrfs root + Limine): snapper takes a snapshot of `/` before and after every pacman
+  transaction (snap-pac) and on demand (Setup > System snapshots). The newest three states from before an update (or taken by hand) are in the Limine menu
+  under *Snapshots*: each boots a writable copy of that state with its own kernel, so an update that broke something can be undone by booting the
+  snapshot. To make it permanent: `sudo torii-snapshots rollback` (or the launcher entry): the snapshot becomes the system again, the broken one stays as
+  `@broken-<date>`, reboot. `/home`, logs and the package cache are not part of a snapshot. Snapshots are on the same disk: they undo a bad update,
+  they are not a backup against a dead drive.

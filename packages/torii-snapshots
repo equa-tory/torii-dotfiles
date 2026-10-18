@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# torii-snapshots sync | create [description] | list | rollback [N] [--yes]
+# System snapshots (btrfs + snapper) that you can boot from the Limine menu and roll back to. Installed as root-owned
+# /usr/local/bin/torii-snapshots by packages/snapshots.sh; pacman runs `sync` around every transaction (snap-pac makes the
+# snapshots), so the menu always has the newest three states from before an upgrade (or taken by hand).
+#
+#   sync      keep a copy of the kernel for each of the newest 3 snapshots, make each one a bootable (writable) copy, and write
+#             the "Snapshots" entries of /boot/limine.conf (between "# torii-snapshots begin/end"; your other entries stay)
+#   create    take a snapshot now ("single") and sync
+#   list      the snapshots snapper has
+#   rollback  make snapshot N the system again (default: asks): the current system is kept as @broken-<date>, the kernel of
+#             that snapshot goes back to /boot. Reboot afterwards. Run it from the normal system or from a snapshot boot.
+# What a snapshot holds: the root filesystem (@). /home, logs and the package cache are separate and stay as they are.
+set -euo pipefail
+
+SNAP="snapper -c root"
+CONF=/boot/limine.conf
+KEEP=3                                    # snapshots shown in the boot menu
+STORE=/boot/torii/snap                    # a kernel + initramfs per snapshot (the ones in /boot move on with updates)
+[[ $EUID -eq 0 ]] || { echo "needs root: sudo torii-snapshots $*" >&2; exit 1; }
+
+shown() {   # the newest KEEP snapshots worth booting: manual ones and the "before" half of pacman transactions
+  $SNAP --jsonout list --columns number,type,date,description | python3 -c '
+import json, sys
+rows = [r for r in json.load(sys.stdin)["root"] if int(r["number"]) > 0 and r["type"] in ("single", "pre")]
+rows.sort(key=lambda r: -int(r["number"]))
+for r in rows[:int(sys.argv[1])]:
+    print("%s\t%s\t%s\t%s" % (r["number"], r["type"], r["date"], (r.get("description") or "").replace("\t", " ")))
+' "$KEEP"
+}
+
+sync() {
+  mountpoint -q /boot || { echo "/boot is not mounted" >&2; exit 1; }
+  mkdir -p "$STORE"
+  local lines n type date desc base cmdline
+  lines=$(shown)
+  # 1. kernel copies (taken now: this runs right after the snapshot is made, so /boot still matches it)
+  while IFS=$'\t' read -r n type date desc; do
+    [[ -n $n ]] || continue
+    if [[ ! -s $STORE/$n/vmlinuz-linux ]]; then
+      mkdir -p "$STORE/$n"
+      cp /boot/vmlinuz-linux "$STORE/$n/"; cp /boot/initramfs-linux.img "$STORE/$n/"
+    fi
+    # 2. a writable copy to boot from (the snapshot itself is read-only; whatever you change in a rescue boot stays in this copy)
+    [[ -d /.snapshots/$n/boot ]] || btrfs subvolume snapshot /.snapshots/$n/snapshot /.snapshots/$n/boot >/dev/null
+  done <<< "$lines"
+  # 3. forget what is no longer shown
+  local keep; keep=" $(cut -f1 <<< "$lines" | tr '\n' ' ') "
+  for d in "$STORE"/*/; do [[ -d $d ]] || continue; n=$(basename "$d"); [[ $keep == *" $n "* ]] || rm -rf "$d"; done
+  for d in /.snapshots/*/boot; do
+    [[ -d $d ]] || continue; n=$(basename "$(dirname "$d")")
+    [[ $keep == *" $n "* ]] || btrfs subvolume delete "$d" >/dev/null 2>&1 || true
+  done
+  # 4. the boot entries: the kernel command line of the normal entry, with the root pointing at the snapshot copy
+  cmdline=$(awk '/# torii-snapshots begin/ {skip=1} /# torii-snapshots end/ {skip=0; next} !skip && /^[ \t]*cmdline:/ {sub(/^[ \t]*cmdline:[ \t]*/, ""); print; exit}' "$CONF")
+  [[ -n $cmdline ]] || { echo "no cmdline found in $CONF" >&2; exit 1; }
+  local tmp; tmp=$(mktemp /boot/.limine.XXXXXX)
+  awk '/# torii-snapshots begin/ {skip=1; next} /# torii-snapshots end/ {skip=0; next} !skip' "$CONF" > "$tmp"
+  if [[ -n $lines ]]; then
+    {
+      echo "# torii-snapshots begin"
+      echo "/Snapshots"
+      while IFS=$'\t' read -r n type date desc; do
+        [[ -n $n ]] || continue
+        echo "    //#$n  $date  ${desc:-$type}"
+        echo "        protocol: linux"
+        echo "        path: boot():/torii/snap/$n/vmlinuz-linux"
+        echo "        cmdline: ${cmdline//rootflags=subvol=@/rootflags=subvol=@/.snapshots/$n/boot}"
+        echo "        module_path: boot():/torii/snap/$n/initramfs-linux.img"
+      done <<< "$lines"
+      echo "# torii-snapshots end"
+    } >> "$tmp"
+  fi
+  # never write a config that lost its normal entries
+  if [[ $(grep -c '^/' "$tmp") -lt 1 ]]; then rm -f "$tmp"; echo "refusing: no boot entries left" >&2; exit 1; fi
+  [[ -f $CONF.torii-snap-bak ]] || cp "$CONF" "$CONF.torii-snap-bak"
+  chmod 644 "$tmp"; mv "$tmp" "$CONF"
+  echo "Boot menu: $(grep -c . <<< "${lines:-}" || true) snapshot entries"
+}
+
+rollback() {
+  local n="${1:-}" yes="${2:-}" dev top stamp
+  if [[ -z $n ]]; then
+    echo "Snapshots in the boot menu:"; shown | awk -F'\t' '{printf "  #%s  %s  %s %s\n", $1, $3, $2, $4}'
+    read -rp "Roll back to which number? " n
+  fi
+  dev=$(findmnt -no SOURCE / | sed 's/\[.*//')
+  top=$(mktemp -d); mount -o subvolid=5 "$dev" "$top"
+  trap 'umount "$top" 2>/dev/null; rmdir "$top" 2>/dev/null' RETURN
+  [[ -d $top/@/.snapshots/$n/snapshot ]] || { echo "no snapshot #$n" >&2; return 1; }
+  [[ -s $STORE/$n/vmlinuz-linux ]] || { echo "no saved kernel for #$n (only the snapshots in the boot menu can be rolled back to)" >&2; return 1; }
+  echo "The system will become snapshot #$n ($(grep -o '<date>[^<]*' "$top/@/.snapshots/$n/info.xml" | cut -c7-)). The current system is kept as @broken-<date>."
+  echo "/home and your files in it stay as they are. Reboot right after."
+  if [[ $yes != --yes ]]; then read -rp "Continue? [y/N] " a; [[ $a == y || $a == Y ]] || { echo "Nothing was changed."; return 0; }; fi
+  stamp=$(date +%Y%m%d-%H%M%S)
+  mv "$top/@" "$top/@broken-$stamp"
+  btrfs subvolume snapshot "$top/@broken-$stamp/.snapshots/$n/snapshot" "$top/@" >/dev/null
+  rmdir "$top/@/.snapshots" 2>/dev/null || true
+  mv "$top/@broken-$stamp/.snapshots" "$top/@/.snapshots"
+  cp "$STORE/$n/vmlinuz-linux" /boot/vmlinuz-linux; cp "$STORE/$n/initramfs-linux.img" /boot/initramfs-linux.img
+  echo "Done. Reboot now. (Delete the old system later:  sudo btrfs subvolume delete -R /@broken-$stamp  after mounting the top level.)"
+}
+
+case "${1:-}" in
+  sync)     sync ;;
+  create)   shift; $SNAP create --type single --description "${*:-manual snapshot}" >/dev/null; sync ;;
+  list)     $SNAP list ;;
+  rollback) shift; rollback "${1:-}" "${2:-}" ;;
+  *)        sed -n '2,15p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac
