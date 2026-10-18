@@ -11,11 +11,14 @@ Row {
     readonly property var mon: Hyprland.monitorFor(screen)
     readonly property bool monFocused: mon ? mon.focused : false
     readonly property int activeId: mon && mon.activeWorkspace ? mon.activeWorkspace.id : -1
+    readonly property int focusedId: Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : -1
 
     property var ids: []
-    readonly property bool special: {
+    // special workspaces that hold windows (or are open here), e.g. "special:magic"; minimized ones live in Alt+Tab
+    property var specials: []
+    readonly property string openSpecial: {
         const o = mon ? mon.lastIpcObject : null;
-        return !!(o && o.specialWorkspace && o.specialWorkspace.name);
+        return o && o.specialWorkspace ? o.specialWorkspace.name : "";
     }
 
     spacing: 6
@@ -28,16 +31,13 @@ Row {
         return null;
     }
 
-    // ids 1..count (unless they live on another monitor) + anything occupied or active here
+    // ids 1..count on every monitor (even when the workspace is pinned to another one) + extra ids living here
     function compute() {
         const out = [];
         const list = Hyprland.workspaces.values;
         const count = Config.workspaces.count;
-        for (let id = 1; id <= count; id++) {
-            const ws = find(id);
-            if (!ws || !mon || ws.monitor === mon)
-                out.push(id);
-        }
+        for (let id = 1; id <= count; id++)
+            out.push(id);
         for (let i = 0; i < list.length; i++) {
             const ws = list[i];
             if (ws.id > count && mon && ws.monitor === mon)
@@ -47,10 +47,27 @@ Row {
         return out;
     }
 
+    function computeSpecials() {
+        const out = [];
+        const list = Hyprland.workspaces.values;
+        for (let i = 0; i < list.length; i++) {
+            const n = list[i].name;
+            if (list[i].id >= 0 || n.indexOf("special:") !== 0 || n === "special:minimized")
+                continue;
+            if (list[i].toplevels.values.length > 0 || n === openSpecial)
+                out.push(n);
+        }
+        out.sort();
+        return out;
+    }
+
     function refresh() {
         const next = compute();
         if (JSON.stringify(next) !== JSON.stringify(ids))
             ids = next;
+        const sp = computeSpecials();
+        if (JSON.stringify(sp) !== JSON.stringify(specials))
+            specials = sp;
     }
 
     Timer {
@@ -79,7 +96,8 @@ Row {
             id: cell
             required property int modelData
             readonly property var ws: root.find(modelData)
-            readonly property bool active: modelData === root.activeId
+            readonly property bool active: modelData === root.activeId || modelData === root.focusedId
+            readonly property bool focused: modelData === root.focusedId
             readonly property bool occupied: ws ? ws.toplevels.values.length > 0 : false
 
             width: capsule.width
@@ -92,7 +110,7 @@ Row {
                 width: cell.active ? 10 : 7
                 height: cell.active ? 22 : 15
                 radius: width / 2
-                color: cell.active ? (root.monFocused ? Theme.accent : Theme.accentDim)
+                color: cell.active ? (cell.focused ? Theme.accent : Theme.accentDim)
                        : cell.occupied ? Theme.subtle : Theme.overlay
 
                 Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
@@ -126,19 +144,46 @@ Row {
         }
     }
 
-    // the "magic" special workspace is open on this monitor
-    Rectangle {
-        visible: root.special
-        anchors.verticalCenter: parent.verticalCenter
-        width: 7
-        height: 7
-        radius: 3.5
-        color: Theme.accent
+    // special workspaces: outlined while hidden, filled while open on this monitor
+    Repeater {
+        model: root.specials
 
-        MouseArea {
-            anchors.fill: parent
-            anchors.margins: -4
-            onClicked: Hyprland.dispatch('hl.dsp.workspace.toggle_special("magic")')
+        delegate: Item {
+            id: sp
+            required property string modelData
+            readonly property bool open: modelData === root.openSpecial
+
+            width: 15
+            height: 22
+            anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: sp.open ? 15 : 13
+                height: width
+                radius: width / 2
+                color: sp.open ? Theme.accent : "transparent"
+                border.width: sp.open ? 0 : 1.5
+                border.color: Theme.subtle
+
+                Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
+                Behavior on color { ColorAnimation { duration: 180 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: sp.modelData.substring(8, 9).toUpperCase()
+                    font.pixelSize: 8
+                    font.bold: true
+                    color: sp.open ? Theme.accentFg : Theme.subtle
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -2
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Hyprland.dispatch('hl.dsp.workspace.toggle_special("' + sp.modelData.substring(8) + '")')
+            }
         }
     }
 }

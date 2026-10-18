@@ -19,8 +19,20 @@ Singleton {
         return String(w).indexOf("special:minimized") === 0;
     }
 
+    // A window you could actually see and focus: mapped, not hidden, a real size, a name, on a normal workspace (or
+    // special: the minimised ones and the scratchpad). Steam and other XWayland apps leave many invisible helpers.
+    function real(t) {
+        const o = t.lastIpcObject;
+        if (!o || o.mapped !== true || o.hidden === true) return false;
+        if (!o.size || o.size[0] < 2 || o.size[1] < 2) return false;
+        if (!o["class"] && !o.title) return false;
+        const w = o.workspace;
+        if (!w) return false;
+        return w.id > 0 || String(w.name).indexOf("special:") === 0;
+    }
+
     readonly property var list: {
-        const all = Hyprland.toplevels.values.filter(t => t.wayland !== null || t.lastIpcObject);
+        const all = Hyprland.toplevels.values.filter(t => root.real(t));
         const rank = a => { const i = root.history.indexOf(root.bare(a)); return i < 0 ? 1000 : i; };
         return all.slice().sort((a, b) => rank(a.address) - rank(b.address));
     }
