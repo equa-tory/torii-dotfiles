@@ -191,7 +191,10 @@ Item {
     function selectedSlider() { return results[selected] && results[selected].node.slider ? results[selected].node : null; }
     function setSlider(n, v) {
         const sl = n.slider;
-        v = Math.max(sl.min, Math.min(sl.max, Math.round(v / sl.step) * sl.step));
+        // a slider with `values` (monitor scale) only has those stops: drag to the nearest one
+        if (sl.values && sl.values.length) v = sl.values.reduce((b, x) => Math.abs(x - v) < Math.abs(b - v) ? x : b, sl.values[0]);
+        else v = Math.round(v / sl.step) * sl.step;
+        v = Math.max(sl.min, Math.min(sl.max, v));
         v = Number(v.toFixed(sl.decimals || 0));
         pending = { id: n.id, value: v };
         commit.node = n; commit.value = v; commit.restart();
@@ -199,7 +202,13 @@ Item {
     }
     function adjust(dir, big) {
         const n = selectedSlider();
-        if (n) setSlider(n, sliderValue(n) + dir * n.slider.step * (big ? 5 : 1));
+        if (!n) return;
+        const vals = n.slider.values;
+        if (vals && vals.length) {          // arrow keys walk the stops, one per press
+            const cur = sliderValue(n);
+            const next = dir > 0 ? vals.filter(x => x > cur + 1e-6) : vals.filter(x => x < cur - 1e-6).reverse();
+            if (next.length) setSlider(n, next[Math.min(next.length - 1, big ? 2 : 0)]);
+        } else setSlider(n, sliderValue(n) + dir * n.slider.step * (big ? 5 : 1));
     }
     Timer { id: commit; interval: 130; property var node: null; property real value: 0
            onTriggered: if (node) node.onSlide(value) }

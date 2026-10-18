@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """torii-hypr layout <dwindle|master|scrolling> | gaps <inner> <outer> | sensitivity <-1..1>
             | size <percent> | float <toggle|status> | bars height <px> | bars side <left|right>
-            | scale <monitor> <factor> | mode <monitor> <WxH@Hz> | monitors | opacity <0.3..1> | blur <on|off> | blur <size> <passes> <vibrancy> | status | apply
+            | border <0..10> | scale <monitor> <factor> | mode <monitor> <WxH@Hz> | monitors | opacity <0.3..1> | blur <on|off> | blur <size> <passes> <vibrancy> | status | apply
 
 Runtime choices made from the launcher. They are kept in ~/.local/state/torii/hypr-user.json, applied to the running
 Hyprland at once and re-applied at every start through hypr-user.lua (hyprland.lua loads it last).
@@ -31,6 +31,8 @@ def lua(s):
         general.append(f'layout="{s["layout"]}"')
     if "gaps_in" in s:
         general.append(f'gaps_in={int(s["gaps_in"])}, gaps_out={int(s["gaps_out"])}')
+    if "border" in s:
+        general.append(f'border_size={int(s["border"])}')
     if "opacity" in s:
         decoration.append(f'active_opacity={float(s["opacity"])}, inactive_opacity={float(s["opacity"])}')
     if "blur" in s:
@@ -115,6 +117,7 @@ def set_mode(s, name, mode):
     if not os.environ.get("TORII_NO_HOOKS"):
         subprocess.run(["hyprctl", "eval", 'hl.monitor({ output = "%s", mode = "%s", position = "%s", scale = %s })' % (name, mode, spec["pos"], scale)], capture_output=True)
     s.setdefault("scale", {})[name] = spec
+    relayout(s)
 
 
 def set_scale(s, name, factor):
@@ -138,6 +141,24 @@ def set_scale(s, name, factor):
             print("Hyprland refused scale %s" % factor, file=sys.stderr)
             sys.exit(1)
     s.setdefault("scale", {})[name] = spec if old is None or old != spec else old
+    relayout(s)
+
+
+def relayout(s):
+    """Monitors side by side from left to right: after a scale or resolution change the logical widths differ, and without this
+    a gap (or an overlap) appears between them and the mouse cannot cross."""
+    mons = sorted(monitors(), key=lambda m: (m["x"], m["y"]))
+    x = 0
+    for m in mons:
+        spec = s.setdefault("scale", {}).get(m["name"]) or {"mode": "%dx%d@%.2f" % (m["width"], m["height"], m["refreshRate"]), "scale": m["scale"]}
+        width = int(re.match(r"(\d+)x", spec["mode"]).group(1))
+        pos = "%dx%d" % (x, m["y"])
+        if spec.get("pos") != pos or not spec.get("custom"):
+            spec = dict(spec, pos=pos, custom=True)
+            s["scale"][m["name"]] = spec
+            if not os.environ.get("TORII_NO_HOOKS"):
+                subprocess.run(["hyprctl", "eval", 'hl.monitor({ output = "%s", mode = "%s", position = "%s", scale = %s })' % (m["name"], spec["mode"], pos, spec["scale"])], capture_output=True)
+        x += round(width / float(spec["scale"]))
 
 
 FLOAT_LUA, BARS_LUA = STATE / "floatmode.lua", STATE / "bars.lua"
@@ -209,7 +230,7 @@ def main(a):
                            "modes": ["%dx%d@%d" % k for k in short_modes(m)[:14]]} for m in monitors()]))
         return
     if a[:1] == ["status"]:
-        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20, "sens": live_sensitivity(), "opacity": 1.0,
+        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20, "border": 1, "sens": live_sensitivity(), "opacity": 1.0,
                "blur": {"enabled": True, "size": 3, "passes": 1, "vibrancy": 0.17},
                "float": float_mode(), "bars": bars(), "bigPercent": big_percent()}
         print(json.dumps({**cur, **s}))
@@ -225,6 +246,8 @@ def main(a):
         set_mode(s, a[1], a[2])
     elif a[:1] == ["scale"] and len(a) == 3:
         set_scale(s, a[1], float(a[2]))
+    elif a[:1] == ["border"] and len(a) == 2 and a[1].isdigit():
+        s["border"] = max(0, min(10, int(a[1])))
     elif a[:1] == ["opacity"] and len(a) == 2:
         s["opacity"] = max(0.3, min(1.0, round(float(a[1]), 2)))
     elif a[:2] == ["blur", "on"] or a[:2] == ["blur", "off"]:

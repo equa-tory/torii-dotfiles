@@ -6,6 +6,8 @@
 #   fallback  emergency: stop the shell, bring back Waybar + hyprpaper
 #   mock      start with fake Wi-Fi / Bluetooth / audio / tray data (for the VM)
 set -u
+# the built-in "Configuration Loaded" popup is not themable (purple, top left): the shell reloads silently
+export QS_NO_RELOAD_POPUP=1
 
 BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE="${TORII_STATE:-$HOME/.local/state/torii}"

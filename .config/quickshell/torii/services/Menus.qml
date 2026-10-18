@@ -803,18 +803,19 @@ Singleton {
         fMons.ensure(); fHypr.ensure();
         const h = Live.hypr, b = h.blur || { enabled: true, size: 3, passes: 1, vibrancy: 0.17 };
         const blurSet = (k, v) => { const n = Object.assign({}, b, k); return ["blur", String(n.size), String(n.passes), String(n.vibrancy)]; };
-        return { id: "appearance", name: "Appearance", glyph: Icons.tune, sub: "Bar size, monitor scale, transparency, blur", keywords: "look theme resize scale opacity transparent vibrancy", children: () => [
+        return { id: "appearance", name: "Appearance", glyph: Icons.tune, sub: "Bar size, monitor scale, border, transparency, blur", keywords: "look theme resize scale opacity transparent vibrancy", children: () => [
             cfgSlider("barh", "Bar height", "notch.height", 24, 60, 1, Config.notch.height, " px", 0, "The notch bar at the top"),
             cfgSlider("baro", "Bar opacity", "notch.opacity", 0.3, 1, 0.05, Config.notch.opacity, "", 2),
             { id: "scale", name: "Monitors", glyph: Icons.monitor, sub: "Scale and resolution", onOpen: () => fMons.refresh(), children: () =>
                 (fMons.data || []).map(m => ({ id: "m:" + m.name, name: m.name, sub: m.w + "×" + m.h + "@" + m.hz + "  ·  " + m.scale + "×" + (m.desc ? "  ·  " + m.desc : ""), glyph: Icons.monitor, children: () => [
                     { id: "sc", name: "Scale  ·  fits: " + (m.scales.length ? m.scales.map(x => x + "×").join(" ") : "1×"), glyph: Icons.tune,
                       sub: "Possible at " + m.w + "×" + m.h + ": " + (m.scales.length ? m.scales.map(x => x + "×").join(" ") : "1×") + "  ·  it snaps to the nearest",
-                      slider: { min: 0.5, max: 3, step: 0.05, value: m.scale, unit: "×", decimals: 2 },
+                      slider: { min: m.scales.length ? m.scales[0] : 1, max: m.scales.length ? m.scales[m.scales.length - 1] : 1, step: 0.05, values: m.scales, value: m.scale, unit: "×", decimals: 2 },
                       onSlide: v => { sh([bin("torii-hypr"), "scale", m.name, String(v)]); later(fMons, 900); } },
                     { id: "res", name: "Resolution", glyph: Icons.monitor, sub: m.w + "×" + m.h + "@" + m.hz, children: () =>
                         (m.modes || []).map(md => ({ id: "r:" + md, name: md.replace("@", " @ ") + " Hz", badge: md === (m.w + "x" + m.h + "@" + m.hz) ? "●" : "", keep: true,
                             run: () => { sh([bin("torii-hypr"), "mode", m.name, md]); later(fMons, 1500); } })) } ] })) },
+            hyprSlider("wborder", "Window border width", v => ["border", String(v)], 0, 10, 1, h.border === undefined ? 1 : h.border, " px", 0, "The coloured frame around windows"),
             hyprSlider("wopac", "Window opacity", v => ["opacity", String(v)], 0.3, 1, 0.05, h.opacity === undefined ? 1 : h.opacity, "", 2, "Transparent windows show the blur behind them"),
             { id: "blur", name: "Blur", glyph: Icons.tune, sub: b.enabled === false ? "Off" : b.size + " · " + b.passes + " passes · " + b.vibrancy, children: () => [
                 { id: "bon", name: b.enabled === false ? "Turn on" : "Turn off", glyph: Icons.power, badge: b.enabled === false ? "Off" : "On", keep: true,

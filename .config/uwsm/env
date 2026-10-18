@@ -4,3 +4,6 @@ export PATH="$HOME/.config/torii/bin:$PATH"
 # defaults chosen in the launcher (Setup > Defaults): EDITOR=..., written by torii-default
 if [ -r "$HOME/.local/state/torii/defaults.env" ]; then set -a; . "$HOME/.local/state/torii/defaults.env"; set +a; fi
 export EDITOR="${EDITOR:-nvim}"
+
+# Quickshell's own reload popup does not follow the wallpaper theme
+export QS_NO_RELOAD_POPUP=1

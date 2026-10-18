@@ -54,7 +54,7 @@
     ]
   },
   "notifications": {
-    "expand": "side"
+    "expand": "center"
   },
   "sounds": {
     "notification": "waterdrop.ogg",
