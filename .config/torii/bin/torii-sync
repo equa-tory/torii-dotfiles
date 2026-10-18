@@ -34,19 +34,25 @@ close_helium() {
   pgrep -x helium >/dev/null || return 0
   say "Closing Helium and the web apps"
   pkill -TERM -x helium
-  for _ in $(seq 1 40); do pgrep -x helium >/dev/null || return 0; sleep 0.5; done
-  echo "  Helium did not close, stopping it"; pkill -KILL -x helium; sleep 1
+  for _ in $(seq 1 120); do pgrep -x helium >/dev/null || break; sleep 0.5; done      # a clean exit can take a while
+  if pgrep -x helium >/dev/null; then echo "  Helium did not close, stopping it"; pkill -KILL -x helium; sleep 1; fi
+  sleep 2
+  # a dying browser may leave its lock files: a new one must not trust them (two Helium processes on one profile break it)
+  rm -f "$HOME"/.config/net.imput.helium/Singleton{Lock,Cookie,Socket}
 }
 reopen_helium() {
   [ -s "$REOPEN" ] || return 0
   say "Opening Helium and the web apps again"
+  first=1
   while IFS= read -r what; do
     case "$what" in
       desktop:*) "$HOME/.config/torii/bin/torii-apps" open "${what#desktop:}" >/dev/null 2>&1 ;;
       plain) (setsid helium-browser >/dev/null 2>&1 &) ;;
     esac
-    sleep 1
+    # the first window starts the browser: give it time to take the profile lock, so the others join it instead of starting a second one
+    if [ "$first" = 1 ]; then for _ in $(seq 1 20); do [ -L "$HOME/.config/net.imput.helium/SingletonLock" ] && break; sleep 0.5; done; sleep 3; first=0; else sleep 1; fi
   done < "$REOPEN"
+  [ "$(ps -eo args= | grep -E '^/opt/helium-browser-bin/helium( |$)' | grep -vc -- '--type=')" -le 1 ] || echo "  !! two Helium processes are running on one profile: close all Helium windows and open them again"
 }
 needs_helium() { case " $* " in *" helium "*|*" webapps "*) return 0 ;; *) return 1 ;; esac; }
 
