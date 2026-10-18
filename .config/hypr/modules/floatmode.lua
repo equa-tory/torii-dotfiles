@@ -244,8 +244,43 @@ local function remember_before(w)
     end
 end
 
+-- tiling mode, a floating window: Alt+Shift+arrows nudge it; against the edge of the screen, left / right carry it over to
+-- the next monitor (it enters at the edge it came from). A tiled window keeps the normal "move in the layout" (false).
+local NUDGE = 80
+local function nudge(dir)
+    local w = hl.get_active_window()
+    if not w or not w.floating then return false end
+    local mon = monitor_of(w)
+    local a = work_area(w)
+    local x, y = xy(w.at, "x", 1), xy(w.at, "y", 2)
+    local ww, wh = xy(w.size, "x", 1), xy(w.size, "y", 2)
+    local function near(v, t) return math.abs(v - t) <= 4 end
+    local nx, ny = x, y
+    if dir == "left" then
+        if near(x, a.x) or x < a.x then
+            local n = neighbour(mon, "left")
+            if n then
+                local a2 = area_of(n)
+                nx, ny = a2.x + a2.w - ww, math.max(a2.y, math.min(y - a.y + a2.y, a2.y + a2.h - wh))
+            else nx = a.x end
+        else nx = math.max(a.x, x - NUDGE) end
+    elseif dir == "right" then
+        local right = a.x + a.w - ww
+        if near(x, right) or x > right then
+            local n = neighbour(mon, "right")
+            if n then
+                local a2 = area_of(n)
+                nx, ny = a2.x, math.max(a2.y, math.min(y - a.y + a2.y, a2.y + a2.h - wh))
+            else nx = math.max(a.x, right) end
+        else nx = math.min(right, x + NUDGE) end
+    elseif dir == "up" then ny = math.max(a.y, y - NUDGE)
+    elseif dir == "down" then ny = math.min(math.max(a.y, a.y + a.h - wh), y + NUDGE) end
+    hl.dispatch(hl.dsp.window.move({ x = math.floor(nx), y = math.floor(ny), exact = true, window = w }))
+    return true
+end
+
 function torii_float_snap(dir)
-    if mode ~= "float" then return false end
+    if mode ~= "float" then return nudge(dir) end
     local w = hl.get_active_window()
     if not w or not w.floating then return false end
     local mon = monitor_of(w)

@@ -133,7 +133,7 @@ hl.bind(mainMod .. " + CTRL + SHIFT + up",   function() if torii_window_big then
 -- Centre the window at its normal size
 hl.bind(mainMod .. " + CTRL + SHIFT + down", function() if torii_window_center then torii_window_center() end end)
 
--- keys: ALT + SHIFT + ← ↑ ↓ → | Move the window; past a monitor edge it goes to the next monitor; in float mode left / right snap to a half and, pressed again, hop to the next monitor
+-- keys: ALT + SHIFT + ← ↑ ↓ → | Tiled window: move it in the layout (past a monitor edge to the next monitor). Floating window in tiling mode: nudge it a bit, at the screen edge left / right carry it to the next monitor. In float mode (Alt+Shift+N) left / right snap to a half and, pressed again, hop to the next monitor
 local move = { left = "l", right = "r", up = "u", down = "d" }
 for key, dir in pairs(move) do
     hl.bind(mainMod .. " + SHIFT + " .. key, function()
