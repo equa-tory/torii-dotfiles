@@ -117,3 +117,4 @@ glfw
 ffmpegthumbs
 kdegraphics-thumbnailers
 kimageformats
+gcc
