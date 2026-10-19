@@ -539,7 +539,7 @@ Singleton {
     function floatTerm(title, args) { app(["kitty", "--class", "torii-float", "--title", title].concat(args)); }
 
     function installMenu() {
-        return { id: "install", name: "Install", glyph: Icons.download, sub: "Packages, web apps, terminal apps, updates", keywords: "add package pacman aur yay web app tui update",
+        return { id: "install", name: "Install", glyph: Icons.download, sub: "Packages, web apps, TUIs, updates", keywords: "add package pacman aur yay web app tui update",
                  children: () => {
             fGit.ensure();
             const g = fGit.data || {};
@@ -549,24 +549,45 @@ Singleton {
                   run: () => floatTerm("Install", [bin("torii-install"), "pacman"]) },
                 { id: "aur", name: "AUR package", sub: "Search the AUR with yay", glyph: Icons.download, keywords: "yay install software",
                   run: () => floatTerm("Install from the AUR", [bin("torii-install"), "aur"]) },
-                { id: "webapp", name: "Web app", sub: "A website in its own window (Helium)", glyph: Icons.web, keywords: "website pwa chromium helium", keep: true,
+                { id: "webapp", name: "Web app", sub: "A website in its own window (Helium), or in the browser", glyph: Icons.web, keywords: "website pwa chromium helium", keep: true,
                   run: () => ask("Name of the web app", false, name => {
                       if (!name) return;
                       ask("Address of " + name + " (https://…)", false, url => {
                           if (!url) return;
-                          sh([bin("torii-apps"), "webapp", "add", name, url]); later(fWeb, 1500);
-                          say(name + " added, it is in Apps in a moment");
+                          ask("Open in the normal browser instead of its own window?  y = browser, Enter = own window", false, b => {
+                              const inBrowser = /^\s*y/i.test(b);
+                              sh([bin("torii-apps"), "webapp", "add"].concat(inBrowser ? ["--browser"] : [], [name, url])); later(fWeb, 1500);
+                              say(name + " added, it is in Apps in a moment");
+                          });
                       });
                   }) },
-                { id: "tui", name: "Terminal app", sub: "A command in a terminal window, e.g. ssh to a server", glyph: Icons.terminal, keywords: "tui command ssh", keep: true,
-                  run: () => ask("Name of the terminal app", false, name => {
+                { id: "tui", name: "TUI", sub: "A command in a terminal window, e.g. ssh to a server", glyph: Icons.terminal, keywords: "tui terminal command ssh script", keep: true,
+                  run: () => ask("Name of the TUI", false, name => {
                       if (!name) return;
                       ask("Command to run for " + name, false, cmd => {
                           if (!cmd) return;
-                          sh([bin("torii-apps"), "tui", "add", name, cmd]); later(fTui, 800);
-                          say(name + " added, it is in Apps");
+                          ask("Run it in the background, with no window?  y = no window (a notification when done), Enter = terminal window", false, q => {
+                              const quiet = /^\s*y/i.test(q);
+                              sh([bin("torii-apps"), "tui", "add"].concat(quiet ? ["--quiet"] : [], [name, cmd])); later(fTui, 800);
+                              say(name + " added, it is in Apps");
+                          });
                       });
                   }) },
+                { id: "appopts", name: "Web app and TUI options", sub: "Open a web app in the browser, run a TUI without a window", glyph: Icons.tune, keywords: "browser quiet background window toggle",
+                  children: () => {
+                      fWeb.ensure(); fTui.ensure();
+                      const mk = (fetch, kind, opt, label, on, off) => (fetch.data || []).map(w => ({
+                          id: kind + ":" + w.name, name: w.name, glyph: kind === "webapp" ? Icons.web : Icons.terminal, keep: true,
+                          sub: label + "  ·  " + (w[opt] ? on : off) + "  (Enter switches)",
+                          run: () => {
+                              sh([bin("torii-apps"), kind, "set", w.name, opt, w[opt] ? "false" : "true"]);
+                              fetch.data = (fetch.data || []).map(x => x.name === w.name ? Object.assign({}, x, { [opt]: !w[opt] }) : x);
+                              later(kind === "webapp" ? fWeb : fTui, 800);
+                          } }));
+                      const l = mk(fWeb, "webapp", "browser", "Web app", "opens in the browser", "own window")
+                          .concat(mk(fTui, "tui", "quiet", "TUI", "background, no window", "terminal window"));
+                      return l.length ? l : [{ id: "none", name: "Nothing added yet", sub: "Install > Web app or TUI" }];
+                  } },
                 { id: "update", name: "Update system", sub: "pacman and AUR upgrade", glyph: Icons.update, keywords: "upgrade yay pacman -Syu",
                   run: () => floatTerm("Update", [bin("torii-install"), "update"]) },
                 syncMenu(g, gitBadge)
@@ -615,23 +636,23 @@ Singleton {
     }
 
     function removeMenu() {
-        return { id: "remove", name: "Remove", glyph: Icons.trash, sub: "Packages, web apps, terminal apps", keywords: "uninstall delete",
+        return { id: "remove", name: "Remove", glyph: Icons.trash, sub: "Packages, web apps, TUIs", keywords: "uninstall delete",
                  children: () => {
             fWeb.ensure(); fTui.ensure();
             const mk = (fetch, kind, label) => (fetch.data || []).map(w => ({
                 id: kind + ":" + w.name, name: w.name, sub: label + "  ·  " + (w.url || w.command || ""), glyph: kind === "webapp" ? Icons.web : Icons.terminal, keep: true,
-                run: () => {
+                run: () => ask("Remove " + w.name + "?  Enter to confirm, Esc to cancel", false, () => {
                     sh([bin("torii-apps"), kind, "remove", w.name]);
                     fetch.data = (fetch.data || []).filter(x => x.name !== w.name);
                     say("Removed " + w.name);
-                } }));
+                }) }));
             return [
                 { id: "package", name: "Package", sub: "Pick installed packages to remove (Tab picks several)", glyph: Icons.trash, keywords: "pacman uninstall software",
                   run: () => floatTerm("Remove", [bin("torii-install"), "remove"]) },
                 { id: "webapp", name: "Web app", sub: (fWeb.data || []).length + " added", glyph: Icons.web, keywords: "website",
                   children: () => { const l = mk(fWeb, "webapp", "Web app"); return l.length ? l : [{ id: "none", name: "No web apps yet", sub: "Install > Web app" }]; } },
-                { id: "tui", name: "Terminal app", sub: (fTui.data || []).length + " added", glyph: Icons.terminal, keywords: "tui command",
-                  children: () => { const l = mk(fTui, "tui", "Terminal app"); return l.length ? l : [{ id: "none", name: "No terminal apps yet", sub: "Install > Terminal app" }]; } }
+                { id: "tui", name: "TUI", sub: (fTui.data || []).length + " added", glyph: Icons.terminal, keywords: "tui command",
+                  children: () => { const l = mk(fTui, "tui", "TUI"); return l.length ? l : [{ id: "none", name: "No TUIs yet", sub: "Install > TUI" }]; } }
             ];
         } };
     }

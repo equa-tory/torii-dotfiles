@@ -13,8 +13,11 @@ file inside that folder (~/apps/v2rayN/v2rayN.desktop) or by an app.json:
             levels down) and write <folder>/<program>.desktop for it, with its icon. Existing files are never touched.
   desktop   copy these apps to ~/.local/share/applications/torii-app-*.desktop so other launchers and xdg-open see them
   run       start one by folder name (used by those entries)
-  webapp add <name> <url> | remove <name> | list | sync    web apps: a Helium window without browser chrome (--app=URL)
-  tui add <name> <command> | remove <name> | list | sync   terminal programs as apps (e.g. dorm = ssh 192.168.1.50)
+  webapp add [--browser] <name> <url> | remove <name> | set <name> browser true|false | list | sync
+            web apps: a Helium window without browser chrome (--app=URL); "browser" opens a tab in the default browser instead
+  tui add [--quiet] <name> <command> | remove <name> | set <name> quiet true|false | list | sync
+            terminal programs as apps (e.g. dorm = ssh 192.168.1.50); "quiet" runs the command in the background with no
+            window (output in ~/.local/state/torii/tui-<name>.log) and a notification when it is done
             Both lists live in ~/.local/state/torii/{webapps,tuis}.json (private data, not in the dotfiles repo; the
             home-server sync carries them). `sync` rewrites the .desktop files from those lists.
 Nothing is moved or installed: the folders stay exactly where they are.
@@ -261,9 +264,15 @@ def sync_web():
         u = urlparse(url)
         f = target / f"torii-web-{slug(w['name'])}.desktop"
         keep.add(f.name)
+        if w.get("browser"):
+            exec_line = f"Exec=xdg-open {url}\n"
+            wm = ""
+        else:
+            exec_line = f"Exec=helium-browser --app={url}\n"
+            wm = f"StartupWMClass=chrome-{u.netloc}_{(u.path or '/').replace('/', '_')}-Default\n"
         f.write_text("[Desktop Entry]\nType=Application\nVersion=1.0\n"
                      f"Name={w['name']}\nComment=Web app\nIcon={favicon(url, w['name'])}\n"
-                     f"Exec=helium-browser --app={url}\nTerminal=false\nCategories=Network;\nStartupWMClass=chrome-{u.netloc}_{(u.path or '/').replace('/', '_')}-Default\n"
+                     f"{exec_line}Terminal=false\nCategories=Network;\n{wm}"
                      "X-Torii-Web=true\n")
     for old in target.glob("torii-web-*.desktop"):
         if old.name not in keep:
@@ -279,11 +288,21 @@ def sync_tui():
         f = d / f"{slug(t['name'])}.desktop"
         keep.add(f)
         run = d / "run.sh"
-        run.write_text("#!/bin/sh\n" + t["command"] + "\nprintf '\\n[done, Enter to close] '\nread _\n")
+        if t.get("quiet"):
+            log = STATE / f"tui-{slug(t['name'])}.log"
+            run.write_text("#!/bin/sh\n"
+                           f"sh -c {shlex.quote(t['command'])} >{shlex.quote(str(log))} 2>&1 </dev/null\n"
+                           "code=$?\n"
+                           f"if [ $code = 0 ]; then notify-send -a torii {shlex.quote(t['name'])} done 2>/dev/null\n"
+                           f"else notify-send -a torii {shlex.quote(t['name'])} \"failed ($code), see the log\" 2>/dev/null; fi\n")
+            exec_line = f"Exec=sh {run}\n"
+        else:
+            run.write_text("#!/bin/sh\n" + t["command"] + "\nprintf '\\n[done, Enter to close] '\nread _\n")
+            exec_line = f"Exec=kitty --title {shlex.quote(t['name'])} {run}\n"
         run.chmod(0o755)
         f.write_text("[Desktop Entry]\nType=Application\nVersion=1.0\n"
-                     f"Name={t['name']}\nComment=Terminal app: {t['command']}\nIcon=utilities-terminal\n"
-                     f"Exec=kitty --title {shlex.quote(t['name'])} {run}\nTerminal=false\nX-Torii-Tui=true\n")
+                     f"Name={t['name']}\nComment=TUI: {t['command']}\nIcon=utilities-terminal\n"
+                     f"{exec_line}Terminal=false\nX-Torii-Tui=true\n")
     for old in root.glob("*/*.desktop") if root.is_dir() else []:
         if "X-Torii-Tui=true" in old.read_text(errors="replace") and old not in keep:
             old.unlink()
@@ -301,8 +320,19 @@ def lists(kind, a):
     if a[:1] == ["list"]:
         print(json.dumps(items))
         return
+    opt = "browser" if kind == "webapp" else "quiet"
     if a[:1] == ["add"] and len(a) >= 3:
-        items = [i for i in items if i["name"].lower() != a[1].lower()] + [{"name": a[1], key: " ".join(a[2:])}]
+        flag = a[1] == "--" + opt
+        a = a[:1] + a[2:] if flag else a
+        item = {"name": a[1], key: " ".join(a[2:])}
+        if flag:
+            item[opt] = True
+        items = [i for i in items if i["name"].lower() != a[1].lower()] + [item]
+        save_list(name, items)
+    elif a[:1] == ["set"] and len(a) == 4 and a[2] == opt:
+        for i in items:
+            if i["name"].lower() == a[1].lower():
+                i[opt] = a[3] == "true"
         save_list(name, items)
     elif a[:1] == ["remove"] and len(a) == 2:
         save_list(name, [i for i in items if i["name"].lower() != a[1].lower()])

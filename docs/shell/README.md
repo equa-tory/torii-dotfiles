@@ -115,7 +115,7 @@ changes made from a terminal too.
 
 **Install / Remove** (`torii-install`, `torii-apps`): packages open a small floating terminal with fzf (Tab picks several, Enter
 installs or removes) and keep `packages/pacman.txt` and `packages/aur.txt` in step, so `./install.sh` brings the same set back.
-Web apps (a Helium `--app=` window with the site's icon) and terminal apps (a command in a terminal, e.g. `dorm` = an ssh
+Web apps (a Helium `--app=` window with the site's icon; with the *browser* option a normal browser tab) and TUIs (a command in a terminal; with the *quiet* option it runs with no window, a notification says when it is done and the output is in `~/.local/state/torii/tui-<name>.log`). Both options are switched in Install › Web app and TUI options; removing one asks first. Example: a TUI (`dorm` = an ssh
 command) are asked for in the launcher; their lists live in `~/.local/state/torii/{webapps,tuis}.json` (private, synced to the
 home server by `private-push.sh`, restored by `personal.sh`). `Update system` runs the full upgrade. `Update torii configs` shows
 `↓`/`↑` for commits to pull or push and `● changes` for local edits; it asks `[y/N]`, then commits, pulls and pushes.
@@ -201,7 +201,7 @@ placed and started at login too (the session starts them silently on their works
 caches, package downloads, old logs, crash dumps and Docker leftovers (root parts ask for your password in a terminal), lists unused packages, and finds files
 over 100 MB in Downloads, Documents, Videos, Pictures, Desktop, Music (move to trash, show in files).
 
-**Your own apps on the home server:** web apps and terminal apps made in the launcher (Install › Web app / Terminal app) are kept in
+**Your own apps on the home server:** web apps and TUIs made in the launcher (Install › Web app / TUI) are kept in
 `~/.local/state/torii/{webapps,tuis}.json`; a `.desktop` file you write yourself goes in `~/.local/share/applications/`, and a program folder in
 `~/apps/<name>/`. `bash packages/private-push.sh` copies all of that (plus the Helium profile and LocalSend) to `~/torii-private/home/` on the server
 (`ONLY=apps bash packages/private-push.sh` just the apps; `--dry-run` shows what would go). `./install.sh` restores them through `packages/personal.sh`.

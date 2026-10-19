@@ -27,9 +27,6 @@ do
     end
 end
 
--- web apps (Telegram, Discord: Helium --app windows) stay tiled in float mode; an app rule with "float" still floats one
-local function stays_tiled(w) return w.class ~= nil and w.class:match("^chrome%-.+%-Default$") ~= nil end
-
 local function save()
     local f = io.open(STATE, "w")
     if not f then return end
@@ -114,7 +111,7 @@ local function set_mode(m)
         every_window(function(w)
             if w.floating then
                 was_floating[w.address] = true
-            elseif not stays_tiled(w) then
+            else
                 float_to(w, target(w))
             end
         end)
@@ -152,7 +149,7 @@ on("window.open", function(w)
         end, { timeout = 500, type = "oneshot" })
         return
     end
-    if mode ~= "float" or w.floating or stays_tiled(w) then return end
+    if mode ~= "float" or w.floating then return end
     float_to(w, target(w))
 end)
 
