@@ -149,6 +149,14 @@ on("window.open", function(w)
     float_to(w, target(w))
 end)
 
+-- the focused floating window is always on top, also when focus came by keyboard (Alt+arrows, Alt+Tab, a window carried to another monitor)
+on("window.active", function()
+    local w = hl.get_active_window()
+    if w and w.floating and w.mapped and w.fullscreen == 0 then
+        hl.dispatch(hl.dsp.window.bring_to_top({ window = w }))
+    end
+end)
+
 -- remembered apps: note where their windows are whenever focus moves, so a move or resize is not lost (also at close)
 on("window.active", function()
     local changed = false
@@ -241,6 +249,7 @@ local function adopt(w, mon)
     if not ws or (w.workspace and w.workspace.id == ws.id) then return end
     hl.dispatch(hl.dsp.window.move({ workspace = ws.id, follow = false, window = w }))
     hl.dispatch(hl.dsp.focus({ window = w }))      -- the focus stays with the window being carried, not the one left behind
+    hl.dispatch(hl.dsp.window.bring_to_top({ window = w }))
 end
 
 local function place(w, g)
