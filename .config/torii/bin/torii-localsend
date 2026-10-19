@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""torii-localsend watch | setup | status  -  text sent to this computer with LocalSend is copied and pasted at once.
+
+  watch    keep running (started at login): when a text message arrives in LocalSend's receive history, put it on the clipboard
+           and paste it into the focused window (Ctrl+V, Ctrl+Shift+V in a terminal). Files are left to LocalSend.
+  setup    how to turn on LocalSend's "Quick save", so a message is accepted without opening a window
+  status   what is set
+
+LocalSend itself is not changed: this reads its history file (~/.local/share/org.localsend.localsend_app/shared_preferences.json).
+The paste can be switched off, the text is then only copied: ~/.local/state/torii/localsend.json  {"paste": false}
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HOME = Path.home()
+PREFS = HOME / ".local/share/org.localsend.localsend_app/shared_preferences.json"
+STATE = Path(os.environ.get("TORII_STATE", HOME / ".local/state/torii"))
+CONF = STATE / "localsend.json"
+
+
+def history():
+    try:
+        d = json.loads(PREFS.read_text())
+    except (OSError, ValueError):
+        return None
+    out = []
+    for e in d.get("flutter.ls_receive_history", []):
+        try:
+            out.append(json.loads(e))
+        except ValueError:
+            pass
+    return out
+
+
+def paste_enabled():
+    try:
+        return json.loads(CONF.read_text()).get("paste", True)
+    except (OSError, ValueError):
+        return True
+
+
+def active_class():
+    try:
+        return json.loads(subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=2).stdout).get("class", "")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return ""
+
+
+def deliver(text, sender):
+    subprocess.run(["wl-copy"], input=text, text=True, timeout=5)
+    pasted = False
+    if paste_enabled():
+        time.sleep(0.15)
+        terminal = active_class() in ("kitty", "foot", "Alacritty", "org.wezfurlong.wezterm")
+        keys = ["-M", "ctrl", "-M", "shift", "-k", "v", "-m", "shift", "-m", "ctrl"] if terminal else ["-M", "ctrl", "-k", "v", "-m", "ctrl"]
+        pasted = subprocess.run(["wtype"] + keys, timeout=5).returncode == 0
+    shown = text if len(text) <= 60 else text[:57] + "..."
+    subprocess.run(["notify-send", "-a", "LocalSend", "-t", "2500", f"From {sender}: {'pasted' if pasted else 'copied'}", shown], timeout=5)
+
+
+def watch():
+    seen = {e["id"] for e in history() or []}
+    last = None
+    print("watching", PREFS, flush=True)
+    while True:
+        try:
+            m = PREFS.stat().st_mtime_ns
+        except OSError:
+            time.sleep(2)
+            continue
+        if m != last:
+            last = m
+            h = history()
+            if h is not None:
+                for e in reversed(h):            # oldest of the new ones first
+                    if e["id"] in seen:
+                        continue
+                    seen.add(e["id"])
+                    if e.get("isMessage") and e.get("fileName"):
+                        deliver(e["fileName"], e.get("senderAlias", "someone"))
+        time.sleep(0.4)
+
+
+def setup():
+    # LocalSend keeps "Quick save" in its own format, so it is switched on in the app (writing it from here broke its start once)
+    print("Open LocalSend > Settings > Receive and turn on  Quick Save  (and  Auto finish  if it is there):")
+    print("then a message is accepted without a dialog, and `torii-localsend watch` pastes it. Run  torii-localsend status  to check.")
+
+
+def status():
+    try:
+        d = json.loads(PREFS.read_text())
+    except (OSError, ValueError):
+        sys.exit("LocalSend settings not found")
+    print("quick save:", d.get("flutter.ls_quick_save", "not set"), " quick save from favorites:", d.get("flutter.ls_quick_save_from_favorites", "not set"),
+          " auto finish:", d.get("flutter.ls_auto_finish", "not set"), " paste:", paste_enabled())
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    {"watch": watch, "setup": setup, "status": status}.get(cmd, lambda: print(__doc__))()

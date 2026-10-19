@@ -12,4 +12,5 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("$HOME/.config/torii/bin/torii-sudo clear")
   hl.exec_cmd("$HOME/.config/torii/bin/torii-capture reset")
   hl.exec_cmd("$HOME/.config/torii/bin/torii-rules autostart")      -- apps with "Start at login" in Setup > App rules
+  hl.exec_cmd("$HOME/.config/torii/bin/torii-localsend watch")       -- text sent with LocalSend is copied and pasted
 end)
