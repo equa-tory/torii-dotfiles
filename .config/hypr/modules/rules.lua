@@ -62,3 +62,12 @@ torii_steam_sub = hl.on("window.open", function(w)
         os.execute(string.format("hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = \"fullscreen\", action = \"set\", window = \"address:%s\" })' >/dev/null 2>&1 &", addr))
     end, { timeout = 1500, type = "oneshot" })
 end)
+
+-- LocalSend shows its window when a message arrives; it must not take the focus away from the field the text is pasted into
+-- (torii-localsend watch pastes, then closes that window again)
+hl.window_rule({
+    name  = "torii-localsend-nofocus",
+    match = { class = "^org\\.localsend\\.localsend_app$" },
+
+    no_initial_focus = true,
+})

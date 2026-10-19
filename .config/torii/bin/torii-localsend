@@ -50,10 +50,39 @@ def active_class():
         return ""
 
 
+LS_CLASS = "org.localsend.localsend_app"
+
+
+def hyprctl(*a):
+    try:
+        return subprocess.run(["hyprctl", *a], capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def close_localsend():
+    """LocalSend opens its window for a message; close it (it goes to the tray) so the focus is back where it was typing."""
+    for _ in range(8):
+        clients = json.loads(hyprctl("clients", "-j") or "[]")
+        mine = [c for c in clients if c.get("class") == LS_CLASS]
+        if mine:
+            for c in mine:
+                hyprctl("dispatch", f'hl.dsp.window.close({{ window = "address:{c["address"]}" }})')
+            break
+        time.sleep(0.15)
+    for _ in range(10):
+        if active_class() != LS_CLASS:
+            return
+        time.sleep(0.1)
+
+
 def deliver(text, sender):
     subprocess.run(["wl-copy"], input=text, text=True, timeout=5)
     pasted = False
-    if paste_enabled():
+    was_in_localsend = active_class() == LS_CLASS       # you are using LocalSend itself: only copy
+    if not was_in_localsend:
+        close_localsend()
+    if paste_enabled() and not was_in_localsend:
         time.sleep(0.15)
         terminal = active_class() in ("kitty", "foot", "Alacritty", "org.wezfurlong.wezterm")
         keys = ["-M", "ctrl", "-M", "shift", "-k", "v", "-m", "shift", "-m", "ctrl"] if terminal else ["-M", "ctrl", "-k", "v", "-m", "ctrl"]
