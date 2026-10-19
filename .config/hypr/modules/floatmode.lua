@@ -99,9 +99,16 @@ local function every_window(fn)
     end
 end
 
+-- tiling: the window under the mouse gets the focus; windows mode: only a click does (2 = hovering does not change the focus)
+local function apply_focus_rule()
+    hl.config({ input = { follow_mouse = mode == "float" and 2 or 1 } })
+end
+apply_focus_rule()
+
 local function set_mode(m)
     if m == mode then return end
     mode = m
+    apply_focus_rule()
     if mode == "float" then
         was_floating = {}      -- a fresh look each time: a window that was floating once must not stay floating for good
         every_window(function(w)
