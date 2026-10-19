@@ -35,16 +35,8 @@ case "${1:-}" in
     need grim; need slurp; mkdir -p "$pics"
     geo=$(zone) || exit 0; [ -n "$geo" ] || exit 0; sleep 0.2
     f="$pics/$ts.png"; grim -g "$geo" "$f" && { wl-copy < "$f"; note "Screenshot saved" "$f" -i "$f"; } ;;
-  record)
-    need wf-recorder
-    if pgrep -x wf-recorder >/dev/null; then pkill -INT -x wf-recorder; exit 0; fi
-    mkdir -p "$vids"; f="$vids/$ts.mp4"
-    st="${TORII_STATE:-$HOME/.local/state/torii}/recording.json"   # the notch shows a red dot while "on" is true
-    mkdir -p "$(dirname "$st")"; printf '{"on": true, "start": %s}\n' "$(date +%s)" > "$st"
-    trap 'printf "{\"on\": false}\n" > "$st"' EXIT
-    note "Recording started" "Click the red dot in the notch to stop"
-    wf-recorder -o "$(focused)" -f "$f"
-    note "Recording saved" "$f" ;;
+  record)   # picture + sound, settings in Capture > Screen recording
+    need wf-recorder; exec "$HOME/.config/torii/bin/torii-record" toggle ;;
   reset)   # after login: no recording survives a reboot
     st="${TORII_STATE:-$HOME/.local/state/torii}/recording.json"; mkdir -p "$(dirname "$st")"; printf '{"on": false}\n' > "$st" ;;
   text)

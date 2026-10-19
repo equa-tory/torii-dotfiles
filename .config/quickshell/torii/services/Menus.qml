@@ -84,9 +84,10 @@ Singleton {
     JsonFetch { id: fClean;    command: [root.bin("torii-clean"), "list"];                 onDataChanged: root.bump() }
     JsonFetch { id: fBig;      command: [root.bin("torii-clean"), "big", "100"];           onDataChanged: root.bump() }
     JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
+    JsonFetch { id: fRecApps;  command: [root.bin("torii-record"), "apps"];               onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fBootImgs, fTrans, fHypr, fMons, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fBootImgs, fTrans, fHypr, fMons, fRecApps, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
@@ -605,13 +606,51 @@ Singleton {
         });
     }
 
+    // ---- screen recording: what is recorded, tracks or one mix, a folder or one file, microphone volume
+    property bool micHear: false
+    Timer { id: micHearOff; interval: 120000; onTriggered: root.micHear = false }
+    function recSet(key, json) { sh([bin("torii-config"), "set", "capture.rec." + key, json]); }
+    function recMenu() {
+        const r = Config.capture.rec;
+        const on = b => b ? "On" : "Off";
+        const toggle = (id, name, sub, key, cur, glyph) => ({ id: id, name: name, sub: sub, glyph: glyph, badge: on(cur), keep: true, run: () => recSet(key, cur ? "false" : "true") });
+        const apps = (r.apps || []).slice();
+        return { id: "recording", name: "Screen recording", glyph: Icons.record, keywords: "video record screencast audio sound mic microphone tracks lanes folder",
+                 sub: (r.system ? "system" : "") + (r.system && r.mic ? " + " : "") + (r.mic ? "mic" : "") + (apps.length ? " + " + apps.length + " app" + (apps.length > 1 ? "s" : "") : "") + (!r.system && !r.mic && !apps.length ? "no sound" : "") + "  ·  " + (r.folder ? "folder" : r.lanes ? "tracks" : "one mix"),
+                 onOpen: () => fRecApps.refresh(), children: () => [
+            { id: "go", name: Live.recording ? "Stop recording" : "Start recording", glyph: Icons.record, sub: "The focused monitor, saved in ~/Videos", badge: Live.recording ? "●" : "",
+              run: () => app([bin("torii-capture"), "record"]) },
+            toggle("system", "Record what the computer plays", "Games, music, calls: the default output, with sound from the speakers or headphones", "system", r.system, Icons.speaker),
+            toggle("mic", "Record the microphone", "The default microphone", "mic", r.mic, Icons.mic),
+            { id: "apps", name: "Programs on their own track", glyph: Icons.apps, badge: apps.length ? String(apps.length) : "",
+              sub: apps.length ? apps.join(", ") : "Pick e.g. the game and Discord: each one can be edited by itself afterwards",
+              onOpen: () => fRecApps.refresh(), sorted: true, children: () => {
+                  const playing = (fRecApps.data || []).map(a => a.name);
+                  const names = playing.concat(apps.filter(a => playing.indexOf(a) < 0));
+                  if (!names.length) return [{ id: "none", name: "Nothing is playing sound", sub: "Start the game or call, then come back here" }];
+                  return names.map(n => ({ id: "a:" + n, name: n, glyph: Icons.speaker, sub: playing.indexOf(n) >= 0 ? "Playing now" : "Not playing now (a program must be playing when the recording starts)",
+                      badge: apps.indexOf(n) >= 0 ? "●" : "", keep: true,
+                      run: () => recSet("apps", JSON.stringify(apps.indexOf(n) >= 0 ? apps.filter(x => x !== n) : apps.concat([n]))) }));
+              } },
+            toggle("lanes", "Separate audio tracks", "Every source is its own track in the video file (choose in the player or editor); Off mixes them into one", "lanes", r.lanes, Icons.layout),
+            toggle("folder", "Folder with files", "A folder with video.mp4 and one audio file per source, instead of one video file with tracks", "folder", r.folder, Icons.folder),
+            { id: "micvol", name: "Microphone volume", glyph: Icons.mic, sub: "The real input level, also for calls",
+              slider: { min: 0, max: 1.5, step: 0.05, value: Audio.sourceVolume, unit: "", decimals: 2 },
+              onSlide: v => sh(["wpctl", "set-volume", "@DEFAULT_AUDIO_SOURCE@", String(v)]) },
+            cfgSlider("micgain", "Microphone in the recording", "capture.rec.micGain", 0.25, 4, 0.05, r.micGain, "×", 2, "Louder or quieter in the file only (1 = as it is)"),
+            { id: "hear", name: micHear ? "Stop hearing the microphone" : "Hear the microphone", glyph: Icons.headphones, badge: micHear ? "On" : "Off", keep: true,
+              sub: "Plays your microphone in the output to check its volume (use headphones; it stops after two minutes or when recording starts)",
+              run: () => { micHear = !micHear; if (micHear) micHearOff.restart(); else micHearOff.stop(); sh([bin("torii-record"), "monitor", micHear ? "on" : "off"]); } } ] };
+    }
+
     function captureMenu(t) {
         const cap = what => () => app([bin("torii-capture"), what]);
         return { id: "capture", name: "Capture", glyph: Icons.camera, sub: "Screenshot, record, text, QR, colour", children: () => [
             { id: "screen", name: "Screenshot", sub: "The whole screen", glyph: Icons.camera, keywords: "screenshot fullscreen", run: cap("screen") },
             { id: "zone", name: "Screenshot zone", sub: "Drag a rectangle", glyph: Icons.camera, keywords: "screenshot region area", run: cap("zone") },
-            { id: "record", name: t.recording ? "Stop recording" : "Record screen", sub: "The focused monitor, saved in ~/Videos", glyph: Icons.record,
+            { id: "record", name: t.recording ? "Stop recording" : "Record screen", sub: "The focused monitor with sound, saved in ~/Videos  ·  settings in Screen recording", glyph: Icons.record,
               keywords: "video screencast", badge: t.recording ? "●" : "", run: cap("record") },
+            recMenu(),
             { id: "text", name: "Text from screen", sub: "Drag a rectangle, the text is copied", glyph: Icons.textScan, keywords: "ocr read copy", run: cap("text") },
             { id: "qr", name: "QR code", sub: "Drag a rectangle around it", glyph: Icons.qr, keywords: "scan barcode", run: cap("qr") },
             { id: "freeze", name: "Freeze screen while selecting", sub: "Zone, text and QR: the picture stands still while you drag (needs wayfreeze)", glyph: Icons.camera,

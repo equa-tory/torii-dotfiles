@@ -51,6 +51,14 @@ Singleton {
             }
             property JsonObject capture: JsonObject {
                 property bool freeze: true          // freeze the screen while you drag a zone (screenshot zone, text, QR)
+                property JsonObject rec: JsonObject {   // screen recording (torii-record)
+                    property bool system: true          // what the computer plays
+                    property bool mic: true             // the microphone
+                    property var apps: []               // programs recorded on a track of their own
+                    property bool lanes: true           // every source its own audio track; false: mixed into one
+                    property bool folder: false         // a folder with the video and one audio file per source
+                    property real micGain: 1.0          // louder or quieter microphone in the recording only
+                }
             }
             property JsonObject workspaces: JsonObject {
                 property int count: 5

@@ -342,3 +342,7 @@ refused, `personal.sh` shows the key and falls back to the backup copy on the Um
 * Setup › App rules › *Add the focused app* (and every other way of adding one) opens the new rule's settings at once.
 * Trigger › *Date next to the clock* puts the date in the notch clock.
 * A floating window can be resized from the strip just above its title bar (top, top-left, top-right): `modules/edgeresize.lua` switches on a mouse-resize submap while the cursor is there.
+
+## Screen recording with sound
+
+Trigger › Capture › *Screen recording* (`torii-record`, `torii-capture record` starts and stops it): the picture is recorded by wf-recorder, each sound by pw-record, and ffmpeg joins them when you stop (the video is copied, not encoded again). Choose what goes in: what the computer plays, the microphone, and programs on their own track (the list shows what plays sound now, e.g. the game and Discord; a program must be playing when the recording starts). *Separate audio tracks* makes every source its own track in the file (Off: one mix); *Folder with files* saves `~/Videos/<time>/video.mp4` (mixed sound) plus one `.flac` per source instead of one file. *Microphone volume* is the real input level, *Microphone in the recording* a gain applied to the file only, and *Hear the microphone* plays it in the output to check (it stops by itself). Settings: `capture.rec` in `config.json`.
