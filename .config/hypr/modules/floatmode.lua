@@ -388,9 +388,9 @@ torii_unmax_poll = hl.timer(function()
                     local cx, cy = c.x or c[1], c.y or c[2]
                     local rx = math.max(0.08, math.min(0.92, (cx - x) / math.max(1, ww)))
                     place(w, { x = cx - rx * old.w, y = cy + bar_h() / 2, w = old.w, h = old.h })      -- the mouse stays on the bar
-                    -- Hyprland's drag goes on from where it began, so the window would jump: let go and press again at this spot
-                    -- (ydotool: a virtual mouse; the physical button is still down) so a new drag starts from the new shape
-                    os.execute("ydotool click 0x80 0x40 >/dev/null 2>&1 &")
+                    -- Hyprland's drag would go on from where it began and the window would jump away from the mouse: end it with a
+                    -- virtual mouse release (an extra release can do no harm; a virtual press could stay down). Press the bar again to drag on.
+                    os.execute("ydotool click 0x80 >/dev/null 2>&1 &")
                 end
             end
         elseif m and not w.mapped then
