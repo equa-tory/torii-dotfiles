@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""torii-bt-battery  -  battery of the connected AirPods / Beats, as JSON {"AA:BB:..": 0..100}.
+
+BlueZ shows no battery for them over A2DP. Apple's own control channel (AAP, L2CAP port 0x1001, the one iOS uses) does:
+handshake, ask for notifications, and the first battery packet (04 00 04 00 04 00 <count> {part 01 level state 01}...) says
+it. Parts: 01 = single (AirPods Max), 02 right, 04 left, 08 case. Devices that are not Apple's or not connected are skipped;
+a device that does not answer in a few seconds is left out. Nothing is written or changed on the headphones.
+"""
+import json
+import re
+import socket
+import subprocess
+import time
+
+
+def apple_connected():
+    out = subprocess.run(["bluetoothctl", "devices", "Connected"], capture_output=True, text=True).stdout
+    for mac in re.findall(r"Device (\S+)", out):
+        info = subprocess.run(["bluetoothctl", "info", mac], capture_output=True, text=True).stdout
+        if "bluetooth:v004C" in info:
+            yield mac
+
+
+def battery(mac):
+    s = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET, socket.BTPROTO_L2CAP)
+    s.settimeout(3)
+    try:
+        s.connect((mac, 0x1001))
+        s.send(bytes.fromhex("00000400010002000000000000000000"))
+        time.sleep(0.4)
+        s.send(bytes.fromhex("040004004d00ff000000000000000000"))
+        time.sleep(0.2)
+        s.send(bytes.fromhex("040004000f00ffffffff"))
+        end = time.time() + 4
+        while time.time() < end:
+            d = s.recv(256)
+            if d.startswith(bytes.fromhex("040004000400")) and len(d) >= 7:
+                levels = {}
+                for i in range(d[6]):
+                    p = d[7 + i * 5:12 + i * 5]
+                    if len(p) == 5 and p[2] <= 100:
+                        levels[p[0]] = (p[2], p[3])
+                # earbuds: the lower of the two, the case does not count; Max: its single part
+                ear = [v[0] for k, v in levels.items() if k in (1, 2, 4)]
+                if ear:
+                    return min(ear), any(levels[k][1] == 1 for k in levels if k in (1, 2, 4))
+    except OSError:
+        pass
+    finally:
+        s.close()
+    return None
+
+
+if __name__ == "__main__":
+    res = {}
+    for mac in apple_connected():
+        b = battery(mac)
+        if b:
+            res[mac] = {"level": b[0], "charging": b[1]}
+    print(json.dumps(res))

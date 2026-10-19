@@ -1046,7 +1046,7 @@ Singleton {
             for (const d of Bt.devices) {
                 out.push({
                     id: "bt:" + d.address, name: d.name, glyph: Icons[Bt.glyph(d)] || Icons.bluetooth, keywords: "bluetooth device",
-                    sub: d.pairing ? "Pairing…" : d.connected ? "Connected" + (d.batteryAvailable ? "  ·  " + Math.round(d.battery * 100) + "%" : "") : d.paired ? "Paired" : "Available",
+                    sub: d.pairing ? "Pairing…" : d.connected ? "Connected" + (Bt.level(d) >= 0 ? "  ·  " + Math.round(Bt.level(d) * 100) + "%" + (Bt.charging(d) ? " ⚡" : "") : "") : d.paired ? "Paired" : "Available",
                     badge: d.connected ? "●" : "", keep: true,
                     run: () => btPrimary(d),
                     children: () => [

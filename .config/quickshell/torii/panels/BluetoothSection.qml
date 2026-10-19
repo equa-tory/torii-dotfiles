@@ -66,7 +66,7 @@ Section {
                     busy: d.pairing || (d.state === 1 && !d.connected)  // bluez can leave "connecting" set on a device that already works
                     subtitle: d.pairing ? "Pairing…"
                             : (d.state === 1 && !d.connected) ? "Connecting…"
-                            : d.connected ? "Connected" + (d.batteryAvailable ? "  ·  " + Math.round(d.battery * 100) + "%" : "")
+                            : d.connected ? "Connected" + (Bt.level(d) >= 0 ? "  ·  " + Math.round(Bt.level(d) * 100) + "%" + (Bt.charging(d) ? " ⚡" : "") : "")
                             : d.paired ? "Paired" : "Available"
                     onClicked: {
                         // trusted: without it bluez (no agent here) refuses the audio profiles of headphones after pairing

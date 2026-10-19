@@ -30,6 +30,22 @@ Singleton {
     readonly property bool powered: mock ? mockPowered : (adapter ? adapter.enabled : false)
     readonly property bool scanning: mock ? mockScanning : (adapter ? adapter.discovering : false)
 
+    // AirPods / Beats: BlueZ has no battery for them, torii-bt-battery asks them over Apple's own channel (AAP)
+    JsonFetch { id: apple; command: [Quickshell.env("HOME") + "/.config/torii/bin/torii-bt-battery"] }
+    readonly property var appleBattery: apple.data || ({})
+    readonly property bool anyConnected: !mock && adapter !== null && adapter.devices.values.some(d => d.connected)
+    onAnyConnectedChanged: if (anyConnected) appleRefresh.restart(); else apple.data = null
+    Timer { id: appleRefresh; interval: 4000; onTriggered: apple.refresh() }
+    Timer { interval: 90000; repeat: true; running: root.anyConnected; onTriggered: apple.refresh() }
+
+    // battery 0..1 of a device (BlueZ's, or Apple's), -1 when unknown
+    function level(d) {
+        if (d.batteryAvailable) return d.battery;
+        const a = appleBattery[d.address];
+        return a ? a.level / 100 : -1;
+    }
+    function charging(d) { const a = appleBattery[d.address]; return !!(a && a.charging); }
+
     function rank(d) { return d.connected ? 0 : d.paired ? 1 : 2; }
 
     readonly property var devices: {

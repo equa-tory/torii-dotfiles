@@ -129,6 +129,7 @@ browser, editor, files app and terminal (`Defaults`, `torii-default`; Hyprland b
 `~/.local/state/torii/defaults.env`); night light (`torii-nightlight`: temperature, manual or daily schedule; method `GPU` uses `hyprsunset`; `Screen filter` is a Hyprland screen shader that multiplies the picture by a warm colour (a calm
 dark red, works on any GPU, the best choice on NVIDIA); `Screen overlay` lays a warm transparent layer over every screen, which can only blend and
 tints blacks); network and Bluetooth (same backends as the control panel); default input and output device.
+AirPods and Beats show their battery (and ⚡ while charging) in both lists: BlueZ has none for them, so `torii-bt-battery` asks them over Apple's own AAP channel every 90 s while one is connected.
 `~/apps` folders are listed under Apps: each folder is described by a `.desktop` file inside it (`~/apps/v2rayN-linux-64/v2rayN.desktop`). A folder without one gets it generated (`torii-apps generate`, run every time the launcher scans): the executable named like the folder, up to two levels down, and its icon. A `Windows app` manifest runs through Bottles:
 `{"name": "Notepad++", "bottle": "Soft", "program": "npp.exe"}`.
 
