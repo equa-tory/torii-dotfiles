@@ -330,3 +330,7 @@ refused, `personal.sh` shows the key and falls back to the backup copy on the Um
 
 ## LocalSend: text is pasted at once
 `torii-localsend watch` (started at login by `hypr/modules/autostart.lua`) reads LocalSend's receive history; when a text message arrives it goes to the clipboard and is pasted into the focused window (Ctrl+V, Ctrl+Shift+V in a terminal) with a small notification. LocalSend itself is not changed. Turn on **Quick Save** once in LocalSend (Settings > Receive) so a message is accepted without a dialog; its window does not take the focus (window rule) and is closed again right after the paste (it goes to the tray). If you are in the LocalSend window itself, the text is only copied. Copy only, no paste: `~/.local/state/torii/localsend.json` with `{"paste": false}`. Files still go to LocalSend's folder as before.
+
+## Windows mode: resize and maximise
+- **Resize edge** (Setup > Windows): drag the edge of a window to resize it; the slider is how far outside the window the grab area reaches (0 = off, default 12 px).
+- Double-click the title bar (or the green button) to fill the work area; again gives the old size back. Dragging the title bar of a window filled this way gives it its old size at once, with the mouse still on the bar at the same relative spot. That needs `ydotoold` (started at login): it lets go and presses the mouse again so the drag starts from the new size instead of jumping.

@@ -259,7 +259,15 @@ local function adopt(w, mon)
     hl.dispatch(hl.dsp.window.bring_to_top({ window = w }))
 end
 
+local function bar_h()
+    local ok, t = pcall(dofile, os.getenv("HOME") .. "/.local/state/torii/bars.lua")
+    return ok and type(t) == "table" and tonumber(t.height) or 28
+end
+
+local is_maxed = {}      -- address -> {x, y, w, h}: windows filled to the work area by the maximise button / double-click
+
 local function place(w, g)
+    is_maxed[w.address] = nil
     hl.dispatch(hl.dsp.window.resize({ x = math.floor(g.w), y = math.floor(g.h), exact = true, window = w }))
     hl.dispatch(hl.dsp.window.move({ x = math.floor(g.x), y = math.floor(g.y), exact = true, window = w }))
 end
@@ -356,9 +364,41 @@ function torii_float_maximize()
         local a = work_area(w)
         remember_before(w)
         place(w, a)
+        is_maxed[w.address] = { x = a.x, y = a.y, w = a.w, h = a.h }
     end
     return true
 end
+
+-- Dragging the title bar of such a window gives it its old size back, with the mouse still on the bar at the same
+-- relative spot (the drag is started again from there, or the window would jump to where the drag began).
+if torii_unmax_poll then pcall(function() torii_unmax_poll:stop() end) end     -- a reload runs this file again
+torii_unmax_poll = hl.timer(function()
+    if next(is_maxed) == nil then return end
+    for _, w in ipairs(hl.get_windows()) do
+        local m = is_maxed[w.address]
+        if m and w.mapped then
+            local x, y, ww, hh = xy(w.at, "x", 1), xy(w.at, "y", 2), xy(w.size, "x", 1), xy(w.size, "y", 2)
+            if math.abs(ww - m.w) > 4 or math.abs(hh - m.h) > 4 then
+                is_maxed[w.address], before_snap[w.address] = nil, nil          -- resized by hand: it is a new size now
+            elseif math.abs(x - m.x) > 4 or math.abs(y - m.y) > 4 then
+                local old = before_snap[w.address]
+                is_maxed[w.address] = nil
+                local c = hl.get_cursor_pos()
+                if old and c then
+                    before_snap[w.address] = nil
+                    local cx, cy = c.x or c[1], c.y or c[2]
+                    local rx = math.max(0.08, math.min(0.92, (cx - x) / math.max(1, ww)))
+                    place(w, { x = cx - rx * old.w, y = cy + bar_h() / 2, w = old.w, h = old.h })      -- the mouse stays on the bar
+                    -- Hyprland's drag goes on from where it began, so the window would jump: let go and press again at this spot
+                    -- (ydotool: a virtual mouse; the physical button is still down) so a new drag starts from the new shape
+                    os.execute("sh -c 'ydotool click 0x80; ydotool click 0x40' >/dev/null 2>&1 &")
+                end
+            end
+        elseif m and not w.mapped then
+            is_maxed[w.address] = nil
+        end
+    end
+end, { timeout = 40, type = "repeat" })
 
 
 -- Ctrl+Alt+Shift+Up: the focused window takes BIG_WINDOW_PERCENT of the work area, centred (again: back to how it was).

@@ -15,8 +15,10 @@ hl.config({
             inactive_border = "rgba(595959aa)",
         },
 
-        -- Set to true to enable resizing windows by clicking and dragging on borders and gaps
-        resize_on_border = false,
+        -- Drag the edge of a window to resize it; how far outside the window the edge reaches is chosen in
+        -- Setup > Windows > Resize edge (0 = off), kept in ~/.local/state/torii/hypr-user.lua
+        resize_on_border = true,
+        extend_border_grab_area = 12,
 
         -- Games may tear (window rule "immediate" in rules.lua): lower latency at 240 Hz. Everything else stays vsynced.
         allow_tearing = true,
