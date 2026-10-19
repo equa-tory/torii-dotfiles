@@ -9,7 +9,7 @@
 
 What is cleaned (nothing outside these):
   trash      ~/.local/share/Trash
-  cache      known safe folders in ~/.cache (thumbnails, yay, pip, npm, mesa shaders, go build, ...), not browser profiles
+  cache      known safe folders in ~/.cache (yay, pip, npm, go build, ...), not browser profiles, thumbnails or shader caches
   pacman     downloaded package files, the latest 2 versions of each stay (paccache), or everything old via pacman -Sc
   journal    systemd journal reduced to 200 MB and 2 weeks
   coredumps  /var/lib/systemd/coredump
@@ -27,9 +27,11 @@ import sys
 from pathlib import Path
 
 HOME = Path.home()
-SAFE_CACHE = ["thumbnails", "yay", "paru", "pip", "npm", "pnpm", "yarn", "mesa_shader_cache", "mesa_shader_cache_db", "nvidia",
+# thumbnails (Dolphin's previews of videos and pictures on slow disks) and shader caches (games stutter while they are built
+# again) are left alone: they are only a few hundred MB and cost a lot of time to rebuild
+SAFE_CACHE = ["yay", "paru", "pip", "npm", "pnpm", "yarn",
               "go-build", "electron", "node-gyp", "fontconfig", "ccache", "sccache", "pre-commit", "cargo", "typescript",
-              "gstreamer-1.0", "qtshadercache-x86_64-little_endian-lp64", "kitty", "pipx", "uv", "bun", "deno"]
+              "gstreamer-1.0", "kitty", "pipx", "uv", "bun", "deno"]
 BIG_DIRS = ["Downloads", "Documents", "Videos", "Video", "Pictures", "Photo", "Photos", "Desktop", "Music"]
 
 
@@ -126,7 +128,7 @@ def orphans():
 def listing():
     items = [
         {"id": "trash", "name": "Trash", "size": du(HOME / ".local/share/Trash"), "sub": "~/.local/share/Trash"},
-        {"id": "cache", "name": "App caches", "size": sum(du(d) for d in cache_dirs()), "sub": "~/.cache: thumbnails, yay, pip, npm, shaders, ..."},
+        {"id": "cache", "name": "App caches", "size": sum(du(d) for d in cache_dirs()), "sub": "~/.cache: yay, pip, npm, go build, ... (not thumbnails or shader caches)"},
         {"id": "pacman", "name": "Package downloads", "size": pacman_reclaimable(), "sub": "old and uninstalled package files in the pacman cache (installed versions stay)", "root": True},
         {"id": "journal", "name": "System logs", "size": max(0, journal_size() - 200 * 1024 * 1024), "sub": "the journal above 200 MB (and older than 2 weeks) goes", "root": True},
         {"id": "tmp", "name": "Old temp files", "size": old_tmp("/tmp", True) + old_tmp("/var/tmp", False),

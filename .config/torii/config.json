@@ -4,7 +4,8 @@
     "opacity": 1,
     "radius": 16,
     "height": 32,
-    "gap": 6
+    "gap": 6,
+    "clockDate": true
   },
   "workspaces": {
     "count": 4

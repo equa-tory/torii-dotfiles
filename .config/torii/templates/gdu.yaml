@@ -32,6 +32,7 @@ ignore-dirs:
     - /mnt/@
     - /mnt/umbrel
     - /mnt/mass
+    - /mnt/media
     - /media
 show-relative-size: true
 show-item-count: true
