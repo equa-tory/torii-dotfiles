@@ -85,6 +85,9 @@ UNIT
   # Dolphin: previews of pictures, video, music, documents (a list left empty in dolphinrc turns every thumbnail off)
   if command -v kwriteconfig6 >/dev/null 2>&1; then
     kwriteconfig6 --file dolphinrc --group PreviewSettings --key Plugins "directorythumbnail,imagethumbnail,jpegthumbnail,svgthumbnail,ffmpegthumbs,audiothumbnail,comicbookthumbnail,ebookthumbnail,textthumbnail,opendocumentthumbnail,windowsexethumbnail,windowsimagethumbnail,rawthumbnail,kraorathumbnail,blenderthumbnail,exrthumbnail,gsthumbnail,mobithumbnail,djvuthumbnail,appimagethumbnail"
+    # previews on in every folder (the view properties are global here)
+    mkdir -p "$HOME/.local/share/dolphin/view_properties/global"
+    kwriteconfig6 --file "$HOME/.local/share/dolphin/view_properties/global/.directory" --group Settings --key ShowPreview true
   fi
 
   # Java: several JDKs are installed (Minecraft needs different ones); the system default is the 21 LTS
