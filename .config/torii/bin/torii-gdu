@@ -17,9 +17,10 @@ theme="${TORII_STATE:-$HOME/.local/state/torii}/theme/gdu.yaml"
 
 # network mounts below the path (not the path's own share)
 skip=()
+base="${path%/}"      # "/" would make the pattern "//*", which matches nothing
 while IFS= read -r m; do
-  [[ -n $m && $m == "$path"/* ]] && skip+=("$m")
-done < <(findmnt -rno TARGET -t cifs,smb3,nfs,nfs4,fuse.sshfs,fuse.rclone,autofs 2>/dev/null)
+  [[ -n $m && $m == "$base"/* ]] && skip+=("$m")
+done < <(findmnt -rno TARGET -t cifs,smb3,nfs,nfs4,fuse.sshfs,fuse.rclone,autofs 2>/dev/null | sort -u)
 ((${#skip[@]})) && extra+=(--ignore-dirs "$(IFS=,; echo "${skip[*]}"),/proc,/dev,/sys,/run")
 
 # a spinning disk: one reader at a time

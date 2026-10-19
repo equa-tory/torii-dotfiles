@@ -102,5 +102,8 @@
   },
   "limine": {
     "image": "/home/equa/Pictures/wallpapers/sig_wallpaper.jpg"
+  },
+  "install": {
+    "track": false
   }
 }
