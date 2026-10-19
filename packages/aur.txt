@@ -11,4 +11,3 @@ wayfreeze
 
 # soft, rounded Qt style for Dolphin and other KDE/Qt apps (colours still follow the wallpaper; torii-theme picks it when installed)
 darkly
-deadlock-modmanager-bin

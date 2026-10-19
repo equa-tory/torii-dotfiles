@@ -12,6 +12,7 @@ Singleton {
 
     readonly property var notch: adapter.notch
     readonly property var capture: adapter.capture
+    readonly property var install: adapter.install
     readonly property var workspaces: adapter.workspaces
     readonly property var weather: adapter.weather
     readonly property var wallpaper: adapter.wallpaper
