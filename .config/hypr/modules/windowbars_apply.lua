@@ -31,7 +31,7 @@ if hl.plugin.hyprbars then
                 bar_text_align             = "center",
                 bar_text_size              = 11,
                 icon_on_hover              = true,
-                on_double_click            = win .. " max",
+                on_double_click            = win .. " dblclick",
             },
         },
     })

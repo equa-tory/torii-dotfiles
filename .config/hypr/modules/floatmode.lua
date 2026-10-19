@@ -356,15 +356,15 @@ end
 function torii_float_maximize()
     local w = hl.get_active_window()
     if not w or not w.floating then return false end
-    local old = before_snap[w.address]
-    if old then
-        before_snap[w.address] = nil
-        place(w, old)
+    local m = is_maxed[w.address]
+    if m then
+        place(w, m.old)                      -- again: the size it had before (place() forgets the maximised state)
     else
         local a = work_area(w)
-        remember_before(w)
+        local old = { x = xy(w.at, "x", 1), y = xy(w.at, "y", 2), w = xy(w.size, "x", 1), h = xy(w.size, "y", 2) }
+        before_snap[w.address] = nil         -- an older half-screen snap must not be mistaken for this window's own size
         place(w, a)
-        is_maxed[w.address] = { x = a.x, y = a.y, w = a.w, h = a.h }
+        is_maxed[w.address] = { x = a.x, y = a.y, w = a.w, h = a.h, old = old }
     end
     return true
 end
@@ -379,19 +379,18 @@ torii_unmax_poll = hl.timer(function()
         if m and w.mapped then
             local x, y, ww, hh = xy(w.at, "x", 1), xy(w.at, "y", 2), xy(w.size, "x", 1), xy(w.size, "y", 2)
             if math.abs(ww - m.w) > 4 or math.abs(hh - m.h) > 4 then
-                is_maxed[w.address], before_snap[w.address] = nil, nil          -- resized by hand: it is a new size now
+                is_maxed[w.address] = nil          -- resized by hand: it is a new size now
             elseif math.abs(x - m.x) > 4 or math.abs(y - m.y) > 4 then
-                local old = before_snap[w.address]
+                local old = m.old
                 is_maxed[w.address] = nil
                 local c = hl.get_cursor_pos()
                 if old and c then
-                    before_snap[w.address] = nil
                     local cx, cy = c.x or c[1], c.y or c[2]
                     local rx = math.max(0.08, math.min(0.92, (cx - x) / math.max(1, ww)))
                     place(w, { x = cx - rx * old.w, y = cy + bar_h() / 2, w = old.w, h = old.h })      -- the mouse stays on the bar
                     -- Hyprland's drag goes on from where it began, so the window would jump: let go and press again at this spot
                     -- (ydotool: a virtual mouse; the physical button is still down) so a new drag starts from the new shape
-                    os.execute("sh -c 'ydotool click 0x80; ydotool click 0x40' >/dev/null 2>&1 &")
+                    os.execute("ydotool click 0x80 0x40 >/dev/null 2>&1 &")
                 end
             end
         elseif m and not w.mapped then

@@ -780,7 +780,16 @@ Singleton {
                 { id: "l", name: "Left", sub: "Like macOS: close, minimise, maximise", badge: bars.side === "left" ? "●" : "", keep: true,
                   run: () => { sh([bin("torii-hypr"), "bars", "side", "left"]); refresh(); } },
                 { id: "r", name: "Right", sub: "Like Windows: minimise, maximise, close", badge: bars.side === "right" ? "●" : "", keep: true,
-                  run: () => { sh([bin("torii-hypr"), "bars", "side", "right"]); refresh(); } } ] } ] };
+                  run: () => { sh([bin("torii-hypr"), "bars", "side", "right"]); refresh(); } } ] },
+            { id: "dbl", name: "Double-click on the title bar", glyph: Icons.layout,
+              sub: ({ max: "Maximise", fullscreen: "Fullscreen", big: "Big window", center: "Centre", min: "Minimise", none: "Nothing" })[bars.dblclick || "max"],
+              children: () => [["max", "Maximise", "Fills the screen area; again gives the old size back"],
+                               ["fullscreen", "Fullscreen", "Like Alt+Shift+F"],
+                               ["big", "Big window", "The size from \"Big window size\", centred"],
+                               ["center", "Centre", "Centres the window at its size"],
+                               ["min", "Minimise", "Hides it; Alt+Tab brings it back"],
+                               ["none", "Nothing", ""]].map(o => ({ id: o[0], name: o[1], sub: o[2], badge: (bars.dblclick || "max") === o[0] ? "●" : "", keep: true,
+                                 run: () => { sh([bin("torii-hypr"), "bars", "dblclick", o[0]]); refresh(); } })) } ] };
     }
 
     function calendarSetupMenu() {

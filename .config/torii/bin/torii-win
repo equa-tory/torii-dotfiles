@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""torii-win close | max | min | restore [address]  -  what the title bar buttons do (on the active window).
+"""torii-win close | max | dblclick | min | restore [address]  -  what the title bar buttons do (on the active window).
 
   close     close the window
   max       maximise / restore (a floating window fills the screen area, a second press gives it back)
+  dblclick  what a double-click on the title bar does: the action chosen in Setup > Windows (maximise, fullscreen, big, center, minimise, none)
   min       hide the window on the special:minimized workspace; Alt+Tab (or `restore`) brings it back
   restore   bring the most recently minimised window (or the one at <address>) back to the current workspace
 """
 import json
+import os
+import re
 import subprocess
 import sys
+from pathlib import Path
+
+STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii"))
 
 
 def hc(*a):
@@ -37,6 +43,23 @@ def main(a):
             hc("eval", "torii_float_maximize()")
         else:
             dispatch('hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })')
+    elif cmd == "dblclick":
+        action = "max"
+        try:
+            m = re.search(r'dblclick\s*=\s*"(\w+)"', (STATE / "bars.lua").read_text())
+            action = m.group(1) if m else "max"
+        except OSError:
+            pass
+        if action == "fullscreen":
+            dispatch('hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" })')
+        elif action == "big":
+            hc("eval", "torii_window_big()")
+        elif action == "center":
+            hc("eval", "torii_window_center()")
+        elif action == "min":
+            main(["min"])
+        elif action != "none":
+            main(["max"])
     elif cmd == "min":
         dispatch('hl.dsp.window.move({ workspace = "special:minimized", follow = false })')
     elif cmd == "restore":
