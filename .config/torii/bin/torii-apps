@@ -13,8 +13,10 @@ file inside that folder (~/apps/v2rayN/v2rayN.desktop) or by an app.json:
             levels down) and write <folder>/<program>.desktop for it, with its icon. Existing files are never touched.
   desktop   copy these apps to ~/.local/share/applications/torii-app-*.desktop so other launchers and xdg-open see them
   run       start one by folder name (used by those entries)
-  webapp add [--browser] <name> <url> | remove <name> | set <name> browser true|false | list | sync
-            web apps: a Helium window without browser chrome (--app=URL); "browser" opens a tab in the default browser instead
+  webapp add [--browser] [--own] <name> <url> | remove <name> | set <name> browser|own true|false | list | sync
+            web apps: a Helium window without browser chrome (--app=URL); "browser" opens a tab in the default browser instead;
+            "own" gives it a browser process and profile of its own (sign in once more), so its sound is a separate stream
+            (screen recording can then put it on its own track)
   tui add [--quiet] <name> <command> | remove <name> | set <name> quiet true|false | list | sync
             terminal programs as apps (e.g. dorm = ssh 192.168.1.50); "quiet" runs the command in the background with no
             window (output in ~/.local/state/torii/tui-<name>.log) and a notification when it is done
@@ -268,7 +270,8 @@ def sync_web():
             exec_line = f"Exec=xdg-open {url}\n"
             wm = ""
         else:
-            exec_line = f"Exec=helium-browser --app={url}\n"
+            prof = f"--user-data-dir={Path.home()}/.local/share/torii/webapp/{slug(w['name'])} " if w.get("own") else ""
+            exec_line = f"Exec=helium-browser {prof}--app={url}\n"
             wm = f"StartupWMClass=chrome-{u.netloc}_{(u.path or '/').replace('/', '_')}-Default\n"
         f.write_text("[Desktop Entry]\nType=Application\nVersion=1.0\n"
                      f"Name={w['name']}\nComment=Web app\nIcon={favicon(url, w['name'])}\n"
@@ -320,16 +323,19 @@ def lists(kind, a):
     if a[:1] == ["list"]:
         print(json.dumps(items))
         return
-    opt = "browser" if kind == "webapp" else "quiet"
+    opts = ("browser", "own") if kind == "webapp" else ("quiet",)
     if a[:1] == ["add"] and len(a) >= 3:
-        flag = a[1] == "--" + opt
-        a = a[:1] + a[2:] if flag else a
+        flags = []
+        while len(a) > 3 and a[1].startswith("--") and a[1][2:] in opts:
+            flags.append(a[1][2:])
+            a = a[:1] + a[2:]
         item = {"name": a[1], key: " ".join(a[2:])}
-        if flag:
-            item[opt] = True
+        for f in flags:
+            item[f] = True
         items = [i for i in items if i["name"].lower() != a[1].lower()] + [item]
         save_list(name, items)
-    elif a[:1] == ["set"] and len(a) == 4 and a[2] == opt:
+    elif a[:1] == ["set"] and len(a) == 4 and a[2] in opts:
+        opt = a[2]
         for i in items:
             if i["name"].lower() == a[1].lower():
                 i[opt] = a[3] == "true"

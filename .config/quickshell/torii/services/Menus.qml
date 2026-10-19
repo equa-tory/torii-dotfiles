@@ -623,7 +623,7 @@ Singleton {
             toggle("system", "Record what the computer plays", "Games, music, calls: the default output, with sound from the speakers or headphones", "system", r.system, Icons.speaker),
             toggle("mic", "Record the microphone", "The default microphone", "mic", r.mic, Icons.mic),
             { id: "apps", name: "Programs on their own track", glyph: Icons.apps, badge: apps.length ? String(apps.length) : "",
-              sub: apps.length ? apps.join(", ") : "Pick e.g. the game and Discord: each one can be edited by itself afterwards",
+              sub: apps.length ? apps.join(", ") : "Pick e.g. the game and Discord: each one can be edited by itself afterwards  ·  web apps: see Install > Web app and TUI options",
               onOpen: () => fRecApps.refresh(), sorted: true, children: () => {
                   const playing = (fRecApps.data || []).map(a => a.name);
                   const names = playing.concat(apps.filter(a => playing.indexOf(a) < 0));
@@ -735,19 +735,28 @@ Singleton {
                           });
                       });
                   }) },
-                { id: "appopts", name: "Web app and TUI options", sub: "Open a web app in the browser, run a TUI without a window", glyph: Icons.tune, keywords: "browser quiet background window toggle",
+                { id: "appopts", name: "Web app and TUI options", sub: "Web app in the browser or with its own process, TUI without a window", glyph: Icons.tune, keywords: "browser quiet background window toggle",
                   children: () => {
                       fWeb.ensure(); fTui.ensure();
-                      const mk = (fetch, kind, opt, label, on, off) => (fetch.data || []).map(w => ({
-                          id: kind + ":" + w.name, name: w.name, glyph: kind === "webapp" ? Icons.web : Icons.terminal, keep: true,
-                          sub: label + "  ·  " + (w[opt] ? on : off) + "  (Enter switches)",
-                          run: () => {
-                              sh([bin("torii-apps"), kind, "set", w.name, opt, w[opt] ? "false" : "true"]);
-                              fetch.data = (fetch.data || []).map(x => x.name === w.name ? Object.assign({}, x, { [opt]: !w[opt] }) : x);
-                              later(kind === "webapp" ? fWeb : fTui, 800);
-                          } }));
-                      const l = mk(fWeb, "webapp", "browser", "Web app", "opens in the browser", "own window")
-                          .concat(mk(fTui, "tui", "quiet", "TUI", "background, no window", "terminal window"));
+                      const flip = (fetch, kind, w, opt) => {
+                          sh([bin("torii-apps"), kind, "set", w.name, opt, w[opt] ? "false" : "true"]);
+                          fetch.data = (fetch.data || []).map(x => x.name === w.name ? Object.assign({}, x, { [opt]: !w[opt] }) : x);
+                          later(kind === "webapp" ? fWeb : fTui, 800);
+                      };
+                      const webs = (fWeb.data || []).map(w => ({
+                          id: "webapp:" + w.name, name: w.name, glyph: Icons.web,
+                          sub: "Web app  ·  " + (w.browser ? "opens in the browser" : "own window") + (w.own ? "  ·  own process" : ""),
+                          children: () => [
+                              { id: "browser", name: "Open in the normal browser", sub: "A tab in the default browser instead of its own window", badge: w.browser ? "On" : "Off", glyph: Icons.web, keep: true,
+                                run: () => flip(fWeb, "webapp", w, "browser") },
+                              { id: "own", name: "Own browser process", glyph: Icons.chip, badge: w.own ? "On" : "Off", keep: true,
+                                sub: "Its own profile (sign in again once) so its sound is a stream of its own: screen recording can put it on its own track",
+                                run: () => flip(fWeb, "webapp", w, "own") } ] }));
+                      const tuis = (fTui.data || []).map(w => ({
+                          id: "tui:" + w.name, name: w.name, glyph: Icons.terminal, keep: true,
+                          sub: "TUI  ·  " + (w.quiet ? "background, no window" : "terminal window") + "  (Enter switches)",
+                          run: () => flip(fTui, "tui", w, "quiet") }));
+                      const l = webs.concat(tuis);
                       return l.length ? l : [{ id: "none", name: "Nothing added yet", sub: "Install > Web app or TUI" }];
                   } },
                 { id: "update", name: "Update system", sub: "pacman and AUR upgrade", glyph: Icons.update, keywords: "upgrade yay pacman -Syu",

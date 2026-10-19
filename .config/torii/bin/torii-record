@@ -60,8 +60,28 @@ def inspect(target, key):
     return m.group(1) if m else ""
 
 
+def webapp_names():
+    """pid of a browser process that only has web app windows -> the name of the (first) web app."""
+    try:
+        clients = json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=3).stdout)
+        apps = json.loads((STATE / "webapps.json").read_text())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {}
+    from urllib.parse import urlparse
+    by_class = {}
+    for w in apps:
+        u = urlparse(w["url"] if "://" in w["url"] else "https://" + w["url"])
+        by_class[f"chrome-{u.netloc}_{(u.path or '/').replace('/', '_')}-Default"] = w["name"]
+    pids = {}
+    for c in clients:
+        pids.setdefault(c.get("pid"), []).append(c.get("class") or "")
+    return {pid: by_class[cl[0]] for pid, cl in pids.items() if cl and all(x in by_class for x in cl)}
+
+
 def sound_apps():
-    """name -> [node ids] of programs that play sound now."""
+    """name -> [node ids] of programs that play sound now. A web app that has a browser process of its own (Install > Web app
+    and TUI options > own process) shows by its name; the ordinary browser (and web apps in it) is one "Helium"."""
+    webs = webapp_names()
     try:
         dump = json.loads(subprocess.run(["pw-dump"], capture_output=True, text=True, timeout=5).stdout)
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -72,6 +92,8 @@ def sound_apps():
         if o.get("type") != "PipeWire:Interface:Node" or p.get("media.class") != "Stream/Output/Audio":
             continue
         name = p.get("application.name") or p.get("application.process.binary") or p.get("node.name") or ""
+        if p.get("application.process.id") in webs:
+            name = webs[p["application.process.id"]] + " (web app)"
         if name and not name.lower().startswith("torii"):
             apps.setdefault(name, []).append(o["id"])
     return apps

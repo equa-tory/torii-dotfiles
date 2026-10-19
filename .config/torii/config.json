@@ -89,7 +89,14 @@
     "right": []
   },
   "capture": {
-    "freeze": true
+    "freeze": true,
+    "rec": {
+      "micGain": 1,
+      "folder": true,
+      "apps": [
+        "deadlock.exe"
+      ]
+    }
   },
   "limine": {
     "image": "/home/equa/Pictures/wallpapers/sig_wallpaper.jpg"
