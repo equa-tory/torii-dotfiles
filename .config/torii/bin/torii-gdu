@@ -1,13 +1,34 @@
 #!/usr/bin/env bash
-# torii-gdu [gdu options] [PATH]  -  gdu that does not crawl network shares and does not thrash a spinning disk.
-#   - `gdu /mnt` walked every Samba share under /mnt (and woke the automounts): over the network, that is the slow part.
-#     Network mounts (cifs, nfs, sshfs and the autofs entries in front of them) below PATH are skipped, unless PATH is on one itself
-#   - PATH on a single spinning disk: --sequential (parallel reads make the head jump around, which is much slower on an HDD)
-#   - colours of the wallpaper theme when torii-theme made them
+# torii-gdu [--pick] [gdu options] [PATH]  -  what takes the space, quickly.
+#   --pick       choose the disk first (system, then each drive); the launcher's "Disk usage" does that
+#   an NTFS drive (its mount point, e.g. /mnt/hdd01): the Master File Table is read in one pass with torii-mft (seconds, like
+#   WizTree / FreeCommander on Windows; needs sudo for the raw read) and shown in gdu. Walking the folders of a big
+#   spinning NTFS disk takes many minutes. The view is of the scan: deleting inside it is not possible, rescan after changes.
+#   anything else: gdu on the path, without crawling network shares (cifs, nfs, sshfs and the autofs entries in front of
+#   them) or other local drives below it, and one reader at a time on a single spinning disk (--sequential)
+#   colours of the wallpaper theme when torii-theme made them
 # Shell alias: gdu -> torii-gdu. The plain program: command gdu ...
 set -uo pipefail
 
-args=("$@"); path=""
+HERE="$(dirname "$(readlink -f "$0")")"
+args=("$@")
+
+locals_() {   # TARGET<TAB>FSTYPE<TAB>SOURCE<TAB>SIZE<TAB>USED of the local disks (not /boot, not snapshots)
+  findmnt -rno TARGET,FSTYPE,SOURCE,SIZE,USED 2>/dev/null | awk '$2 ~ /^(ntfs3|ntfs|fuseblk|ext4|xfs|exfat)$/ || ($2=="btrfs" && $1=="/") {print $1"\t"$2"\t"$3"\t"$4"\t"$5}' | sed 's/\\x20/ /g'
+}
+
+if [[ ${args[0]:-} == --pick ]]; then
+  menu=""
+  while IFS=$'\t' read -r t fs src size used; do
+    name="$(basename "$t")"; [[ $t == / ]] && name="System"
+    menu+="$(printf '%-14s %-6s %7s of %-7s %s' "$name" "$fs" "$used" "$size" "$t")"$'\n'
+  done < <(locals_)
+  pick="$(printf '%s' "$menu" | fzf --layout=reverse --prompt='disk > ' --height=100% --border=none --header='Enter scans it' 2>/dev/null)" || exit 0
+  [[ -n $pick ]] || exit 0
+  exec "$0" "${pick##* }"
+fi
+
+path=""
 for a in "${args[@]}"; do [[ $a != -* && -e $a ]] && path="$a"; done
 path="$(readlink -f "${path:-.}")"
 
@@ -15,18 +36,41 @@ extra=()
 theme="${TORII_STATE:-$HOME/.local/state/torii}/theme/gdu.yaml"
 [[ -f $theme ]] && ! printf '%s\n' "${args[@]}" | grep -q -- '--config-file' && extra+=(--config-file "$theme")
 
-# network mounts below the path (not the path's own share)
+# ---- an NTFS drive: read its file table
+read -r fstype src root <<<"$(findmnt -no FSTYPE,SOURCE,TARGET -T "$path" 2>/dev/null | head -1 | sed 's/\[.*\]//')"
+if [[ $path == "$root" && $fstype =~ ^(ntfs3|ntfs|fuseblk)$ && -b ${src:-} ]]; then
+  bin="${XDG_CACHE_HOME:-$HOME/.cache}/torii/torii-mft"; csrc="$HERE/../src/torii-mft.c"
+  if [[ ! -x $bin || $csrc -nt $bin ]]; then
+    mkdir -p "$(dirname "$bin")"
+    cc -O2 -o "$bin" "$csrc" 2>/dev/null || echo "torii-gdu: cc could not build torii-mft, scanning folder by folder instead" >&2
+  fi
+  if [[ -x $bin ]]; then
+    json="${XDG_CACHE_HOME:-$HOME/.cache}/torii/disk-$(basename "$path").json"
+    printf 'Reading the file table of %s (asks for your password)...\n' "$path"
+    if sudo "$bin" "$src" "$path" > "$json.tmp" && [[ -s $json.tmp ]]; then
+      mv "$json.tmp" "$json"
+      exec gdu "${extra[@]}" -f "$json"
+    fi
+    rm -f "$json.tmp"
+    echo "torii-gdu: the file table could not be read, scanning folder by folder instead" >&2
+  fi
+fi
+
+# ---- a folder: skip network shares and other local drives below the path
 skip=()
 base="${path%/}"      # "/" would make the pattern "//*", which matches nothing
+pdev="$(findmnt -no SOURCE -T "$path" 2>/dev/null | head -1 | sed 's/\[.*//')"
 while IFS= read -r m; do
   [[ -n $m && $m == "$base"/* ]] && skip+=("$m")
 done < <(findmnt -rno TARGET -t cifs,smb3,nfs,nfs4,fuse.sshfs,fuse.rclone,autofs 2>/dev/null | sort -u)
+while IFS=$'\t' read -r t fs s _; do
+  [[ $t == "$base"/* && ${s%%\[*} != "$pdev" ]] && skip+=("$t")
+done < <(locals_)
 ((${#skip[@]})) && extra+=(--ignore-dirs "$(IFS=,; echo "${skip[*]}"),/proc,/dev,/sys,/run")
 
 # a spinning disk: one reader at a time
-src="$(findmnt -no SOURCE -T "$path" 2>/dev/null | head -1 | sed 's/\[.*//')"
-if [[ -b $src ]]; then
-  parent="$(lsblk -no PKNAME "$src" 2>/dev/null | head -1)"; parent="${parent:-$(basename "$src")}"
+if [[ -b $pdev ]]; then
+  parent="$(lsblk -no PKNAME "$pdev" 2>/dev/null | head -1)"; parent="${parent:-$(basename "$pdev")}"
   [[ "$(cat "/sys/block/$parent/queue/rotational" 2>/dev/null)" == 1 ]] && extra+=(--sequential)
 fi
 
