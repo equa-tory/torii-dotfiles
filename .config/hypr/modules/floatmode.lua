@@ -240,6 +240,7 @@ local function adopt(w, mon)
     local ws = mon and mon.active_workspace
     if not ws or (w.workspace and w.workspace.id == ws.id) then return end
     hl.dispatch(hl.dsp.window.move({ workspace = ws.id, follow = false, window = w }))
+    hl.dispatch(hl.dsp.focus({ window = w }))      -- the focus stays with the window being carried, not the one left behind
 end
 
 local function place(w, g)
