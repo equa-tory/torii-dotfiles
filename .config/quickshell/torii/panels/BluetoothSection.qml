@@ -63,9 +63,9 @@ Section {
                     glyphColor: d.connected ? Theme.accent : Theme.subtle
                     title: d.name || d.address
                     titleColor: d.paired ? Theme.fg : Theme.fgDim
-                    busy: d.pairing || d.state === 1
+                    busy: d.pairing || (d.state === 1 && !d.connected)  // bluez can leave "connecting" set on a device that already works
                     subtitle: d.pairing ? "Pairing…"
-                            : d.state === 1 ? "Connecting…"
+                            : (d.state === 1 && !d.connected) ? "Connecting…"
                             : d.connected ? "Connected" + (d.batteryAvailable ? "  ·  " + Math.round(d.battery * 100) + "%" : "")
                             : d.paired ? "Paired" : "Available"
                     onClicked: {

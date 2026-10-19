@@ -1,0 +1,14 @@
+#!/bin/sh
+# Reconnect the paired Bluetooth devices (AirPods, controllers, ...) after login: BlueZ itself waits for the device to
+# call, and AirPods never do after a PC boot. Retries for 3 minutes, so a device that is switched on later still comes.
+for _ in $(seq 1 18); do
+  todo=0
+  for mac in $(bluetoothctl devices Paired | awk '{print $2}'); do
+    bluetoothctl info "$mac" | grep -q 'Trusted: yes' || continue
+    bluetoothctl info "$mac" | grep -q 'Connected: yes' && continue
+    todo=1
+    timeout 8 bluetoothctl connect "$mac" >/dev/null 2>&1
+  done
+  [ $todo = 0 ] && exit 0
+  sleep 10
+done

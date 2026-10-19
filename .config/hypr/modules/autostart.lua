@@ -14,4 +14,7 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("$HOME/.config/torii/bin/torii-rules autostart")      -- apps with "Start at login" in Setup > App rules
   hl.exec_cmd("$HOME/.config/torii/bin/torii-localsend watch")       -- text sent with LocalSend is copied and pasted
   hl.exec_cmd("ydotoold")                                            -- a virtual mouse: dragging a maximised window out of it (floatmode.lua)
+  -- a pairing agent: without one BlueZ answers "AuthenticationFailed" to a controller (Xbox) that pairs from the control centre
+  hl.exec_cmd("sh -c 'pgrep -x bluetoothctl >/dev/null || { echo agent NoInputNoOutput; echo default-agent; sleep infinity; } | bluetoothctl >/dev/null 2>&1'")
+  hl.exec_cmd("$HOME/.config/torii/bin/torii-bt-connect")           -- paired Bluetooth devices (AirPods, controller) connect after login
 end)

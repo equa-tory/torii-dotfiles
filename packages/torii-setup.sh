@@ -97,6 +97,9 @@ UNIT
   say "Bluetooth service"
   if systemctl list-unit-files bluetooth.service >/dev/null 2>&1; then
     $SUDO systemctl enable --now bluetooth.service || echo "!!  could not enable bluetooth.service (no adapter here is fine)"
+    # power the adapter on at boot, and let a controller that lost its pairing (Xbox) pair again without a prompt
+    $SUDO sed -i -E 's/^#?\s*AutoEnable\s*=.*/AutoEnable=true/; s/^#?\s*JustWorksRepairing\s*=.*/JustWorksRepairing=always/; s/^#?\s*FastConnectable\s*=.*/FastConnectable=true/' /etc/bluetooth/main.conf
+    $SUDO sed -i -E 's/^#?\s*ReconnectAttempts\s*=.*/ReconnectAttempts=7/; s/^#?\s*ReconnectIntervals\s*=.*/ReconnectIntervals=1,2,4,8,16,32,64/' /etc/bluetooth/main.conf
   fi
 
   say "Helium: theme colour policy + default browser"
