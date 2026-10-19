@@ -7,7 +7,8 @@
 #   update      full system update (yay, or pacman when there is no yay)
 #   git-status  JSON {"behind", "ahead", "dirty"} for the dotfiles repo (fetches first)
 #   git-sync    behind: pull; local changes: commit and push; ahead: push (then re-link with stow)
-# Installing and removing keeps packages/*.txt in step, so ./install.sh brings the same set back on a new machine.
+# Installing and removing keeps packages/*.txt in step, so ./install.sh brings the same set back on a new machine
+# (switch that off with Install > "Add installs to the dotfiles").
 set -uo pipefail
 
 cfg="$(readlink -f "$HOME/.config/torii" 2>/dev/null || true)"                       # <repo>/.config/torii
@@ -16,8 +17,10 @@ PAC="$REPO/packages/pacman.txt"; AUR="$REPO/packages/aur.txt"
 pause() { printf '\n%s ' "${1:-Press Enter to close}"; read -r _; }
 say() { printf '\n==> %s\n' "$*"; }
 in_list() { grep -qxF "$2" "$1" 2>/dev/null; }
-add_line() { in_list "$1" "$2" && return; [ -s "$1" ] && [ -n "$(tail -c1 "$1")" ] && echo >> "$1"; echo "$2" >> "$1"; }
-del_line() { local esc; esc=$(printf '%s' "$2" | sed 's/[][\.*^$/]/\\&/g'); sed -i "/^${esc}\$/d" "$1"; }
+# Setup: Install > "Add installs to the dotfiles" (install.track in config.json); off: packages/*.txt are left alone
+track() { [ "$("$HOME/.config/torii/bin/torii-config" get install.track 2>/dev/null)" != "false" ]; }
+add_line() { track || return 0; in_list "$1" "$2" && return; [ -s "$1" ] && [ -n "$(tail -c1 "$1")" ] && echo >> "$1"; echo "$2" >> "$1"; }
+del_line() { track || return 0; local esc; esc=$(printf '%s' "$2" | sed 's/[][\.*^$/]/\\&/g'); sed -i "/^${esc}\$/d" "$1"; }
 need() { command -v "$1" >/dev/null 2>&1 || { echo "$1 is not installed"; pause; exit 1; }; }
 pick() {   # pick <prompt> <preview command with {}>   reads the list on stdin
   fzf --multi --layout=reverse --border=none --prompt="$1 > " --header="Tab selects more, Enter confirms, Esc cancels" \
@@ -33,7 +36,7 @@ case "${1:-}" in
     # shellcheck disable=SC2086
     if sudo pacman -S --needed $sel; then
       for p in $sel; do in_list "$AUR" "$p" || add_line "$PAC" "$p"; done
-      say "Added to packages/pacman.txt"
+      track && say "Added to packages/pacman.txt"
     fi
     pause ;;
   aur)
@@ -44,7 +47,7 @@ case "${1:-}" in
     # shellcheck disable=SC2086
     if yay -S --needed $sel; then
       for p in $sel; do add_line "$AUR" "$p"; done
-      say "Added to packages/aur.txt"
+      track && say "Added to packages/aur.txt"
     fi
     pause ;;
   remove)

@@ -92,10 +92,12 @@
     "freeze": true,
     "rec": {
       "micGain": 1,
-      "folder": true,
+      "folder": false,
       "apps": [
-        "deadlock.exe"
-      ]
+        "deadlock.exe",
+        "Helium"
+      ],
+      "lanes": false
     }
   },
   "limine": {

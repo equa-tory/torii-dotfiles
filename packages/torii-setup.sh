@@ -82,6 +82,10 @@ UNIT
 
   # xdg-open / Dolphin / browsers use the same apps as the `open` command
   [ -x "$REPO/.config/torii/bin/torii-open" ] && "$REPO/.config/torii/bin/torii-open" --apply || true
+  # Dolphin: previews of pictures, video, music, documents (a list left empty in dolphinrc turns every thumbnail off)
+  if command -v kwriteconfig6 >/dev/null 2>&1; then
+    kwriteconfig6 --file dolphinrc --group PreviewSettings --key Plugins "directorythumbnail,imagethumbnail,jpegthumbnail,svgthumbnail,ffmpegthumbs,audiothumbnail,comicbookthumbnail,ebookthumbnail,textthumbnail,opendocumentthumbnail,windowsexethumbnail,windowsimagethumbnail,rawthumbnail,kraorathumbnail,blenderthumbnail,exrthumbnail,gsthumbnail,mobithumbnail,djvuthumbnail,appimagethumbnail"
+  fi
 
   # Java: several JDKs are installed (Minecraft needs different ones); the system default is the 21 LTS
   if command -v archlinux-java >/dev/null 2>&1 && archlinux-java status 2>/dev/null | grep -q java-21-openjdk; then

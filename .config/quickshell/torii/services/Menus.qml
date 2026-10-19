@@ -93,6 +93,7 @@ Singleton {
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
     Connections { target: Config.launcher; function onSearchHiddenChanged() { root.bump(); } }
     Connections { target: Config.notch; function onClockDateChanged() { root.bump(); } }
+    Connections { target: Config.install; function onTrackChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
     Connections {
@@ -759,6 +760,9 @@ Singleton {
                       const l = webs.concat(tuis);
                       return l.length ? l : [{ id: "none", name: "Nothing added yet", sub: "Install > Web app or TUI" }];
                   } },
+                { id: "track", name: "Add installs to the dotfiles", glyph: Icons.git, badge: Config.install.track ? "On" : "Off", keep: true,
+                  sub: "On: what you install or remove here is written to packages/pacman.txt and aur.txt, so install.sh brings it back on a new machine",
+                  run: () => sh([bin("torii-config"), "set", "install.track", Config.install.track ? "false" : "true"]) },
                 { id: "update", name: "Update system", sub: "pacman and AUR upgrade", glyph: Icons.update, keywords: "upgrade yay pacman -Syu",
                   run: () => floatTerm("Update", [bin("torii-install"), "update"]) },
                 syncMenu(g, gitBadge)

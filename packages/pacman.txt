@@ -114,3 +114,6 @@ jdk21-openjdk
 jdk-openjdk
 openal
 glfw
+ffmpegthumbs
+kdegraphics-thumbnailers
+kimageformats

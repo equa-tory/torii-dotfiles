@@ -58,5 +58,11 @@
     "name": "Deadlock Mod Manager",
     "silent": true,
     "float": true
+  },
+  {
+    "class": "mpv",
+    "name": "video.mp4 - mpv",
+    "float": true,
+    "silent": true
   }
 ]

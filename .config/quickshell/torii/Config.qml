@@ -60,6 +60,9 @@ Singleton {
                     property real micGain: 1.0          // louder or quieter microphone in the recording only
                 }
             }
+            property JsonObject install: JsonObject {
+                property bool track: true           // packages installed from the launcher are added to packages/*.txt (and removed from them)
+            }
             property JsonObject workspaces: JsonObject {
                 property int count: 5
             }
