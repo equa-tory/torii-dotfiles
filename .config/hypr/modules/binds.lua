@@ -323,3 +323,9 @@ for _, ev in ipairs({ "window.active", "window.fullscreen" }) do
     if _G[v] then pcall(function() _G[v]:remove() end) end     -- a reload runs this file again
     _G[v] = hl.on(ev, function() hl.timer(game_keys, { timeout = 50, type = "oneshot" }) end)
 end
+
+-- an empty submap: while the launcher waits for a key combination (Ctrl+K > Add binding) Hyprland's own binds let every key through.
+-- (the dummy bind is only there because a submap without any bind is not registered)
+hl.define_submap("capture", function()
+    hl.bind("XF86Launch9", hl.dsp.submap("reset"))
+end)

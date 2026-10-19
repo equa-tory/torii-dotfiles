@@ -43,6 +43,7 @@ Singleton {
             property JsonObject notch: JsonObject {
                 property string shape: "attached"   // attached | floating
                 property real opacity: 1.0
+                property bool clockDate: false      // the clock shows the date next to the time
                 property int radius: 16
                 property int height: 34
                 property int gap: 6
@@ -81,6 +82,8 @@ Singleton {
                 property string placeholder: "Search apps  ·  ↓ opens the menus"
                 // menus whose rows are left out of the search (the menu itself still shows up): path of ids, e.g. "setup/rules"
                 property var searchHidden: ["setup/rules"]
+                // per item or folder (Ctrl+K in the launcher), by path of ids: { "apps/firefox": { name, where, alias, bind, pin, hide } }
+                property var custom: ({})
             }
             property JsonObject notifications: JsonObject {
                 property real popupSeconds: 5          // how long a notification stays in the notch

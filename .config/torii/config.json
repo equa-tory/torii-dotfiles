@@ -51,7 +51,29 @@
       "remove/webapp",
       "remove/tui",
       "trigger/capture"
-    ]
+    ],
+    "custom": {
+      "apps/app:org.telegram.desktop": {
+        "hide": true,
+        "name": "Telegram",
+        "where": ""
+      },
+      "apps/app:torii-web-discord": {
+        "name": "Discord",
+        "pin": 1792422759392,
+        "where": ""
+      },
+      "link:aur": {
+        "hide": true,
+        "name": "AUR",
+        "where": ""
+      },
+      "setup/rules": {
+        "alias": "window rule",
+        "name": "App rules",
+        "where": "Setup"
+      }
+    }
   },
   "notifications": {
     "expand": "side"

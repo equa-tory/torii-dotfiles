@@ -91,6 +91,7 @@ Singleton {
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
     Connections { target: Config.launcher; function onSearchHiddenChanged() { root.bump(); } }
+    Connections { target: Config.notch; function onClockDateChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
     Connections {
@@ -119,24 +120,121 @@ Singleton {
         return list.slice().sort((a, b) => rank(a) - rank(b));
     }
 
-    function childrenOf(node) {
-        if (!node) return rootNodes();
+    // ---- per-item choices (launcher: Ctrl+K on a row): alias, keyboard shortcut, pin, never show. Keyed by the path of ids.
+    property var customLocal: null          // what was just saved, until the config file has been read again
+    function custom() { return customLocal || Config.launcher.custom || ({}); }
+    Connections { target: Config.launcher; function onCustomChanged() { root.customLocal = null; root.bump(); } }
+    function keyOf(chain, id) { return chain.concat([id]).join("/"); }
+    function entry(key) { return custom()[key] || ({}); }
+    function aliasOf(key) { return entry(key).alias || ""; }
+    function visible(chain, nodes) {
+        const c = custom();
+        return nodes.filter(n => !(c[chain.concat([n.id]).join("/")] || {}).hide);
+    }
+
+    // chain = ids from the top down to `node` itself; given, the items marked "never show" are left out
+    function childrenOf(node, chain) {
+        if (!node) return chain ? visible([], rootNodes()) : rootNodes();
         const c = typeof node.children === "function" ? node.children() : (node.children || []);
         // lists that come from live data (apps, networks, devices) keep their own order
-        return node.sorted ? c : ordered(node.id, c);
+        const out = node.sorted ? c : ordered(node.id, c);
+        return chain ? visible(chain, out) : out;
     }
 
     // the node chain for a list of ids, rebuilt from scratch so every node sees the current state
-    function resolve(ids) {
+    // (raw: also what is marked "never show", for a shortcut or the management menu)
+    function resolve(ids, raw) {
         const nodes = [];
-        let list = rootNodes();
-        for (const id of ids) {
-            const n = list.find(x => x.id === id);
+        let list = childrenOf(null, raw ? undefined : []);
+        for (let i = 0; i < ids.length; i++) {
+            const n = list.find(x => x.id === ids[i]);
             if (!n) break;
             nodes.push(n);
-            list = childrenOf(n);
+            list = childrenOf(n, raw ? undefined : ids.slice(0, i + 1));
         }
         return nodes;
+    }
+
+    function saveCustom(key, node, where, patch) {
+        const c = JSON.parse(JSON.stringify(custom()));
+        const e = Object.assign({ name: node.name, where: where || "" }, c[key] || {}, patch);
+        for (const k of ["alias", "bind", "pin", "hide"]) if (!e[k]) delete e[k];
+        if (!e.alias && !e.bind && !e.pin && !e.hide) delete c[key]; else c[key] = e;
+        customLocal = c;
+        const json = JSON.stringify(c);
+        const bindsChanged = (patch.bind !== undefined);
+        sh(["sh", "-c", '"$1" set launcher.custom "$2"' + (bindsChanged ? ' && "$3" apply' : ""), "sh", bin("torii-config"), json, bin("torii-binds")]);
+        bump();
+    }
+
+    // pinned items, newest pin last, for the top of the launcher
+    function pinnedRows() {
+        const c = custom(), out = [];
+        for (const key of Object.keys(c)) {
+            const e = c[key];
+            if (!e.pin || e.hide) continue;
+            const ids = key.split("/"), id = ids.pop();
+            const nodes = resolve(ids);
+            if (nodes.length < ids.length) continue;
+            const n = childrenOf(nodes.length ? nodes[nodes.length - 1] : null, ids).find(x => x.id === id);
+            if (n) out.push({ node: n, trail: nodes.filter(x => !x.flat).map(x => x.name), chain: ids, key: key, t: e.pin });
+        }
+        return out.sort((a, b) => a.t - b.t);
+    }
+
+    // a shortcut was pressed: a menu opens in the launcher, an action runs (one that asks something opens the launcher first)
+    function runKey(key) {
+        const ids = key.split("/"), id = ids.pop();
+        const nodes = resolve(ids, true);
+        if (nodes.length < ids.length) return;
+        const n = childrenOf(nodes.length ? nodes[nodes.length - 1] : null).find(x => x.id === id);
+        if (!n) return;
+        if (n.children !== undefined || n.keep) { Panels.openLauncherAt(ids.concat(n.children !== undefined ? [id] : [])); return; }
+        if (n.onOpen) n.onOpen();
+        if (n.run) n.run();
+    }
+
+    // ---- the small menu of Ctrl+K: pin, alias, shortcut, hide
+    property var capture: null              // { label, done(combo) } while the launcher waits for a key combination
+    function startCapture(label, done) {
+        capture = { label: label, done: done };
+        sh(["hyprctl", "dispatch", 'hl.dsp.submap("capture")']);       // an empty submap: Hyprland's own binds let every key through
+    }
+    function endCapture() {
+        if (!capture) return;
+        capture = null;
+        sh(["hyprctl", "dispatch", 'hl.dsp.submap("reset")']);
+    }
+    function setBinding(key, node, where, combo) {
+        runWithInput([bin("torii-binds"), "check", combo], "", code => {
+            if (code !== 0) { say(combo.replace(/ \+ /g, "+") + " is used already"); return; }
+            saveCustom(key, node, where, { bind: combo });
+            say(node.name + ": " + combo.replace(/ \+ /g, "+"));
+        });
+    }
+    function entryRows(key, node, where, done) {
+        const e = entry(key), isDir = node.children !== undefined;
+        const kb = e.bind ? e.bind.replace(/ \+ /g, "+") : "";
+        const rows = [];
+        const act = fn => () => { fn(); done(); };
+        if (e.hide) rows.push({ id: "show", name: "Show again", glyph: Icons.search, keep: true, run: act(() => saveCustom(key, node, where, { hide: false })) });
+        else {
+            rows.push({ id: "pin", name: e.pin ? "Unpin" : "Pin to the launcher", glyph: e.pin ? Icons.pinOff : Icons.pin,
+                        sub: e.pin ? "" : "Shown on top as soon as the launcher opens", keep: true,
+                        run: act(() => saveCustom(key, node, where, { pin: e.pin ? 0 : Date.now() })) });
+            rows.push({ id: "alias", name: e.alias ? "Change alias  (" + e.alias + ")" : "Add alias…", glyph: Icons.tag,
+                        sub: "A short name that finds it first when you type it", keep: true,
+                        run: () => { done(); ask("Alias for " + node.name, false, a => { a = a.trim().toLowerCase(); if (a) saveCustom(key, node, where, { alias: a }); }); } });
+            if (e.alias) rows.push({ id: "unalias", name: "Remove alias", glyph: Icons.close, sub: e.alias, keep: true, run: act(() => saveCustom(key, node, where, { alias: "" })) });
+            rows.push({ id: "bind", name: e.bind ? "Change binding  (" + kb + ")" : "Add binding…", glyph: Icons.keyboard,
+                        sub: isDir ? "A key combination that opens it" : "A key combination that runs it", keep: true,
+                        run: () => { done(); startCapture("Press the keys for " + node.name + "  ·  Esc cancels", combo => setBinding(key, node, where, combo)); } });
+            if (e.bind) rows.push({ id: "unbind", name: "Remove binding", glyph: Icons.close, sub: kb, keep: true, run: act(() => saveCustom(key, node, where, { bind: "" })) });
+            rows.push({ id: "hide", name: isDir ? "Never show this folder" : "Never show this", glyph: Icons.eyeOff,
+                        sub: "Hidden everywhere; Setup > Launcher search brings it back", keep: true,
+                        run: act(() => saveCustom(key, node, where, { hide: true, pin: 0 })) });
+        }
+        return rows;
     }
 
     // ---- menu history: what you opened before ranks higher while you search (menus and apps; it stays on this machine)
@@ -178,21 +276,28 @@ Singleton {
         const q = query.trim().toLowerCase();
         const entries = [];
         const hidden = Config.launcher.searchHidden || [];
-        function walk(node, trail, chain, depth) {
-            for (const c of childrenOf(node)) {
-                entries.push({ node: c, trail: trail, chain: chain });
-                if (isMenu(c) && !c.noSearch && depth < 4 && hidden.indexOf(chain.concat([c.id]).join("/")) < 0) walk(c, c.flat ? trail : trail.concat(c.name), chain.concat([c.id]), depth + 1);
+        const cust = custom();
+        // a menu left out of the search (Setup > rules) still gives its rows to an alias
+        function walk(node, trail, chain, depth, ghost) {
+            for (const c of childrenOf(node, chain)) {
+                const path = chain.concat([c.id]).join("/");
+                entries.push({ node: c, trail: trail, chain: chain, ghost: ghost });
+                if (isMenu(c) && !c.noSearch && depth < 4) walk(c, c.flat ? trail : trail.concat(c.name), chain.concat([c.id]), depth + 1, ghost || hidden.indexOf(path) >= 0);
             }
         }
-        walk(scope, scope ? [scope.name] : [], baseChain || [], 0);
+        walk(scope, scope ? [scope.name] : [], baseChain || [], 0, false);
         const scored = [];
         for (const e of entries) {
-            const s = Fuzzy.scoreFields(q, [
+            const al = ((cust[e.chain.concat([e.node.id]).join("/")] || {}).alias || "");
+            const aliasScore = al !== "" && al.indexOf(q) === 0 ? 100000 - al.length : -1;
+            if (e.ghost && aliasScore < 0) continue;
+            const s0 = Fuzzy.scoreFields(q, [
                 { text: e.node.name, weight: 1 },
                 { text: e.trail.join(" "), weight: 0.45 },
                 { text: e.node.keywords || "", weight: 0.6 },
                 { text: e.node.sub || "", weight: 0.3 }
             ]);
+            const s = e.ghost ? aliasScore : Math.max(s0, aliasScore);
             // "Remove ..." rows are never what you meant first: the app or web app itself comes before its Remove entry
             const penalty = e.trail.length && e.trail[0] === "Remove" ? 60 : 0;
             if (s >= 0) scored.push({ e: e, s: s + boost(e.chain, e.node.id) - penalty + (isMenu(e.node) ? 0 : 12) });   // things you can run beat folders
@@ -252,6 +357,19 @@ Singleton {
 
     // ---- app rules: what happens when a window of an app opens (workspace, in the background, floating)
     Timer { id: rulesRefresh; interval: 400; onTriggered: fRules.refresh() }
+    // a rule was added from the launcher: go straight into its settings
+    function goto(ids) { gotoNow(ids); }
+    signal gotoNow(var ids)
+    Timer { id: gotoRule; interval: 900; property string key: ""
+            onTriggered: {
+                const r = (fRules.data || []).find(x => x.key === key);
+                if (r) goto(["setup", "rules", "g:" + (r.workspace ? String(r.workspace) : "-"), "r:" + key]);
+            } }
+    function addRule(cls, name) {
+        runWithInput([bin("torii-rules"), "set", cls, "name", name || cls], "", () => { fRules.refresh(); gotoRule.key = cls; gotoRule.restart(); });
+    }
+    JsonFetch { id: fFocus; command: [root.bin("torii-rules"), "focused"]
+                onDataChanged: { const d = data; if (d && d["class"]) addRule(d["class"], d.title && d.title.length < 40 ? d.title : d["class"]); else say("No app has the focus"); } }
     function rule(args) { sh([bin("torii-rules")].concat(args)); rulesRefresh.restart(); }
     function ruleSummary(r) {
         const p = [];
@@ -265,7 +383,7 @@ Singleton {
         const rules = fRules.data || [];
         const have = c => rules.some(r => r.key === c);
         const pick = (cls, name) => ({ id: "add:" + cls, name: name || cls, sub: cls.replace("|", "  ·  popup: "), badge: have(cls) ? "●" : "", keep: true,
-            run: () => { if (!have(cls)) rule(["set", cls, "name", name || cls]); say("Added " + (name || cls) + ": open App rules to set it up"); } });
+            run: () => addRule(cls, name) });
         const specials = (fSpecials.data || []).map(w => w.name);
         const wsLabel = w => typeof w === "string" ? w.replace("special:", "Special ") : "Workspace " + w;
         return { id: "rules", name: "App rules", glyph: Icons.apps, keywords: "window workspace float background open rule deadlock steam",
@@ -297,6 +415,7 @@ Singleton {
                     { id: "remove", name: "Remove rule", glyph: Icons.trash, sub: r.key.replace("|", "  ·  popup: "), run: () => rule(["remove", r.key]) } ].filter(e => !r.title || ["ws", "silent", "float", "remove"].indexOf(e.id) >= 0) });
             const addNode = { id: "add", name: "Add an app", glyph: Icons.plus, sub: "Pick a window that is open, or an installed app", onOpen: () => fWins.refresh(),
               children: () => [
+                { id: "focused", name: "Focused app", glyph: Icons.monitor, sub: "The window you were in when you opened the launcher", keep: true, run: () => fFocus.refresh() },
                 { id: "open", name: "Open windows", glyph: Icons.monitor, sub: "The easiest way: open the app first", sorted: true, onOpen: () => fWins.refresh(),
                   children: () => (fWins.data || []).map(w => w.popup
                       ? pick(w.class + "|" + w.initialTitle, (w.title || w.initialTitle).slice(0, 40) + "  ·  popup of " + w.class)
@@ -305,8 +424,9 @@ Singleton {
                   children: () => Apps.items().filter(a => a.kind === "app" || (a.exec && /--class\s+\S+/.test(a.exec)))
                       .map(a => a.kind === "app" ? pick(a.wm || a.id, a.name) : pick(/--class\s+(\S+)/.exec(a.exec)[1], a.name)) },
                 { id: "typed", name: "Type a window class…", glyph: Icons.keyboard2, keep: true,
-                  run: () => ask("Window class (hyprctl clients shows it)", false, c => { if (c.trim()) rule(["set", c.trim(), "name", c.trim()]); }) } ] };
+                  run: () => ask("Window class (hyprctl clients shows it)", false, c => { if (c.trim()) addRule(c.trim(), c.trim()); }) } ] };
             const out = [addNode,
+                { id: "addfocused", name: "Add the focused app", glyph: Icons.plus, sub: "The window you were in when you opened the launcher", keep: true, run: () => fFocus.refresh() },
                 { id: "reopen", name: "Open all saved apps now", glyph: Icons.apps, keep: true,
                   sub: "Starts every app that starts at login and is not open yet; the open ones stay as they are",
                   run: () => { rule(["reopen"]); say("Opening the saved apps"); } },
@@ -419,6 +539,9 @@ Singleton {
               run: () => { if (Audio.sourceNode || Audio.mock) Audio.toggleSourceMute(); else say("No microphone found"); } },
             { id: "dnd", name: "Do not disturb", glyph: t.dnd ? Icons.bellOff : Icons.bell, keywords: "notifications silence",
               sub: "Notifications", badge: t.dnd ? "On" : "Off", keep: true, run: () => Notifs.toggleDnd() },
+            { id: "clockdate", name: "Date next to the clock", glyph: Icons.calendar, keywords: "time notch top date clock day",
+              sub: "The clock in the notch shows the date as well as the time", badge: Config.notch.clockDate ? "On" : "Off", keep: true,
+              run: () => sh([bin("torii-config"), "set", "notch.clockDate", Config.notch.clockDate ? "false" : "true"]) },
             { id: "dark", name: "Dark mode", glyph: Icons.themeDark, keywords: "light theme appearance",
               badge: (darkNow || Theme.mode) === "dark" ? "On" : "Off", keep: true,
               run: () => { darkNow = (darkNow || Theme.mode) === "dark" ? "light" : "dark"; sh([bin("torii-theme"), "mode", darkNow]); } },
@@ -554,7 +677,7 @@ Singleton {
                       if (!name) return;
                       ask("Address of " + name + " (https://…)", false, url => {
                           if (!url) return;
-                          ask("Open in the normal browser instead of its own window?  y = browser, Enter = own window", false, b => {
+                          ask("In the browser?  y / Enter", false, b => {
                               const inBrowser = /^\s*y/i.test(b);
                               sh([bin("torii-apps"), "webapp", "add"].concat(inBrowser ? ["--browser"] : [], [name, url])); later(fWeb, 1500);
                               say(name + " added, it is in Apps in a moment");
@@ -566,7 +689,7 @@ Singleton {
                       if (!name) return;
                       ask("Command to run for " + name, false, cmd => {
                           if (!cmd) return;
-                          ask("Run it in the background, with no window?  y = no window (a notification when done), Enter = terminal window", false, q => {
+                          ask("No window?  y / Enter", false, q => {
                               const quiet = /^\s*y/i.test(q);
                               sh([bin("torii-apps"), "tui", "add"].concat(quiet ? ["--quiet"] : [], [name, cmd])); later(fTui, 800);
                               say(name + " added, it is in Apps");
@@ -748,34 +871,20 @@ Singleton {
 
     // which menus the launcher search looks inside (the menu itself is always found; its rows only when this is on)
     function searchMenu() {
-        return { id: "search", name: "Launcher search", glyph: Icons.search, sub: "Which menus show their rows when you type",
-                 keywords: "hide menus fzf clutter results", noSearch: true, children: () => {
-            const hidden = Config.launcher.searchHidden || [];
-            const rows = [];
-            const add = (chain, node) => {
-                const path = chain.concat([node.id]).join("/");
-                const off = hidden.indexOf(path) >= 0;
-                rows.push({ id: "s:" + path, name: chain.length ? node.name + "  ·  " + chain.join(" › ") : node.name,
-                            sub: off ? "Rows inside are not searched" : "Rows inside show up in the search", badge: off ? "Off" : "On", keep: true,
-                            run: () => {
-                                const next = off ? hidden.filter(x => x !== path) : hidden.concat([path]);
-                                sh([bin("torii-config"), "set", "launcher.searchHidden", JSON.stringify(next)]);
-                            } });
-            };
-            for (const top of rootNodes()) {
-                if (!isMenu(top) || top.noSearch) continue;
-                if (top.id !== "setup") add([], top);
-                const ids = [top.id];
-                for (const sub of childrenOf(top)) {
-                    if (isMenu(sub) && !sub.noSearch && !sub.flat && sub.id !== "search") {
-                        const p = ids.concat([sub.id]).join("/"), off = hidden.indexOf(p) >= 0;
-                        rows.push({ id: "s:" + p, name: sub.name + "  ·  " + top.name, sub: off ? "Rows inside are not searched" : "Rows inside show up in the search",
-                                    badge: off ? "Off" : "On", keep: true,
-                                    run: () => sh([bin("torii-config"), "set", "launcher.searchHidden", JSON.stringify(off ? hidden.filter(x => x !== p) : hidden.concat([p]))]) });
-                    }
-                }
-            }
-            return rows;
+        const c = custom();
+        const keys = Object.keys(c).sort((x, y) => (c[x].name || x).localeCompare(c[y].name || y));
+        return { id: "search", name: "Launcher search", glyph: Icons.search, sub: keys.length ? keys.length + " items with a choice from Ctrl+K" : "Items hidden, pinned, aliased or with a key",
+                 keywords: "hide never show pin alias binding shortcut unpin clutter", noSearch: true, children: () => {
+            const cc = custom();
+            if (keys.length === 0) return [{ id: "none", name: "Nothing yet", sub: "Ctrl+K on a row: Pin, Add alias, Add binding, Never show this" }];
+            return keys.filter(k => cc[k]).map(k => {
+                const e = cc[k];
+                const bits = [e.hide ? "hidden" : "", e.pin ? "pinned" : "", e.alias ? "alias " + e.alias : "", e.bind ? e.bind.replace(/ \+ /g, "+") : ""].filter(x => x);
+                const node = { id: k.split("/").pop(), name: e.name || k };
+                return { id: "e:" + k, name: e.name || k, glyph: e.hide ? Icons.eyeOff : e.pin ? Icons.pin : e.bind ? Icons.keyboard : Icons.tag,
+                         sub: bits.join("  ·  ") + (e.where ? "  ·  " + e.where : ""), keywords: bits.join(" "),
+                         children: () => { const f = Object.assign({}, node, { children: e.hide ? undefined : [] }); return entryRows(k, f, e.where, () => bump()); } };
+            });
         } };
     }
 

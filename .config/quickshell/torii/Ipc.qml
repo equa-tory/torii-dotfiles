@@ -20,6 +20,8 @@ Scope {
     IpcHandler {
         target: "launcher"
         function toggle(): void { Panels.toggle("launcher"); }
+        // a launcher item with a keyboard shortcut (Ctrl+K > Add binding): its path of ids, e.g. "apps/firefox"
+        function run(path: string): void { Menus.runKey(path); }
     }
     IpcHandler {
         target: "switcher"

@@ -25,7 +25,10 @@ Item {
 
     readonly property var scope: path.length ? path[path.length - 1] : null
     readonly property bool asking: Menus.prompt !== null
-    readonly property bool showList: !asking && results.length > 0 && (expanded || input.text.trim() !== "")
+    property var ctx: null                // { node, chain, trail }: the small Ctrl+K menu of one row is open
+    property int pinCount: 0              // pinned rows at the top of the first level (they show before anything is typed)
+    readonly property bool capturing: Menus.capture !== null
+    readonly property bool showList: !asking && !capturing && results.length > 0 && (ctx !== null || expanded || input.text.trim() !== "" || (pinCount > 0 && !scope))
     readonly property bool showNotice: Menus.notice !== ""
     // a menu can ask for a grid (emoji): arrows then move in two dimensions
     readonly property bool gridMode: scope !== null && scope.grid === true
@@ -47,7 +50,7 @@ Item {
         update(false);
         input.forceActiveFocus();
     }
-    Component.onDestruction: { Menus.endPrompt(); }
+    Component.onDestruction: { Menus.endPrompt(); Menus.endCapture(); }
     Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
     Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
@@ -86,15 +89,22 @@ Item {
 
     function update(keepSel) {
         if (dragging) { dirty = true; return; }
-        if (asking) { results = []; return; }
+        if (asking || capturing) { results = []; return; }
         path = Menus.resolve(pathIds);
+        if (ctx) { results = Menus.entryRows(Menus.keyOf(ctx.chain, ctx.node.id), ctx.node, ctx.trail.join(" › "), closeCtx).map(n => ({ node: n, trail: [], chain: [] })); selected = Math.min(selected, results.length - 1); return; }
         if (path.length < pathIds.length) pathIds = pathIds.slice(0, path.length);
         const q = input.text.trim();
         const prev = keepSel && results[selected] ? results[selected].node.id : null;
         let out = [];
 
         if (q === "") {
-            out = Menus.childrenOf(scope).map(n => ({ node: n, trail: [] }));
+            const pins = scope ? [] : Menus.pinnedRows();
+            pinCount = pins.length;
+            const pk = {};
+            for (const p of pins) pk[p.key] = true;
+            const base = Menus.childrenOf(scope, pathIds).filter(n => scope || !pk[n.id]).map(n => ({ node: n, trail: [] }));
+            const pinned = pins.map(p => ({ node: p.node, trail: p.trail, chain: p.chain, pinned: true }));
+            out = pinned.length && !expanded ? pinned : pinned.concat(base);
         } else if (q.charAt(0) === ":" && !scope) {
             out = q.length > 1 ? Menus.emojiSearch(q.slice(1)) : [];
         } else {
@@ -102,7 +112,8 @@ Item {
                 const calc = Calc.evaluate(q);
                 if (calc.ok) out.push({ node: { id: "calc", name: "= " + calc.text, sub: q + "  ·  Enter copies the result", glyph: Icons.calc,
                     run: () => Quickshell.execDetached(["sh", "-c", 'printf %s "$1" | wl-copy && notify-send -a torii -t 2500 "Copied" "$1"', "sh", calc.text]) }, trail: [] });
-                const link = Quicklinks.resolve(q);
+                let link = Quicklinks.resolve(q);
+                if (link && Menus.entry("link:" + link.keyword).hide) link = null;          // "Never show this" on a quicklink
                 if (link) out.push({ node: linkNode(link), trail: [] });
                 if (link && /\s/.test(q)) { results = out; selected = 0; return; }   // "yt cats" is a search, not a lookup
             }
@@ -152,6 +163,12 @@ Item {
         }
     }
     Connections { target: Menus; function onPromptChanged() { input.text = ""; root.update(false); } }
+    Connections { target: Menus; function onCaptureChanged() { if (Menus.capture) input.text = ""; root.update(false); } }
+    Connections {
+        target: Menus
+        function onGotoNow(ids) { root.ctx = null; root.pathIds = ids; input.text = ""; root.expanded = true; root.lastNav = "forward"; root.update(false); }
+    }
+    onExpandedChanged: if (!dragging) update(true)
 
     // ---- actions
     function move(d) {
@@ -240,8 +257,66 @@ Item {
         update(false);
     }
 
+    function openCtx() {
+        if (asking || capturing || ctx || !showList || !results[selected]) return;
+        const r = results[selected];
+        if (r.node.id === "calc" || r.node.noCtx) return;
+        ctx = { node: r.node, chain: r.chain || pathIds, trail: r.pinned ? r.trail : (r.trail || []) };
+        ctxSel = selected;
+        selected = 0;
+        update(false);
+    }
+    property int ctxSel: 0
+    function closeCtx() {
+        if (!ctx) return;
+        ctx = null;
+        update(true);
+        selected = Math.min(ctxSel, Math.max(0, results.length - 1));
+        ensureVisible(true);
+    }
+
+    // a key combination for Hyprland: "ALT + SHIFT + K"
+    readonly property var keyNames: ({ [Qt.Key_Space]: "SPACE", [Qt.Key_Return]: "RETURN", [Qt.Key_Enter]: "RETURN", [Qt.Key_Tab]: "TAB", [Qt.Key_Backtab]: "TAB",
+        [Qt.Key_Left]: "LEFT", [Qt.Key_Right]: "RIGHT", [Qt.Key_Up]: "UP", [Qt.Key_Down]: "DOWN", [Qt.Key_Home]: "HOME", [Qt.Key_End]: "END",
+        [Qt.Key_PageUp]: "PRIOR", [Qt.Key_PageDown]: "NEXT", [Qt.Key_Insert]: "INSERT", [Qt.Key_Delete]: "DELETE", [Qt.Key_Backspace]: "BACKSPACE",
+        [Qt.Key_Minus]: "MINUS", [Qt.Key_Equal]: "EQUAL", [Qt.Key_Comma]: "COMMA", [Qt.Key_Period]: "PERIOD", [Qt.Key_Slash]: "SLASH",
+        [Qt.Key_Semicolon]: "SEMICOLON", [Qt.Key_Apostrophe]: "APOSTROPHE", [Qt.Key_BracketLeft]: "BRACKETLEFT", [Qt.Key_BracketRight]: "BRACKETRIGHT",
+        [Qt.Key_Backslash]: "BACKSLASH", [Qt.Key_QuoteLeft]: "GRAVE", [Qt.Key_Print]: "PRINT",
+        // what Shift turns a key into
+        [Qt.Key_Exclam]: "1", [Qt.Key_At]: "2", [Qt.Key_NumberSign]: "3", [Qt.Key_Dollar]: "4", [Qt.Key_Percent]: "5", [Qt.Key_AsciiCircum]: "6",
+        [Qt.Key_Ampersand]: "7", [Qt.Key_Asterisk]: "8", [Qt.Key_ParenLeft]: "9", [Qt.Key_ParenRight]: "0", [Qt.Key_Underscore]: "MINUS",
+        [Qt.Key_Plus]: "EQUAL", [Qt.Key_Less]: "COMMA", [Qt.Key_Greater]: "PERIOD", [Qt.Key_Question]: "SLASH", [Qt.Key_Colon]: "SEMICOLON",
+        [Qt.Key_QuoteDbl]: "APOSTROPHE", [Qt.Key_BraceLeft]: "BRACKETLEFT", [Qt.Key_BraceRight]: "BRACKETRIGHT", [Qt.Key_Bar]: "BACKSLASH", [Qt.Key_AsciiTilde]: "GRAVE" })
+    function comboOf(event) {
+        const k = event.key;
+        if (k === Qt.Key_Shift || k === Qt.Key_Control || k === Qt.Key_Alt || k === Qt.Key_Meta || k === Qt.Key_AltGr || k === Qt.Key_CapsLock) return "";
+        let name = keyNames[k] || "";
+        if (!name && k >= Qt.Key_A && k <= Qt.Key_Z) name = String.fromCharCode(k);
+        if (!name && k >= Qt.Key_0 && k <= Qt.Key_9) name = String.fromCharCode(k);
+        if (!name && k >= Qt.Key_F1 && k <= Qt.Key_F24) name = "F" + (k - Qt.Key_F1 + 1);
+        if (!name) return "";
+        const mods = [];
+        if (event.modifiers & Qt.MetaModifier) mods.push("SUPER");
+        if (event.modifiers & Qt.ControlModifier) mods.push("CTRL");
+        if (event.modifiers & Qt.AltModifier) mods.push("ALT");
+        if (event.modifiers & Qt.ShiftModifier) mods.push("SHIFT");
+        return mods.concat([name]).join(" + ");
+    }
+    function captureKey(event) {
+        event.accepted = true;
+        if (event.key === Qt.Key_Escape) { Menus.endCapture(); update(false); return; }
+        const combo = comboOf(event);
+        if (combo === "") return;
+        if (combo.indexOf("+") < 0 && !/^F\d+$/.test(combo)) { Menus.say("Add Alt, Ctrl, Super or Shift"); return; }
+        const done = Menus.capture.done;
+        Menus.endCapture();
+        update(false);
+        done(combo);
+    }
+
     function activate(right) {
         if (results.length === 0) return;
+        if (ctx) { const r = results[selected].node; if (r.run) r.run(); return; }
         const n = results[selected].node;
         const menu = n.children !== undefined;
         if (menu && (right || !n.run)) { enter(n, results[selected].chain); return; }
@@ -297,6 +372,7 @@ Item {
                 Keys.onDownPressed: event => {
                     if (root.asking) return;
                     if (!root.showList) { if (root.results.length) { root.expanded = true; root.selected = 0; } }
+                    else if (!root.expanded && root.pinCount > 0 && !root.scope && !root.ctx && input.text.trim() === "" && root.selected >= root.results.length - 1) { root.expanded = true; root.update(true); root.move(1); }
                     else root.move(root.gridMode ? root.cols : 1);
                 }
                 Keys.onUpPressed: event => {
@@ -310,7 +386,7 @@ Item {
                 Keys.onBacktabPressed: root.move(-1)
                 Keys.onReturnPressed: root.asking ? root.submitPrompt() : root.activate(false)
                 Keys.onEnterPressed: root.asking ? root.submitPrompt() : root.activate(false)
-                Keys.onEscapePressed: { if (root.asking) Menus.endPrompt(); else Panels.close(); }
+                Keys.onEscapePressed: { if (root.asking) Menus.endPrompt(); else if (root.ctx) root.closeCtx(); else Panels.close(); }
                 Keys.onRightPressed: event => {
                     if (!root.asking && root.gridMode && root.showList) { root.move(1); return; }
                     if (!root.asking && root.selectedSlider() && root.showList) { root.adjust(1, event.modifiers & Qt.ShiftModifier); return; }
@@ -323,6 +399,7 @@ Item {
                     if (!root.asking && root.selectedSlider() && root.showList) { root.adjust(-1, event.modifiers & Qt.ShiftModifier); return; }
                     if (input.cursorPosition > 0 || input.selectionStart !== input.selectionEnd) { event.accepted = false; return; }
                     if (root.asking) { Menus.endPrompt(); return; }
+                    if (root.ctx) { root.closeCtx(); return; }
                     if (input.text !== "") return;
                     if (root.pathIds.length) root.back();
                     else if (root.expanded) root.expanded = false;
@@ -330,6 +407,11 @@ Item {
                 }
                 Keys.onPressed: event => {
                     root.mouseLive = false;
+                    if (root.capturing) { root.captureKey(event); return; }
+                    if (event.key === Qt.Key_K && (event.modifiers & Qt.ControlModifier) && !root.asking) {
+                        if (root.ctx) root.closeCtx(); else root.openCtx();
+                        event.accepted = true; return;
+                    }
                     if (root.showList && !root.asking) {
                         if (event.key === Qt.Key_PageDown) { root.jump(root.selected + (root.gridMode ? root.cols * root.gridRows : root.maxRows - 1)); event.accepted = true; return; }
                         if (event.key === Qt.Key_PageUp) { root.jump(root.selected - (root.gridMode ? root.cols * root.gridRows : root.maxRows - 1)); event.accepted = true; return; }
@@ -338,13 +420,17 @@ Item {
                     }
                     if (event.modifiers & Qt.ControlModifier) {
                         if (event.key === Qt.Key_J || event.key === Qt.Key_N) { root.move(1); event.accepted = true; }
-                        else if (event.key === Qt.Key_K || event.key === Qt.Key_P) { root.move(-1); event.accepted = true; }
+                        else if (event.key === Qt.Key_P) { root.move(-1); event.accepted = true; }
                     }
                 }
 
                 Label {
                     visible: !input.text.length
-                    text: Menus.prompt !== null ? Menus.prompt.label
+                    width: input.width
+                    elide: Text.ElideRight
+                    text: Menus.capture !== null ? Menus.capture.label
+                        : root.ctx ? root.ctx.node.name + "  ·  Ctrl+K or Esc to go back"
+                        : Menus.prompt !== null ? Menus.prompt.label
                         : root.scope ? "Search in " + root.scope.name
                         : Config.launcher.placeholder
                     color: Theme.muted
@@ -565,6 +651,12 @@ Item {
                     visible: (row.node.badge || "") !== "" || row.node.slider !== undefined
                     text: row.node.slider !== undefined ? root.sliderText(row.node) : (row.node.badge || "")
                     color: Theme.accent
+                }
+                Glyph {
+                    visible: row.modelData.pinned === true
+                    text: Icons.pin
+                    size: 13
+                    color: Theme.muted
                 }
                 Glyph {
                     visible: row.isMenu

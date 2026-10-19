@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""torii-rules list | windows | specials | autostart | set <rule> <key> <value> | remove <rule> | apply  -  per-app window rules.
+"""torii-rules list | windows | focused | specials | autostart | set <rule> <key> <value> | remove <rule> | apply  -  per-app window rules.
 
 A rule says what happens when a window of an app opens:
   workspace  1..10, special:NAME or none   send it there (in the background when `silent` is true)
@@ -13,7 +13,7 @@ A rule says what happens when a window of an app opens:
                                   (remembered), opened in the background, and started at login
   name       text                 label shown in the launcher
 A <rule> is the window class, or class|title for one kind of window of an app (a login popup of a browser: matched on the
-title it opened with). `windows` lists the windows that are open now (their class is what a rule matches), `list` the saved rules.
+title it opened with). `focused` prints the window that has the focus, `windows` lists the windows that are open now (their class is what a rule matches), `list` the saved rules.
 Rules live in ~/.config/torii/app-rules.json; the Hyprland side is ~/.local/state/torii/hypr-rules.lua (hyprland.lua loads it)
 and is also applied to the running session at once.
 """
@@ -285,6 +285,14 @@ def main(a):
         return
     if a == ["windows"]:
         print(json.dumps(windows()))
+        return
+    if a == ["focused"]:
+        try:
+            w = json.loads(subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=3).stdout or "{}")
+        except (OSError, ValueError, subprocess.SubprocessError):
+            w = {}
+        cls = w.get("class") or ""
+        print(json.dumps({"class": cls, "title": w.get("title", "")} if cls and not (cls.startswith("torii-") and not cls.startswith("torii-app-")) else {}))
         return
     if a == ["apply"]:
         apply()

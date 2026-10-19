@@ -335,3 +335,10 @@ refused, `personal.sh` shows the key and falls back to the backup copy on the Um
 ## Windows mode: resize and maximise
 - **Resize edge** (Setup > Windows): drag the edge of a window to resize it; the slider is how far outside the window the grab area reaches (0 = off, default 12 px).
 - Double-click the title bar: the action is chosen in Setup > Windows > "Double-click on the title bar" (maximise by default: fills the work area and a second double-click gives the old size back; fullscreen, big window, centre, minimise or nothing). The green button always maximises. Dragging the title bar of a window filled this way gives it its old size at once, with the mouse on the bar; that first drag ends there (press the bar again to carry on). It needs `ydotoold` (started at login): a virtual mouse release ends Hyprland's own drag, which would otherwise jump away from the mouse. Nothing is ever pressed virtually, so no button can stay down.
+
+## Launcher: Ctrl+K on a row, app rules, resize from the top
+
+* **Ctrl+K** on any row or folder opens its small menu: *Pin to the launcher* (pinned rows show as soon as the launcher opens, above the menus; Down from the last one shows the rest), *Add alias* (typing it finds the row first, also inside menus the search skips), *Add binding* (press the keys; a Hyprland bind runs the row, or opens the folder in the launcher: `torii-binds` writes `~/.local/state/torii/launcher-binds.lua`), *Never show this* (hidden everywhere, quicklinks too). The same rows undo each one, and Setup › Launcher search lists everything chosen this way. Ctrl+P is up now (Ctrl+K was).
+* Setup › App rules › *Add the focused app* (and every other way of adding one) opens the new rule's settings at once.
+* Trigger › *Date next to the clock* puts the date in the notch clock.
+* A floating window can be resized from the strip just above its title bar (top, top-left, top-right): `modules/edgeresize.lua` switches on a mouse-resize submap while the cursor is there.

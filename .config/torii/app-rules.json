@@ -46,5 +46,17 @@
     "title": "Friends List",
     "silent": true,
     "float": true
+  },
+  {
+    "class": "helium",
+    "name": "helium",
+    "workspace": 2,
+    "silent": false
+  },
+  {
+    "class": "deadlock-modmanager",
+    "name": "Deadlock Mod Manager",
+    "silent": true,
+    "float": true
   }
 ]

@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""torii-binds check <combo> | apply  -  keyboard shortcuts for launcher items (launcher: Ctrl+K on a row > Add binding).
+
+The shortcuts live in ~/.config/torii/config.json (launcher.custom.<item path>.bind, e.g. "ALT + SHIFT + K").
+  check   exit 0 when no bind in the running Hyprland uses the combo, 1 when one does (the use is printed)
+  apply   write ~/.local/state/torii/launcher-binds.lua (hyprland.lua loads it) and reload Hyprland when it changed;
+          every bind runs  qs -c torii ipc call launcher run '<item path>'  (a menu opens in the launcher, an action runs)
+"""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+CFG = Path(os.environ.get("TORII_CONFIG", Path.home() / ".config/torii/config.json"))
+OUT = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii")) / "launcher-binds.lua"
+MODS = {"SHIFT": 1, "CTRL": 4, "CONTROL": 4, "ALT": 8, "SUPER": 64, "META": 64, "MOD4": 64}
+
+
+def entries():
+    try:
+        c = json.loads(CFG.read_text()).get("launcher", {}).get("custom", {})
+    except (OSError, ValueError):
+        return {}
+    return {k: v["bind"] for k, v in c.items() if isinstance(v, dict) and v.get("bind")}
+
+
+def parse(combo):
+    mask, key = 0, ""
+    for p in [x.strip().upper() for x in combo.split("+")]:
+        if p in MODS:
+            mask |= MODS[p]
+        elif p:
+            key = p
+    return mask, key
+
+
+def lua_str(s):
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def check(combo):
+    mask, key = parse(combo)
+    try:
+        binds = json.loads(subprocess.run(["hyprctl", "binds", "-j"], capture_output=True, text=True).stdout or "[]")
+    except ValueError:
+        binds = []
+    mine = {parse(c) for c in entries().values()}
+    for b in binds:
+        if b.get("submap") or b.get("key", "").upper() != key or b.get("modmask") != mask:
+            continue
+        print(b.get("description") or b.get("dispatcher") or "another shortcut")
+        return 1
+    return 0
+
+
+def apply():
+    lines = ["-- written by torii-binds (launcher items with a shortcut); do not edit"]
+    for path, combo in sorted(entries().items()):
+        cmd = "qs -c torii ipc call launcher run " + "'" + path.replace("'", "") + "'"
+        lines.append(f"hl.bind({lua_str(combo)}, hl.dsp.exec_cmd({lua_str(cmd)}))")
+    text = "\n".join(lines) + "\n"
+    old = OUT.read_text() if OUT.exists() else ""
+    if text == old:
+        return
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(text)
+    if not os.environ.get("TORII_NO_HOOKS"):
+        subprocess.run(["hyprctl", "reload"], capture_output=True)
+
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if a[:1] == ["check"] and len(a) == 2:
+        sys.exit(check(a[1]))
+    elif a == ["apply"]:
+        apply()
+    else:
+        sys.exit(__doc__)

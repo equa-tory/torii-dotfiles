@@ -22,7 +22,7 @@ Item {
     Label {
         id: label
         anchors.centerIn: parent
-        text: root.showDate ? Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
+        text: root.showDate || Config.notch.clockDate ? Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
                             : Qt.formatDateTime(clock.date, "HH:mm")
         color: Theme.fg
         font.family: Config.font.family
