@@ -880,7 +880,7 @@ Singleton {
         fMons.ensure(); fHypr.ensure();
         const h = Live.hypr, b = h.blur || { enabled: true, size: 3, passes: 1, vibrancy: 0.17 };
         const blurSet = (k, v) => { const n = Object.assign({}, b, k); return ["blur", String(n.size), String(n.passes), String(n.vibrancy)]; };
-        return { id: "appearance", name: "Appearance", glyph: Icons.tune, sub: "Bar size, monitor scale, border, transparency, blur", keywords: "look theme resize scale opacity transparent vibrancy", children: () => [
+        return { id: "appearance", name: "Appearance", glyph: Icons.tune, sub: "Bar size, monitor scale, border, corner radius, transparency, blur", keywords: "look theme resize scale opacity transparent vibrancy", children: () => [
             cfgSlider("barh", "Bar height", "notch.height", 24, 60, 1, Config.notch.height, " px", 0, "The notch bar at the top"),
             cfgSlider("baro", "Bar opacity", "notch.opacity", 0.3, 1, 0.05, Config.notch.opacity, "", 2),
             { id: "scale", name: "Monitors", glyph: Icons.monitor, sub: "Scale and resolution", onOpen: () => fMons.refresh(), children: () =>
@@ -893,6 +893,7 @@ Singleton {
                         (m.modes || []).map(md => ({ id: "r:" + md, name: md.replace("@", " @ ") + " Hz", badge: md === (m.w + "x" + m.h + "@" + m.hz) ? "●" : "", keep: true,
                             run: () => { sh([bin("torii-hypr"), "mode", m.name, md]); later(fMons, 1500); } })) } ] })) },
             hyprSlider("wborder", "Window border width", v => ["border", String(v)], 0, 10, 1, h.border === undefined ? 1 : h.border, " px", 0, "The coloured frame around windows"),
+            hyprSlider("wround", "Window corner radius", v => ["rounding", String(v)], 0, 30, 1, h.rounding === undefined ? 14 : h.rounding, " px", 0, "How round the corners of windows are (0 = square)"),
             hyprSlider("wgrab", "Resize edge", v => ["grab", String(v)], 0, 40, 1, h.grab === undefined ? 12 : h.grab, " px", 0, "Drag the edge of a window to resize it: how far outside the window the grab area reaches (0 = off)"),
             hyprSlider("wopac", "Window opacity", v => ["opacity", String(v)], 0.3, 1, 0.05, h.opacity === undefined ? 1 : h.opacity, "", 2, "Transparent windows show the blur behind them"),
             { id: "blur", name: "Blur", glyph: Icons.tune, sub: b.enabled === false ? "Off" : b.size + " · " + b.passes + " passes · " + b.vibrancy, children: () => [
