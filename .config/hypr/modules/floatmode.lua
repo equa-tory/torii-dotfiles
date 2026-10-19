@@ -234,6 +234,14 @@ local function neighbour(mon, dir)
     return best
 end
 
+-- a window moved to another monitor by coordinates is still on the workspace of the first one (Hyprland only notices later):
+-- a fullscreen app there then hides it. Put it on the workspace the other monitor shows.
+local function adopt(w, mon)
+    local ws = mon and mon.active_workspace
+    if not ws or (w.workspace and w.workspace.id == ws.id) then return end
+    hl.dispatch(hl.dsp.window.move({ workspace = ws.id, follow = false, window = w }))
+end
+
 local function place(w, g)
     hl.dispatch(hl.dsp.window.resize({ x = math.floor(g.w), y = math.floor(g.h), exact = true, window = w }))
     hl.dispatch(hl.dsp.window.move({ x = math.floor(g.x), y = math.floor(g.y), exact = true, window = w }))
@@ -262,6 +270,7 @@ local function nudge(dir)
             local n = neighbour(mon, "left")
             if n then
                 local a2 = area_of(n)
+                adopt(w, n)
                 nx, ny = a2.x + a2.w - ww, math.max(a2.y, math.min(y - a.y + a2.y, a2.y + a2.h - wh))
             else nx = a.x end
         else nx = math.max(a.x, x - NUDGE) end
@@ -271,6 +280,7 @@ local function nudge(dir)
             local n = neighbour(mon, "right")
             if n then
                 local a2 = area_of(n)
+                adopt(w, n)
                 nx, ny = a2.x, math.max(a2.y, math.min(y - a.y + a2.y, a2.y + a2.h - wh))
             else nx = math.max(a.x, right) end
         else nx = math.min(right, x + NUDGE) end
@@ -298,6 +308,7 @@ function torii_float_snap(dir)
             if n then
                 local a2 = area_of(n)
                 local half2 = (a2.w - a2.gap) / 2
+                adopt(w, n)
                 place(w, { x = dir == "left" and (a2.x + a2.w - half2) or a2.x, y = a2.y, w = half2, h = a2.h })
             end
             return true
