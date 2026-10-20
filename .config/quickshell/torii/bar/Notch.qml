@@ -148,6 +148,7 @@ PanelWindow {
                            : Panels.panel === "windows" ? windowsPanel
                            : Panels.panel === "weather" ? weatherPanel
                            : Panels.panel === "calendar" ? calendarPanel
+                           : Panels.panel === "clipboard" ? clipboardPanel
                            : Panels.panel === "launcher" ? launcherPanel : null
         }
     }
@@ -196,5 +197,6 @@ PanelWindow {
     Component { id: windowsPanel; WindowSwitcher { maxWidth: win.width - 160 } }
     Component { id: weatherPanel; WeatherPanel {} }
     Component { id: calendarPanel; CalendarPanel {} }
+    Component { id: clipboardPanel; ClipboardPanel {} }
     Component { id: launcherPanel; Launcher {} }
 }

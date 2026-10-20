@@ -76,6 +76,7 @@ hyprsunset
 
 # launcher Trigger menu: capture, OCR, QR, colour picker, recording, emoji, notifications
 wl-clipboard
+cliphist
 tesseract
 tesseract-data-eng
 tesseract-data-rus
@@ -118,3 +119,4 @@ ffmpegthumbs
 kdegraphics-thumbnailers
 kimageformats
 gcc
+qemu-desktop

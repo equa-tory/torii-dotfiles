@@ -44,6 +44,9 @@ hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("$HOME/.config/torii/bin/tori
 hl.bind(mainMod .. " + SPACE",          hl.dsp.exec_cmd(qsipc .. "launcher toggle"))
 -- Open the control panel: sound, network, bluetooth, notifications
 hl.bind(mainMod .. " + N",              hl.dsp.exec_cmd(qsipc .. "control toggle"))
+-- keys: SUPER + V | Clipboard history in the notch (type to filter, Enter pastes, Delete forgets one)
+hl.bind("SUPER + V", hl.dsp.exec_cmd(qsipc .. "clipboard toggle"))
+
 -- Open the wallpaper / theme switcher
 hl.bind(mainMod .. " + CTRL + SPACE",   hl.dsp.exec_cmd(qsipc .. "switcher toggle"))
 -- window switcher: Alt+Tab opens it on the previous window, more Tabs move on, letting go of Alt focuses

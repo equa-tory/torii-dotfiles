@@ -9,7 +9,7 @@ import qs.services
 Singleton {
     id: root
 
-    property string panel: ""        // "" | control | launcher | switcher | windows | weather | calendar
+    property string panel: ""        // "" | control | launcher | switcher | windows | weather | calendar | clipboard
     property string panelScreen: ""
     property var launcherPath: []    // menu ids the launcher opens inside of next time (e.g. ["notifications"])
 

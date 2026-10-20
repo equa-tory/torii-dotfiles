@@ -24,6 +24,10 @@ Scope {
         function run(path: string): void { Menus.runKey(path); }
     }
     IpcHandler {
+        target: "clipboard"
+        function toggle(): void { Panels.toggle("clipboard"); }
+    }
+    IpcHandler {
         target: "switcher"
         function toggle(): void { Panels.toggle("switcher"); }
     }

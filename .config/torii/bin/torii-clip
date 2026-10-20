@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""torii-clip watch | list | paste <id> | copy <id> | delete <id> | clear
+
+The clipboard history behind Super+V in the notch (cliphist keeps the entries).
+
+  watch        start the recorders for text and images (once; from the autostart)
+  list         JSON [{"id", "text", "image"}], newest first (the latest 60)
+  copy <id>    put an entry back on the clipboard
+  paste <id>   copy it and press Ctrl+V in the window that has the focus (Ctrl+Shift+V in a terminal)
+  delete <id>  forget one entry
+  clear        forget everything
+"""
+import json
+import re
+import subprocess
+import sys
+import time
+
+
+def run(*cmd, **kw):
+    return subprocess.run(cmd, capture_output=True, **kw)
+
+
+def entries():
+    out = run("cliphist", "list").stdout.decode("utf-8", "replace")
+    rows = []
+    for line in out.splitlines()[:60]:
+        i, _, text = line.partition("\t")
+        if not i.isdigit():
+            continue
+        image = bool(re.match(r"\[\[ binary data .*(png|jpe?g|bmp|gif|webp)", text))
+        rows.append({"id": i, "text": text.strip(), "image": image})
+    return rows
+
+
+def copy(i):
+    # cliphist decodes by the "id<TAB>preview" line it printed
+    line = next((l for l in run("cliphist", "list").stdout.decode("utf-8", "replace").splitlines() if l.split("\t")[0] == i), None)
+    if line is None:
+        return False
+    data = subprocess.run(["cliphist", "decode"], input=line.encode(), capture_output=True).stdout
+    subprocess.run(["wl-copy"], input=data)
+    return True
+
+
+def main():
+    a = sys.argv[1:]
+    cmd = a[0] if a else "list"
+    if cmd == "watch":
+        if run("pgrep", "-f", "wl-paste.*cliphist store").returncode == 0:
+            return
+        for kind in ("text", "image"):
+            subprocess.Popen(["wl-paste", "--type", kind, "--watch", "cliphist", "store"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    elif cmd == "list":
+        print(json.dumps(entries()))
+    elif cmd in ("copy", "paste") and len(a) > 1:
+        if not copy(a[1]) or cmd == "copy":
+            return
+        time.sleep(0.25)                      # the panel is closing: the keys must reach the window underneath
+        active = run("hyprctl", "activewindow", "-j").stdout
+        try:
+            cls = json.loads(active).get("class", "")
+        except ValueError:
+            cls = ""
+        mods = "CTRL SHIFT" if cls == "kitty" else "CTRL"
+        run("hyprctl", "dispatch", 'hl.dsp.send_shortcut({ mods = "%s", key = "V" })' % mods)
+    elif cmd == "delete" and len(a) > 1:
+        line = next((l for l in run("cliphist", "list").stdout.decode("utf-8", "replace").splitlines() if l.split("\t")[0] == a[1]), None)
+        if line:
+            subprocess.run(["cliphist", "delete"], input=line.encode())
+    elif cmd == "clear":
+        run("cliphist", "wipe")
+    else:
+        print(__doc__)
+
+
+main()

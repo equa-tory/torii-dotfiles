@@ -356,3 +356,9 @@ Trigger › Capture › *Screen recording* (`torii-record`, `torii-capture recor
 **Disk usage like FreeCommander / WizTree.** Walking the folders of a big NTFS drive takes minutes, because every folder is a seek (a spinning disk) and gdu has to ask the kernel about millions of files. Windows tools are fast because they read the NTFS Master File Table, which holds every name, parent and size, in one pass. `torii-gdu` does that for an NTFS drive (`torii-gdu /mnt/hdd01`, or Disk usage in the launcher, which asks which disk): `.config/torii/src/torii-mft.c` (built once into `~/.cache/torii/torii-mft` with `cc`) reads the table through the block device (it asks for your sudo password) and writes the JSON that `gdu -f` shows. Tested: hdd02 (850 GiB, 285 000 files) in 0.2 s, hdd01 (925 GiB, 1.08 million files) in a few seconds, totals within 1 GiB of `df`. The view is of the scan (no delete in it); other disks and folders use plain gdu, which now leaves out the drives under `/` and the network shares.
 
 **Archives.** Double-click (or `open FILE`) on a zip, tar.*, 7z or rar extracts it into a folder named like the archive next to it (`-1`, `-2`... when that exists), with a notification when it is done (`extract:here` in `torii-open`, bsdtar). Setup › Defaults › Open files with › archive can pick Ark instead. `torii-setup.sh` also writes `ShowPreview=true` into Dolphin's global view properties.
+
+## Clipboard history (Super+V)
+
+Super+V opens the clipboard history in the notch: type to filter, Up/Down choose, Enter pastes into the window underneath
+(Ctrl+Shift+V in a terminal), Delete forgets the chosen entry, Ctrl+Delete forgets all. `cliphist` records text and images
+(`torii-clip watch` runs from the autostart); `torii-clip list|paste|delete|clear` are the commands behind it.
