@@ -383,4 +383,4 @@ TUI apps get ~/.local/bin and ~/.cargo/bin on the PATH (apps started from the la
 
 Title bars are fully opaque now (the theme template used 95 % alpha, so blur and the window shadow showed through the bar and its rounded corners).
 
-Per-monitor night light: wlsunset needs the cold side warmer than the warm side, so a fixed temperature is sent as T and T+1 K (before, the process refused to start and the screen went neutral). Window moves are not animated any more (animations.lua windowsMove), so a window dragged by its bar follows the pointer without the spring lag.
+Per-monitor night light: wlsunset needs the cold side warmer than the warm side, so a fixed temperature is sent as T and T+1 K (before, the process refused to start and the screen went neutral).
