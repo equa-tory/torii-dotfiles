@@ -70,22 +70,33 @@ Singleton {
         tz.running = true;
     }
 
+    // curl rather than XMLHttpRequest: Qt's own network stack in the shell never completed these requests
+    // direct first; through Config.weather.proxy when that fails
+    function fetchCmd(url) {
+        const p = Config.weather.proxy;
+        if (!p) return ["curl", "-fsS", "-m", "20", url];
+        return ["sh", "-c", 'curl -fsS -m 6 "$1" || curl -fsS -m 20 -x "$2" "$1"', "sh", url, p];
+    }
+    property string geoZone: ""
     function geocode(name, zone) {
-        const xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            if (xhr.status !== 200) return;
-            try {
-                const r = (JSON.parse(xhr.responseText).results || []);
-                const hit = r.find(x => x.timezone === zone) || r[0];
-                if (!hit) return;
-                root.lat = hit.latitude; root.lon = hit.longitude; root.city = hit.name;
-                place.setText(JSON.stringify({ key: root.placeKey(), lat: hit.latitude, lon: hit.longitude, city: hit.name }));
-                root.fetch();
-            } catch (e) { console.warn("weather: geocoding failed", e); }
-        };
-        xhr.open("GET", "https://geocoding-api.open-meteo.com/v1/search?count=8&name=" + encodeURIComponent(name));
-        xhr.send();
+        geoZone = zone;
+        geo.command = fetchCmd("https://geocoding-api.open-meteo.com/v1/search?count=8&name=" + encodeURIComponent(name));
+        geo.running = true;
+    }
+    Process {
+        id: geo
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const r = (JSON.parse(text).results || []);
+                    const hit = r.find(x => x.timezone === root.geoZone) || r[0];
+                    if (!hit) return;
+                    root.lat = hit.latitude; root.lon = hit.longitude; root.city = hit.name;
+                    place.setText(JSON.stringify({ key: root.placeKey(), lat: hit.latitude, lon: hit.longitude, city: hit.name }));
+                    root.fetch();
+                } catch (e) { console.warn("weather: geocoding failed", e); }
+            }
+        }
     }
 
     property string zone: ""
@@ -107,27 +118,26 @@ Singleton {
 
     function fetch() {
         if (!located) return;
-        const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon
+        wx.command = fetchCmd("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon
                   + "&current=temperature_2m,weather_code,is_day,wind_speed_10m"
                   + "&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min"
-                  + "&forecast_days=6&timezone=auto";
-        const xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
-                return;
-            if (xhr.status !== 200)
-                return;
-            try {
-                root.apply(JSON.parse(xhr.responseText));
-                root.updated = Date.now();
-                cache.setText(JSON.stringify({ temp: root.temp, code: root.code, isDay: root.isDay, wind: root.wind,
-                                               hourly: root.hourly, daily: root.daily, updated: root.updated }));
-            } catch (e) {
-                console.warn("weather: bad response", e);
+                  + "&forecast_days=6&timezone=auto");
+        wx.running = true;
+    }
+    Process {
+        id: wx
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.apply(JSON.parse(text));
+                    root.updated = Date.now();
+                    cache.setText(JSON.stringify({ temp: root.temp, code: root.code, isDay: root.isDay, wind: root.wind,
+                                                   hourly: root.hourly, daily: root.daily, updated: root.updated }));
+                } catch (e) {
+                    console.warn("weather: bad response", e);
+                }
             }
-        };
-        xhr.open("GET", url);
-        xhr.send();
+        }
     }
 
     function apply(d) {

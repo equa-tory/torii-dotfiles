@@ -72,10 +72,12 @@ Singleton {
                 property real lat: 0               // set both to pin exact coordinates (0 = automatic)
                 property real lon: 0
                 property int refreshMin: 20
+                property string proxy: ""       // e.g. http://127.0.0.1:10808: tried when the direct request fails (the weather service is blocked in some countries)
             }
             property JsonObject wallpaper: JsonObject {
                 property string dir: "~/Pictures/wallpapers"
                 property int transitionMs: 600
+                property string shuffle: "off"      // random wallpaper: off | 5 | 60 (minutes) | login
             }
             property JsonObject apps: JsonObject {
                 property string dir: "~/apps"

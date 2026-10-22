@@ -362,3 +362,11 @@ Trigger › Capture › *Screen recording* (`torii-record`, `torii-capture recor
 Super+V opens the clipboard history in the notch: type to filter, Up/Down choose, Enter pastes into the window underneath
 (Ctrl+Shift+V in a terminal), Delete forgets the chosen entry, Ctrl+Delete forgets all. `cliphist` records text and images
 (`torii-clip watch` runs from the autostart); `torii-clip list|paste|delete|clear` are the commands behind it.
+
+## Wallpapers menu and a random wallpaper
+
+Setup > Wallpapers: open the wallpaper panel, open the wallpapers folder, "Change randomly" (off, every 5 minutes, every 60 minutes, on login) and "Random wallpaper now".
+`torii-wallpaper shuffle off|5|60|login` does it (a systemd user timer for 5 / 60; the autostart runs it once for "login"); `wallpaper.shuffle` in config.json.
+
+Weather: the shell fetches it with `curl` (Qt's own requests never finished here). When the weather service is blocked, set `weather.proxy`
+(e.g. `http://127.0.0.1:10808`): it is used when the direct request fails. A failed fetch is why the weather icon turns dim: it fades to half after 50 minutes without fresh data.

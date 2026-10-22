@@ -14,6 +14,7 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("$HOME/.config/torii/bin/torii-rules autostart")      -- apps with "Start at login" in Setup > App rules
   hl.exec_cmd("$HOME/.config/torii/bin/torii-localsend watch")       -- text sent with LocalSend is copied and pasted
   hl.exec_cmd("$HOME/.config/torii/bin/torii-binds apply")         -- launcher shortcuts that came with a copied config
+  hl.exec_cmd("$HOME/.config/torii/bin/torii-wallpaper apply")        -- a random wallpaper when Setup > Wallpapers > "On login" is chosen
   hl.exec_cmd("$HOME/.config/torii/bin/torii-clip watch")            -- clipboard history (Super+V)
   hl.exec_cmd("ydotoold")                                            -- a virtual mouse: dragging a maximised window out of it (floatmode.lua)
   -- a pairing agent: without one BlueZ answers "AuthenticationFailed" to a controller (Xbox) that pairs from the control centre

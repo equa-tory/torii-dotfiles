@@ -890,7 +890,7 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), bootMenu(), snapshotsMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), wallpapersMenu(), bootMenu(), snapshotsMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
     }
 
     // ================= Clean up: caches, logs, Docker, big files (torii-clean)
@@ -1063,6 +1063,21 @@ Singleton {
                 hyprSlider("bsize", "Size", v => blurSet({ size: v }), 1, 20, 1, b.size, "", 0, "How far the blur spreads"),
                 hyprSlider("bpass", "Passes", v => blurSet({ passes: v }), 1, 6, 1, b.passes, "", 0, "More passes: smoother, heavier on the GPU"),
                 hyprSlider("bvib", "Vibrancy", v => blurSet({ vibrancy: v }), 0, 1, 0.05, b.vibrancy, "", 2, "How strongly the colours behind are boosted") ] } ] };
+    }
+
+    // ================= Setup > Wallpapers: the picker, the folder, a random change
+    function wallpapersMenu() {
+        const cur = Config.wallpaper.shuffle || "off";
+        const label = { off: "Off", "5": "Every 5 minutes", "60": "Every 60 minutes", login: "On login" };
+        const dir = Config.wallpaper.dir.replace(/^~/, home);
+        const pick = m => ({ id: "s:" + m, name: label[m], glyph: Icons.image || Icons.apps, badge: cur === m ? "●" : "", keep: true,
+                             run: () => sh([bin("torii-wallpaper"), "shuffle", m]) });
+        return { id: "wallpapers", name: "Wallpapers", glyph: Icons.image || Icons.apps, sub: "Random change: " + label[cur] + "  ·  " + Config.wallpaper.dir,
+                 keywords: "wallpaper background picture image random shuffle slideshow switcher theme", children: () => [
+            { id: "panel", name: "Open the wallpaper panel", glyph: Icons.image || Icons.apps, sub: "Pick one; the colours follow it", run: () => Panels.open("switcher") },
+            { id: "dir", name: "Open the wallpapers folder", glyph: Icons.folder, sub: Config.wallpaper.dir, keep: true, run: () => sh(["xdg-open", dir]) },
+            { id: "random", name: "Change randomly", glyph: Icons.refresh, sub: label[cur], children: () => ["off", "5", "60", "login"].map(pick) },
+            { id: "now", name: "Random wallpaper now", glyph: Icons.refresh, keep: true, run: () => sh([bin("torii-theme"), "random"]) } ] };
     }
 
     function mouseNode() {

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# torii-wallpaper shuffle [off|5|60|login] | apply   -  change the wallpaper by itself
+#
+#   shuffle          print the current mode (off, 5, 60, login)
+#   shuffle 5|60     a random wallpaper every 5 / 60 minutes (a systemd user timer: torii-wallpaper.timer)
+#   shuffle login    a random wallpaper once per login (apply runs it from the autostart)
+#   shuffle off      stop
+#   apply            after login: switch to a random one when the mode is "login"
+# The mode is wallpaper.shuffle in ~/.config/torii/config.json. The pictures come from wallpaper.dir (default ~/Pictures/wallpapers).
+set -uo pipefail
+CFG="$HOME/.config/torii/bin/torii-config"
+UNITS="$HOME/.config/systemd/user"
+mode() { "$CFG" get wallpaper.shuffle 2>/dev/null | tr -d '"'; }
+
+case "${1:-}" in
+  shuffle)
+    if [ $# -eq 1 ]; then m=$(mode); echo "${m:-off}"; exit 0; fi
+    m="$2"
+    case "$m" in off|5|60|login) ;; *) echo "usage: torii-wallpaper shuffle off|5|60|login"; exit 2 ;; esac
+    "$CFG" set wallpaper.shuffle "\"$m\"" >/dev/null
+    systemctl --user disable --now torii-wallpaper.timer >/dev/null 2>&1
+    if [ "$m" = 5 ] || [ "$m" = 60 ]; then
+      mkdir -p "$UNITS"
+      cat > "$UNITS/torii-wallpaper.service" <<UNIT
+[Unit]
+Description=Random torii wallpaper
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/torii/bin/torii-theme random
+UNIT
+      cat > "$UNITS/torii-wallpaper.timer" <<UNIT
+[Unit]
+Description=Change the wallpaper every $m minutes
+
+[Timer]
+OnActiveSec=${m}min
+OnUnitActiveSec=${m}min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
+UNIT
+      systemctl --user daemon-reload
+      systemctl --user enable --now torii-wallpaper.timer >/dev/null 2>&1
+    fi
+    ;;
+  apply)
+    [ "$(mode)" = login ] && { sleep 6; exec "$HOME/.config/torii/bin/torii-theme" random; }
+    ;;
+  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' ;;
+esac

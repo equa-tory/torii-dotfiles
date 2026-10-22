@@ -124,6 +124,7 @@ elif command -v fdfind >/dev/null 2>&1; then
   alias f='fdfind'
 fi
 alias tren='trans -b :en'
+alias trru='trans -b :ru'
 alias myip='curl ifconfig.me'
 
 # ==============================
