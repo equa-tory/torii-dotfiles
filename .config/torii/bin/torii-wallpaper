@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# torii-wallpaper shuffle [off|5|60|login] | apply   -  change the wallpaper by itself
+# torii-wallpaper shuffle [off|<minutes>|login] | apply   -  change the wallpaper by itself
 #
-#   shuffle          print the current mode (off, 5, 60, login)
-#   shuffle 5|60     a random wallpaper every 5 / 60 minutes (a systemd user timer: torii-wallpaper.timer)
+#   shuffle          print the current mode (off, <minutes> or login)
+#   shuffle <min>    a random wallpaper every <min> minutes (1-1440) (a systemd user timer: torii-wallpaper.timer)
 #   shuffle login    a random wallpaper once per login (apply runs it from the autostart)
 #   shuffle off      stop
 #   apply            after login: switch to a random one when the mode is "login"
@@ -16,10 +16,10 @@ case "${1:-}" in
   shuffle)
     if [ $# -eq 1 ]; then m=$(mode); echo "${m:-off}"; exit 0; fi
     m="$2"
-    case "$m" in off|5|60|login) ;; *) echo "usage: torii-wallpaper shuffle off|5|60|login"; exit 2 ;; esac
+    case "$m" in off|login) ;; ''|*[!0-9]*) echo "usage: torii-wallpaper shuffle off|<minutes>|login"; exit 2 ;; esac
     "$CFG" set wallpaper.shuffle "\"$m\"" >/dev/null
     systemctl --user disable --now torii-wallpaper.timer >/dev/null 2>&1
-    if [ "$m" = 5 ] || [ "$m" = 60 ]; then
+    if [ "$m" != off ] && [ "$m" != login ]; then
       mkdir -p "$UNITS"
       cat > "$UNITS/torii-wallpaper.service" <<UNIT
 [Unit]

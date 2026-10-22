@@ -1068,15 +1068,19 @@ Singleton {
     // ================= Setup > Wallpapers: the picker, the folder, a random change
     function wallpapersMenu() {
         const cur = Config.wallpaper.shuffle || "off";
-        const label = { off: "Off", "5": "Every 5 minutes", "60": "Every 60 minutes", login: "On login" };
+        const mins = /^\d+$/.test(cur) ? parseInt(cur) : 0;
+        const label = cur === "off" ? "Off" : cur === "login" ? "On login" : "Every " + cur + " minutes";
         const dir = Config.wallpaper.dir.replace(/^~/, home);
-        const pick = m => ({ id: "s:" + m, name: label[m], glyph: Icons.image || Icons.apps, badge: cur === m ? "●" : "", keep: true,
-                             run: () => sh([bin("torii-wallpaper"), "shuffle", m]) });
-        return { id: "wallpapers", name: "Wallpapers", glyph: Icons.image || Icons.apps, sub: "Random change: " + label[cur] + "  ·  " + Config.wallpaper.dir,
+        const shuffle = m => sh([bin("torii-wallpaper"), "shuffle", String(m)]);
+        return { id: "wallpapers", name: "Wallpapers", glyph: Icons.image || Icons.apps, sub: "Random change: " + label + "  ·  " + Config.wallpaper.dir,
                  keywords: "wallpaper background picture image random shuffle slideshow switcher theme", children: () => [
             { id: "panel", name: "Open the wallpaper panel", glyph: Icons.image || Icons.apps, sub: "Pick one; the colours follow it", run: () => Panels.open("switcher") },
             { id: "dir", name: "Open the wallpapers folder", glyph: Icons.folder, sub: Config.wallpaper.dir, keep: true, run: () => sh(["xdg-open", dir]) },
-            { id: "random", name: "Change randomly", glyph: Icons.refresh, sub: label[cur], children: () => ["off", "5", "60", "login"].map(pick) },
+            { id: "random", name: "Change randomly", glyph: Icons.refresh, sub: label, children: () => [
+                { id: "off", name: "Off", glyph: Icons.power, badge: cur === "off" ? "●" : "", keep: true, run: () => shuffle("off") },
+                { id: "every", name: "Every …", glyph: Icons.refresh, badge: mins ? "●" : "", sub: "Slide to set the minutes (5 to 120); this switches it on",
+                  slider: { min: 5, max: 120, step: 5, value: mins || 30, unit: " min", decimals: 0 }, onSlide: v => shuffle(v) },
+                { id: "login", name: "On login", glyph: Icons.refresh, badge: cur === "login" ? "●" : "", keep: true, run: () => shuffle("login") } ] },
             { id: "now", name: "Random wallpaper now", glyph: Icons.refresh, keep: true, run: () => sh([bin("torii-theme"), "random"]) } ] };
     }
 
