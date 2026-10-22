@@ -17,7 +17,8 @@ hl.curve("ephasized_accel", { type = "bezier", points = { {0.3, 0.0}, {0.8, 0.15
 hl.animation({ leaf = "windows",       enabled = true,  speed = 5, spring = "s_default" })
 hl.animation({ leaf = "windowsIn",     enabled = true,  speed = 5, spring = "s_default", style = "popin 92%"})
 hl.animation({ leaf = "windowsOut",    enabled = true,  speed = 2, spring = "s_default",       style = "popin 92%" })
-hl.animation({ leaf = "windowsMove",   enabled = true,  speed = 5, spring = "s_default" })
+-- off: with the spring a window dragged by its title bar trails behind the pointer and the bar looks glitchy while moving
+hl.animation({ leaf = "windowsMove",   enabled = false, speed = 5, spring = "s_default" })
 
 hl.animation({ leaf = "layers",        enabled = true,  speed = 3,    bezier = "standart", style = "fade" })
 hl.animation({ leaf = "layersIn",      enabled = true,  speed = 3,    bezier = "standart", style = "fade" })

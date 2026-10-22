@@ -150,7 +150,8 @@ def push_wlsunset(s):
                 # wlsunset fades on its own: down from the start time, back up ending at the stop time
                 want[out] = ["-t", str(t), "-T", "6500", "-s", s["from"], "-S", hhmm_minus(s["to"], fade), "-d", str(fade)]
             else:
-                want[out] = ["-t", str(t), "-T", str(t)]
+                # wlsunset wants day warmer-than-night and some times: 1 K apart is the same colour day and night
+                want[out] = ["-t", str(t), "-T", str(t + 1), "-S", "06:00", "-s", "18:00"]
     have = {}
     for line in sh("pgrep", "-ax", "wlsunset").stdout.splitlines():
         a = line.split()[2:]
@@ -159,6 +160,11 @@ def push_wlsunset(s):
     if have == want and len(have) == len(want):
         return
     sh("pkill", "-x", "wlsunset")
+    for _ in range(20):                             # the old ones must let go of the outputs first
+        if sh("pgrep", "-x", "wlsunset").returncode != 0:
+            break
+        time.sleep(0.05)
+    time.sleep(0.1)
     for out, args in want.items():
         cmd = ["wlsunset", "-o", out] + args
         subprocess.Popen(["uwsm", "app", "--"] + cmd if sh("which", "uwsm").returncode == 0 else cmd,
