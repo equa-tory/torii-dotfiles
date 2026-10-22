@@ -380,3 +380,5 @@ Setup > Night light > Per monitor: a slider for each monitor (2000-6500 K); "Sam
 hyprsunset can only colour every screen alike, so with an own temperature set, one `wlsunset` per monitor takes over (it fades on the schedule by itself); `torii-nightlight monitor <name> <kelvin>|reset`. Needs the `wlsunset` package.
 
 TUI apps get ~/.local/bin and ~/.cargo/bin on the PATH (apps started from the launcher did not, so `claude` was not found).
+
+Title bars are fully opaque now (the theme template used 95 % alpha, so blur and the window shadow showed through the bar and its rounded corners).

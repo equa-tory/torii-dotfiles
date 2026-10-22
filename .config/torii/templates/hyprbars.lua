@@ -2,7 +2,7 @@
 hl.config({
     plugin = {
         hyprbars = {
-            bar_color             = "rgba({{surface|strip}}f2)",
+            bar_color             = "rgba({{surface|strip}}ff)",
             ["col.text"]          = "rgba({{fg|strip}}ff)",
             inactive_button_color = "rgba({{muted|strip}}ff)",
         },
