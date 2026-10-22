@@ -370,3 +370,6 @@ Setup > Wallpapers: open the wallpaper panel, open the wallpapers folder, "Chang
 
 Weather: the shell fetches it with `curl` (Qt's own requests never finished here). When the weather service is blocked, set `weather.proxy`
 (e.g. `http://127.0.0.1:10808`): it is used when the direct request fails. A failed fetch is why the weather icon turns dim: it fades to half after 50 minutes without fresh data.
+
+A quiet TUI app that fails now says "click to see the log": the notification opens the log in a terminal.
+The game keys (Alt binds off in a fullscreen Steam game) only count while that game is on the visible workspace, so leaving it for another workspace gives the shortcuts back.

@@ -311,6 +311,11 @@ end)
 local function game_keys()
     local w = hl.get_active_window()
     local game = w ~= nil and (w.class or ""):match("^steam_app_%d+$") ~= nil and w.fullscreen ~= 0 and not torii_panel_open()
+    -- leaving for another (maybe empty) workspace can keep the game as the "active window" for a while: it only counts while it is on screen
+    if game then
+        local ws, cur = w.workspace, hl.get_active_workspace and hl.get_active_workspace()
+        if ws and cur and ws.id ~= cur.id then game = false end
+    end
     local now = hl.get_current_submap and hl.get_current_submap() or ""
     if game and now ~= "game" then hl.dispatch(hl.dsp.submap("game"))
     elseif not game and now == "game" then hl.dispatch(hl.dsp.submap("reset")) end
@@ -321,10 +326,10 @@ torii_game_poll = hl.timer(function()
     local now = hl.get_current_submap and hl.get_current_submap() or ""
     if now == "game" or hl.get_active_window() ~= nil then game_keys() end
 end, { timeout = 300, type = "repeat" })
-for _, ev in ipairs({ "window.active", "window.fullscreen" }) do
+for _, ev in ipairs({ "window.active", "window.fullscreen", "workspace.active" }) do
     local v = "torii_game_sub_" .. ev:gsub("%.", "_")
     if _G[v] then pcall(function() _G[v]:remove() end) end     -- a reload runs this file again
-    _G[v] = hl.on(ev, function() hl.timer(game_keys, { timeout = 50, type = "oneshot" }) end)
+    pcall(function() _G[v] = hl.on(ev, function() hl.timer(game_keys, { timeout = 50, type = "oneshot" }) end) end)
 end
 
 -- an empty submap: while the launcher waits for a key combination (Ctrl+K > Add binding) Hyprland's own binds let every key through.

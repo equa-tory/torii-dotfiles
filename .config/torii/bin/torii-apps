@@ -297,7 +297,9 @@ def sync_tui():
                            f"sh -c {shlex.quote(t['command'])} >{shlex.quote(str(log))} 2>&1 </dev/null\n"
                            "code=$?\n"
                            f"if [ $code = 0 ]; then notify-send -a torii {shlex.quote(t['name'])} done 2>/dev/null\n"
-                           f"else notify-send -a torii {shlex.quote(t['name'])} \"failed ($code), see the log\" 2>/dev/null; fi\n")
+                           f"else a=$(notify-send -a torii -A default='Show the log' -w {shlex.quote(t['name'])} \"failed ($code), click to see the log\" 2>/dev/null)\n"
+                           f"  [ \"$a\" = default ] && exec kitty --title {shlex.quote(t['name'] + ' log')} sh -c 'cat \"$1\"; printf \"\\n[Enter to close] \"; read _' sh {shlex.quote(str(log))}\n"
+                           "fi\n")
             exec_line = f"Exec=sh {run}\n"
         else:
             run.write_text("#!/bin/sh\n" + t["command"] + "\nprintf '\\n[done, Enter to close] '\nread _\n")
