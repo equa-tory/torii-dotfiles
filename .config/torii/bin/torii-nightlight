@@ -12,6 +12,8 @@
   apply                     restore after login (autostart runs this)
   dim <0..60>               filter mode only: how much darker the screen gets at full strength, in % (default 20, 0 = only the colour)
   fade <seconds>            how long the automatic fade takes (default 30, 0 = at once)
+  monitor <name> <kelvin>   a monitor of its own temperature (e.g. the second one looks too dark); needs wlsunset
+  monitor <name|all> reset  that monitor (or all) follows the common temperature again
   tick                      the fade-out before the end of the window (a timer starts it)
 In auto mode the colour fades in over the fade time when the window starts and fades out the same way before it
 ends (about two steps a second). Manual on/off and the temperature slider act at once.
@@ -20,6 +22,7 @@ State: ~/.local/state/torii/nightlight.json. The daily switches are transient sy
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -27,7 +30,7 @@ from datetime import datetime
 from pathlib import Path
 
 STATE = Path(os.environ.get("TORII_STATE", Path.home() / ".local/state/torii")) / "nightlight.json"
-DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00", "mode": "gpu", "fade": 30, "dim": 20}
+DEFAULT = {"on": False, "temp": 4000, "auto": False, "from": "20:00", "to": "07:00", "mode": "gpu", "fade": 30, "dim": 20, "monitors": {}}
 SELF = os.path.abspath(sys.argv[0])
 
 
@@ -118,10 +121,61 @@ def arm_tick(seconds):
         sh("systemd-run", "--user", "--collect", "--unit=torii-nl-tick", f"--on-active={int(seconds)}s", SELF, "tick")
 
 
+def outputs():
+    import json as _j
+    try:
+        return [m["name"] for m in _j.loads(sh("hyprctl", "monitors", "-j").stdout)]
+    except ValueError:
+        return []
+
+
+def permon(s):
+    """Own temperatures per monitor are done by one wlsunset per output (hyprsunset can only colour every screen alike)."""
+    return s["mode"] == "gpu" and bool(s.get("monitors"))
+
+
+def hhmm_minus(t, seconds):
+    h, m = map(int, t.split(":"))
+    n = (h * 3600 + m * 60 - int(seconds)) % 86400
+    return "%02d:%02d" % (n // 3600, n % 3600 // 60)
+
+
+def push_wlsunset(s):
+    want = {}
+    if s["on"]:
+        fade = int(s["fade"])
+        for out in outputs():
+            t = min(6500, int(s["monitors"].get(out, s["temp"])))
+            if s["auto"] and in_window(s) and fade > 0:
+                # wlsunset fades on its own: down from the start time, back up ending at the stop time
+                want[out] = ["-t", str(t), "-T", "6500", "-s", s["from"], "-S", hhmm_minus(s["to"], fade), "-d", str(fade)]
+            else:
+                want[out] = ["-t", str(t), "-T", str(t)]
+    have = {}
+    for line in sh("pgrep", "-ax", "wlsunset").stdout.splitlines():
+        a = line.split()[2:]
+        if "-o" in a:
+            have[a[a.index("-o") + 1]] = a[:a.index("-o")] + a[a.index("-o") + 2:]
+    if have == want and len(have) == len(want):
+        return
+    sh("pkill", "-x", "wlsunset")
+    for out, args in want.items():
+        cmd = ["wlsunset", "-o", out] + args
+        subprocess.Popen(["uwsm", "app", "--"] + cmd if sh("which", "uwsm").returncode == 0 else cmd,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
 def push(s):
     if os.environ.get("TORII_NO_HOOKS"):
         return
     eff = s.get("eff", s["temp"])
+    if permon(s):
+        if running():
+            sh("pkill", "-x", "hyprsunset")        # two programs cannot both own an output's colours
+        set_shader("")
+        push_wlsunset(s)
+        return
+    sh("pkill", "-x", "wlsunset")
     if s["mode"] != "filter":
         set_shader("")                            # nothing else may keep a shader on the screen
     if s["mode"] == "filter":
@@ -191,6 +245,16 @@ def main(a):
         s["fade"] = int(a[1])
     elif cmd == "dim" and len(a) == 2 and a[1].isdigit() and int(a[1]) <= 60:
         s["dim"] = int(a[1])
+    elif cmd == "monitor" and len(a) == 3 and (a[2] == "reset" or (a[2].isdigit() and 1000 <= int(a[2]) <= 6500)):
+        if a[2] != "reset" and not shutil.which("wlsunset"):
+            print("wlsunset is not installed (sudo pacman -S wlsunset)", file=sys.stderr)
+            sys.exit(3)
+        mons = dict(s.get("monitors") or {})
+        if a[2] == "reset":
+            mons = {} if a[1] == "all" else {k: v for k, v in mons.items() if k != a[1]}
+        else:
+            mons[a[1]] = int(a[2])
+        s["monitors"] = mons
     elif cmd == "mode" and len(a) == 2 and a[1] in ("gpu", "filter", "overlay"):
         s["mode"] = a[1]
     elif cmd == "auto" and a[1:] == ["off"]:
@@ -209,6 +273,11 @@ def main(a):
         sys.exit(2)
     stop_fade()
     s["eff"], wait = ramp_state(s)
+    if permon(s):
+        # wlsunset does the fading itself; only be there at the end of the window to switch the state off
+        s["eff"] = s["temp"]
+        w = window(s, datetime.now()) if s["auto"] else None
+        wait = (w[1] - datetime.now()).total_seconds() + 2 if w else None
     save(s)
     push(s)
     if wait is not None and wait < 5 and not os.environ.get("TORII_NO_HOOKS"):

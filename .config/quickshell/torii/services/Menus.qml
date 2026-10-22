@@ -1162,6 +1162,15 @@ Singleton {
                 { id: "overlay", name: "Screen overlay", sub: "A transparent warm layer over every screen, it can only blend", badge: s.mode === "overlay" ? "●" : "", keep: true, run: () => night(["mode", "overlay"]) } ] },
             { id: "temp", name: "Temperature", glyph: Icons.tune, keywords: "kelvin warm slider",
               slider: { min: 2000, max: 6500, step: 100, value: s.temp, unit: " K", decimals: 0 }, onSlide: v => night(["temp", String(v)]) },
+            { id: "mons", name: "Per monitor", glyph: Icons.monitor, keywords: "screen second display own temperature different",
+              sub: Object.keys(s.monitors || {}).length ? "Own temperature on " + Object.keys(s.monitors).join(", ") : "Every monitor the same", children: () =>
+                Quickshell.screens.map(sc => {
+                    const own = (s.monitors || {})[sc.name];
+                    return { id: "m:" + sc.name, name: sc.name, glyph: Icons.monitor, sub: own ? own + " K (own)" : "Same as the rest",
+                             keywords: sc.model || "", slider: { min: 2000, max: 6500, step: 100, value: own || s.temp, unit: " K", decimals: 0 },
+                             onSlide: v => night(["monitor", sc.name, String(v)]) };
+                }).concat([{ id: "same", name: "Same temperature on all monitors", glyph: Icons.refresh, keep: true,
+                             sub: "Needs the wlsunset package for own temperatures", run: () => night(["monitor", "all", "reset"]) }]) },
             { id: "dim", name: "Dimming", glyph: Icons.tune, keywords: "dark tint darker brightness",
               sub: "Screen filter: how much darker the screen gets (0 = only the colour changes)",
               slider: { min: 0, max: 60, step: 1, value: s.dim === undefined ? 20 : s.dim, unit: " %", decimals: 0 }, onSlide: v => night(["dim", String(v)]) },

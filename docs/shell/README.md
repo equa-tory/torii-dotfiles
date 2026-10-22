@@ -373,3 +373,10 @@ Weather: the shell fetches it with `curl` (Qt's own requests never finished here
 
 A quiet TUI app that fails now says "click to see the log": the notification opens the log in a terminal.
 The game keys (Alt binds off in a fullscreen Steam game) only count while that game is on the visible workspace, so leaving it for another workspace gives the shortcuts back.
+
+## Night light per monitor
+
+Setup > Night light > Per monitor: a slider for each monitor (2000-6500 K); "Same temperature on all monitors" undoes it.
+hyprsunset can only colour every screen alike, so with an own temperature set, one `wlsunset` per monitor takes over (it fades on the schedule by itself); `torii-nightlight monitor <name> <kelvin>|reset`. Needs the `wlsunset` package.
+
+TUI apps get ~/.local/bin and ~/.cargo/bin on the PATH (apps started from the launcher did not, so `claude` was not found).
