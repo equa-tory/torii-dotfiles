@@ -403,6 +403,6 @@ removes its pill. Changing an app's workspace in the rules menu now keeps you in
 Install > Edit web apps and TUIs: pick one and change it without removing it: a web app's browser / own process toggles, address and name; a TUI's "close when done (no window)", command and name.
 **Command for the terminal**: a word (e.g. `ddd`) that runs the TUI in whatever terminal you type it in, with arguments passed on; it is a tiny script
 `~/.local/bin/<word>` (marked torii-tui-alias, removed again when you clear or change the word), so nothing goes into .zshrc. A word that is already a
-program (`dd`, `ls`) is refused so nothing is shadowed. `torii-apps tui alias <name> <word|none>`, `edit`, `rename` do the same from a terminal.
+program (`dd`, `ls`) is refused unless you end it with `!` (`dd!`): then yours comes first on the PATH and the real program stays at /usr/bin. `torii-apps tui alias <name> <word|none>`, `edit`, `rename` do the same from a terminal.
 
 Web apps on an address with a port (http://192.168.1.160:8123): the desktop entry's window class now leaves the port out like Chromium does, so "Start at login" in App rules finds the app (it used to fail with "Can't start").

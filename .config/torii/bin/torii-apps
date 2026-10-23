@@ -18,7 +18,7 @@ file inside that folder (~/apps/v2rayN/v2rayN.desktop) or by an app.json:
             "own" gives it a browser process and profile of its own (sign in once more), so its sound is a separate stream
             (screen recording can then put it on its own track)
   tui add [--quiet] <name> <command> | remove <name> | set <name> quiet true|false | edit <name> <command> | rename <name> <new>
-      | alias <name> <word|none> (a command for the terminal: ~/.local/bin/<word> runs it, no .zshrc needed) | list | sync
+      | alias <name> <word|none> [force] (a command for the terminal: ~/.local/bin/<word> runs it, no .zshrc needed) | list | sync
             terminal programs as apps (e.g. dorm = ssh 192.168.1.50); "quiet" runs the command in the background with no
             window (output in ~/.local/state/torii/tui-<name>.log) and a notification when it is done
             Both lists live in ~/.local/state/torii/{webapps,tuis}.json (private data, not in the dotfiles repo; the
@@ -385,16 +385,17 @@ def lists(kind, a):
             if i["name"].lower() == a[1].lower():
                 i["name"] = a[2]
         save_list(name, items)
-    elif kind == "tui" and a[:1] == ["alias"] and len(a) == 3:      # a command word for the terminal (no .zshrc needed)
+    elif kind == "tui" and a[:1] == ["alias"] and len(a) in (3, 4):      # a command word for the terminal (no .zshrc needed)
         word = "" if a[2] == "none" else a[2]
         if word and not re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", word):
             sys.exit("a command word is lowercase letters, digits, - and _")
-        if word:
+        force = len(a) == 4 and a[3] == "force"       # replaces a program of that name for you (the program itself stays where it is)
+        if word and not force:
             mine = ALIAS_DIR / word
             found = shutil.which(word)
             if found and not (mine.exists() and "torii-tui-alias" in mine.read_text(errors="replace")) \
                     and not any(i.get("alias") == word and i["name"].lower() == a[1].lower() for i in items):
-                sys.exit(f"{word} is already a program ({found}): pick another word")
+                sys.exit(f"{word} is already a program ({found}): pick another word, or end it with ! to use it anyway")
         for i in items:
             if i["name"].lower() == a[1].lower():
                 if word:

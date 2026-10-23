@@ -790,7 +790,10 @@ Singleton {
                                 run: () => flip(fTui, "tui", w, "quiet") },
                               { id: "alias", name: "Command for the terminal", glyph: Icons.keyboard2, badge: w.alias || "", keep: true,
                                 sub: w.alias ? "Type  " + w.alias + "  in any terminal (empty removes it)" : "A word to type in any terminal to run it, without touching .zshrc",
-                                run: () => ask("Command word for " + w.name + " (lowercase, empty = remove)", false, t => apps("tui", ["alias", w.name, t.trim() === "" ? "none" : t.trim()], fTui)) },
+                                run: () => ask("Command word for " + w.name + " (empty = remove, word! = even if it is a program)", false, t => {
+                                    const v = t.trim(), force = v.endsWith("!"), word = force ? v.slice(0, -1) : v;
+                                    apps("tui", ["alias", w.name, word === "" ? "none" : word].concat(force ? ["force"] : []), fTui);
+                                }) },
                               { id: "cmd", name: "Change the command", glyph: Icons.terminal, sub: w.command, keep: true,
                                 run: () => ask("New command for " + w.name + " (now " + w.command + ")", false, t => { if (t.trim()) apps("tui", ["edit", w.name, t.trim()], fTui); }) },
                               { id: "rename", name: "Rename", glyph: Icons.tag, keep: true,
