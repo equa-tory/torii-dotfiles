@@ -646,7 +646,7 @@ Singleton {
             toggle("system", "Record what the computer plays", "Games, music, calls: the default output, with sound from the speakers or headphones", "system", r.system, Icons.speaker),
             toggle("mic", "Record the microphone", "The default microphone", "mic", r.mic, Icons.mic),
             { id: "apps", name: "Programs on their own track", glyph: Icons.apps, badge: apps.length ? String(apps.length) : "",
-              sub: apps.length ? apps.join(", ") : "Pick e.g. the game and Discord: each one can be edited by itself afterwards  ·  web apps: see Install > Web app and TUI options",
+              sub: apps.length ? apps.join(", ") : "Pick e.g. the game and Discord: each one can be edited by itself afterwards  ·  web apps: see Install > Edit web apps and TUIs",
               onOpen: () => fRecApps.refresh(), sorted: true, children: () => {
                   const playing = (fRecApps.data || []).map(a => a.name);
                   const names = playing.concat(apps.filter(a => playing.indexOf(a) < 0));
@@ -758,7 +758,8 @@ Singleton {
                           });
                       });
                   }) },
-                { id: "appopts", name: "Web app and TUI options", sub: "Web app in the browser or with its own process, TUI without a window", glyph: Icons.tune, keywords: "browser quiet background window toggle",
+                { id: "appopts", name: "Edit web apps and TUIs", sub: "Change an installed one: browser or own window, address or command, name, a terminal command word", glyph: Icons.tune,
+                  keywords: "web app tui options edit change browser quiet background window toggle alias rename command shellrc zshrc terminal",
                   children: () => {
                       fWeb.ensure(); fTui.ensure();
                       const flip = (fetch, kind, w, opt) => {
@@ -766,19 +767,34 @@ Singleton {
                           fetch.data = (fetch.data || []).map(x => x.name === w.name ? Object.assign({}, x, { [opt]: !w[opt] }) : x);
                           later(kind === "webapp" ? fWeb : fTui, 800);
                       };
+                      // torii-apps says what is wrong itself (a word that is already a program...) in a notification
+                      const apps = (kind, args, fetch) => runWithInput([bin("torii-apps"), kind].concat(args), "", code => { later(fetch, 600); });
                       const webs = (fWeb.data || []).map(w => ({
-                          id: "webapp:" + w.name, name: w.name, glyph: Icons.web,
+                          id: "webapp:" + w.name, name: w.name, glyph: Icons.web, keywords: "web app " + w.url,
                           sub: "Web app  ·  " + (w.browser ? "opens in the browser" : "own window") + (w.own ? "  ·  own process" : ""),
                           children: () => [
                               { id: "browser", name: "Open in the normal browser", sub: "A tab in the default browser instead of its own window", badge: w.browser ? "On" : "Off", glyph: Icons.web, keep: true,
                                 run: () => flip(fWeb, "webapp", w, "browser") },
                               { id: "own", name: "Own browser process", glyph: Icons.chip, badge: w.own ? "On" : "Off", keep: true,
                                 sub: "Its own profile (sign in again once) so its sound is a stream of its own: screen recording can put it on its own track",
-                                run: () => flip(fWeb, "webapp", w, "own") } ] }));
+                                run: () => flip(fWeb, "webapp", w, "own") },
+                              { id: "url", name: "Change the address", glyph: Icons.web, sub: w.url, keep: true,
+                                run: () => ask("New address for " + w.name + " (now " + w.url + ")", false, t => { if (t.trim()) apps("webapp", ["edit", w.name, t.trim()], fWeb); }) },
+                              { id: "rename", name: "Rename", glyph: Icons.tag, keep: true,
+                                run: () => ask("New name for " + w.name, false, t => { if (t.trim()) apps("webapp", ["rename", w.name, t.trim()], fWeb); }) } ] }));
                       const tuis = (fTui.data || []).map(w => ({
-                          id: "tui:" + w.name, name: w.name, glyph: Icons.terminal, keep: true,
-                          sub: "TUI  ·  " + (w.quiet ? "background, no window" : "terminal window") + "  (Enter switches)",
-                          run: () => flip(fTui, "tui", w, "quiet") }));
+                          id: "tui:" + w.name, name: w.name, glyph: Icons.terminal, keywords: "tui " + w.command + " " + (w.alias || ""),
+                          sub: "TUI  ·  " + (w.quiet ? "background, no window" : "terminal window") + (w.alias ? "  ·  command: " + w.alias : ""),
+                          children: () => [
+                              { id: "quiet", name: "Close when done (no window)", sub: "Runs in the background and says when it is done; Off keeps a terminal window", badge: w.quiet ? "On" : "Off", glyph: Icons.terminal, keep: true,
+                                run: () => flip(fTui, "tui", w, "quiet") },
+                              { id: "alias", name: "Command for the terminal", glyph: Icons.keyboard2, badge: w.alias || "", keep: true,
+                                sub: w.alias ? "Type  " + w.alias + "  in any terminal (empty removes it)" : "A word to type in any terminal to run it, without touching .zshrc",
+                                run: () => ask("Command word for " + w.name + " (lowercase, empty = remove)", false, t => apps("tui", ["alias", w.name, t.trim() === "" ? "none" : t.trim()], fTui)) },
+                              { id: "cmd", name: "Change the command", glyph: Icons.terminal, sub: w.command, keep: true,
+                                run: () => ask("New command for " + w.name + " (now " + w.command + ")", false, t => { if (t.trim()) apps("tui", ["edit", w.name, t.trim()], fTui); }) },
+                              { id: "rename", name: "Rename", glyph: Icons.tag, keep: true,
+                                run: () => ask("New name for " + w.name, false, t => { if (t.trim()) apps("tui", ["rename", w.name, t.trim()], fTui); }) } ] }));
                       const l = webs.concat(tuis);
                       return l.length ? l : [{ id: "none", name: "Nothing added yet", sub: "Install > Web app or TUI" }];
                   } },

@@ -13,11 +13,12 @@ file inside that folder (~/apps/v2rayN/v2rayN.desktop) or by an app.json:
             levels down) and write <folder>/<program>.desktop for it, with its icon. Existing files are never touched.
   desktop   copy these apps to ~/.local/share/applications/torii-app-*.desktop so other launchers and xdg-open see them
   run       start one by folder name (used by those entries)
-  webapp add [--browser] [--own] <name> <url> | remove <name> | set <name> browser|own true|false | list | sync
+  webapp add [--browser] [--own] <name> <url> | remove <name> | set <name> browser|own true|false | edit <name> <url> | rename <name> <new> | list | sync
             web apps: a Helium window without browser chrome (--app=URL); "browser" opens a tab in the default browser instead;
             "own" gives it a browser process and profile of its own (sign in once more), so its sound is a separate stream
             (screen recording can then put it on its own track)
-  tui add [--quiet] <name> <command> | remove <name> | set <name> quiet true|false | list | sync
+  tui add [--quiet] <name> <command> | remove <name> | set <name> quiet true|false | edit <name> <command> | rename <name> <new>
+      | alias <name> <word|none> (a command for the terminal: ~/.local/bin/<word> runs it, no .zshrc needed) | list | sync
             terminal programs as apps (e.g. dorm = ssh 192.168.1.50); "quiet" runs the command in the background with no
             window (output in ~/.local/state/torii/tui-<name>.log) and a notification when it is done
             Both lists live in ~/.local/state/torii/{webapps,tuis}.json (private data, not in the dotfiles repo; the
@@ -29,6 +30,7 @@ import os
 import re
 import shlex
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -286,9 +288,33 @@ def sync_web():
 PATH_FIX = 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"\n'
 
 
+ALIAS_DIR = Path.home() / ".local/bin"
+
+
+def sync_aliases(items):
+    """~/.local/bin/<word>: a tiny script that runs the TUI's command in the terminal you type it in (arguments are passed on).
+    Scripts of removed or renamed aliases go away; only files marked torii-tui-alias are ever touched."""
+    ALIAS_DIR.mkdir(parents=True, exist_ok=True)
+    want = {t["alias"]: t for t in items if t.get("alias")}
+    for f in ALIAS_DIR.iterdir():
+        try:
+            if f.is_file() and f.name not in want and "torii-tui-alias" in f.read_text(errors="replace")[:200]:
+                f.unlink()
+        except (OSError, UnicodeDecodeError):
+            pass
+    for word, t in want.items():
+        f = ALIAS_DIR / word
+        if f.exists() and "torii-tui-alias" not in f.read_text(errors="replace")[:200]:
+            continue                                          # somebody else's file: leave it
+        f.write_text("#!/bin/sh\n# torii-tui-alias: made by Install > Edit web apps and TUIs, do not edit\n" + PATH_FIX
+                     + "exec sh -c " + shlex.quote(t["command"] + ' "$@"') + ' sh "$@"\n')
+        f.chmod(0o755)
+
+
 def sync_tui():
     root = apps_dir()
     keep = set()
+    sync_aliases(load_list("tuis.json"))
     for t in load_list("tuis.json"):
         d = root / slug(t["name"])
         d.mkdir(parents=True, exist_ok=True)
@@ -346,6 +372,35 @@ def lists(kind, a):
             if i["name"].lower() == a[1].lower():
                 i[opt] = a[3] == "true"
         save_list(name, items)
+    elif a[:1] == ["edit"] and len(a) >= 3:                 # change the address / command of an installed one
+        for i in items:
+            if i["name"].lower() == a[1].lower():
+                i[key] = " ".join(a[2:])
+        save_list(name, items)
+    elif a[:1] == ["rename"] and len(a) == 3:
+        if any(i["name"].lower() == a[2].lower() for i in items if i["name"].lower() != a[1].lower()):
+            sys.exit("there is already one called " + a[2])
+        for i in items:
+            if i["name"].lower() == a[1].lower():
+                i["name"] = a[2]
+        save_list(name, items)
+    elif kind == "tui" and a[:1] == ["alias"] and len(a) == 3:      # a command word for the terminal (no .zshrc needed)
+        word = "" if a[2] == "none" else a[2]
+        if word and not re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", word):
+            sys.exit("a command word is lowercase letters, digits, - and _")
+        if word:
+            mine = ALIAS_DIR / word
+            found = shutil.which(word)
+            if found and not (mine.exists() and "torii-tui-alias" in mine.read_text(errors="replace")) \
+                    and not any(i.get("alias") == word and i["name"].lower() == a[1].lower() for i in items):
+                sys.exit(f"{word} is already a program ({found}): pick another word")
+        for i in items:
+            if i["name"].lower() == a[1].lower():
+                if word:
+                    i["alias"] = word
+                else:
+                    i.pop("alias", None)
+        save_list(name, items)
     elif a[:1] == ["remove"] and len(a) == 2:
         save_list(name, [i for i in items if i["name"].lower() != a[1].lower()])
     elif a[:1] != ["sync"]:
@@ -356,7 +411,12 @@ def lists(kind, a):
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a[:1] in (["webapp"], ["tui"]):
-        lists(a[0], a[1:])
+        try:
+            lists(a[0], a[1:])
+        except SystemExit as e:
+            if isinstance(e.code, str) and a[1:2] in (["edit"], ["rename"], ["alias"]):      # called from the launcher: nobody sees stderr
+                subprocess.run(["notify-send", "-a", "torii", "Not changed", e.code], capture_output=True)
+            raise
         sys.exit(0)
     if a == ["list"]:
         generate()

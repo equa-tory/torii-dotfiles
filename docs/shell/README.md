@@ -115,7 +115,7 @@ changes made from a terminal too.
 
 **Install / Remove** (`torii-install`, `torii-apps`): packages open a small floating terminal with fzf (Tab picks several, Enter
 installs or removes) and keep `packages/pacman.txt` and `packages/aur.txt` in step, so `./install.sh` brings the same set back.
-Web apps (a Helium `--app=` window with the site's icon; with the *browser* option a normal browser tab) and TUIs (a command in a terminal; with the *quiet* option it runs with no window, a notification says when it is done and the output is in `~/.local/state/torii/tui-<name>.log`). Both options are switched in Install › Web app and TUI options; removing one asks first. Example: a TUI (`dorm` = an ssh
+Web apps (a Helium `--app=` window with the site's icon; with the *browser* option a normal browser tab) and TUIs (a command in a terminal; with the *quiet* option it runs with no window, a notification says when it is done and the output is in `~/.local/state/torii/tui-<name>.log`). Both options are switched in Install › Edit web apps and TUIs; removing one asks first. Example: a TUI (`dorm` = an ssh
 command) are asked for in the launcher; their lists live in `~/.local/state/torii/{webapps,tuis}.json` (private, synced to the
 home server by `private-push.sh`, restored by `personal.sh`). `Update system` runs the full upgrade. `Update torii configs` shows
 `↓`/`↑` for commits to pull or push and `● changes` for local edits; it asks `[y/N]`, then commits, pulls and pushes.
@@ -347,7 +347,7 @@ refused, `personal.sh` shows the key and falls back to the backup copy on the Um
 
 Trigger › Capture › *Screen recording* (`torii-record`, `torii-capture record` starts and stops it): the picture is recorded by wf-recorder, each sound by pw-record, and ffmpeg joins them when you stop (the video is copied, not encoded again). Choose what goes in: what the computer plays, the microphone, and programs on their own track (the list shows what plays sound now, e.g. the game and Discord; a program must be playing when the recording starts). *Separate audio tracks* makes every source its own track in the file (Off: one mix); *Folder with files* saves `~/Videos/<time>/video.mp4` (mixed sound) plus one `.flac` per source instead of one file. *Microphone volume* is the real input level, *Microphone in the recording* a gain applied to the file only, and *Hear the microphone* plays it in the output to check (it stops by itself). Settings: `capture.rec` in `config.json`.
 
-**Web apps on their own recording track.** Every window of the ordinary browser (Helium) plays into the same sound stream, so the Discord web app cannot be told apart from a music tab. Install › Web app and TUI options › *web app* › **Own browser process** starts that web app with a profile of its own (`~/.local/share/torii/webapp/<name>`, sign in once more): its sound is then a stream of its own, listed in Screen recording › Programs on their own track as "Discord (web app)".
+**Web apps on their own recording track.** Every window of the ordinary browser (Helium) plays into the same sound stream, so the Discord web app cannot be told apart from a music tab. Install › Edit web apps and TUIs › *web app* › **Own browser process** starts that web app with a profile of its own (`~/.local/share/torii/webapp/<name>`, sign in once more): its sound is then a stream of its own, listed in Screen recording › Programs on their own track as "Discord (web app)".
 
 **Dolphin previews.** `ffmpegthumbs` (video), `kdegraphics-thumbnailers`, `kimageformats` and kio-extras (music covers) are installed, and `torii-setup.sh` writes the preview list into `dolphinrc` (it had been left empty, which turns every thumbnail off). Quick look: Dolphin has no Space-bar preview, but F11 (Information panel) shows the picture, video or cover of the selected item with a play button, and its details.
 
@@ -397,3 +397,10 @@ the numbers and every other bind stay. A letter is a named Hyprland workspace; y
 (or pick a letter already in use). The notch shows a pill for every letter that has an app rule or a window, left of the numbered workspaces
 (the clock stays in the middle); the pills get an outline while Alt+W waits for the letter. Removing the last rule that uses a letter
 removes its pill. Changing an app's workspace in the rules menu now keeps you in that menu (it used to fall back to the App rules list because the app moved to another group).
+
+## Editing installed web apps and TUIs
+
+Install > Edit web apps and TUIs: pick one and change it without removing it: a web app's browser / own process toggles, address and name; a TUI's "close when done (no window)", command and name.
+**Command for the terminal**: a word (e.g. `ddd`) that runs the TUI in whatever terminal you type it in, with arguments passed on; it is a tiny script
+`~/.local/bin/<word>` (marked torii-tui-alias, removed again when you clear or change the word), so nothing goes into .zshrc. A word that is already a
+program (`dd`, `ls`) is refused so nothing is shadowed. `torii-apps tui alias <name> <word|none>`, `edit`, `rename` do the same from a terminal.
