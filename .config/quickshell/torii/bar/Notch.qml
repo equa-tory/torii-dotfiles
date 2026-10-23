@@ -113,6 +113,7 @@ PanelWindow {
                 anchors { right: clock.left; rightMargin: row.gap }
                 WidgetSlot { names: Config.widgets.left; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
                 LangWidget { anchors.verticalCenter: parent.verticalCenter }
+                Letters { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
                 Workspaces { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
             }
 

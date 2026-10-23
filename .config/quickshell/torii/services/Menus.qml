@@ -65,7 +65,7 @@ Singleton {
                 onDataChanged: { root.emojiNodes = (data || []).map(e => ({ id: "e:" + e.c, name: e.n, sub: e.g, glyph: e.c, run: () => app([root.bin("torii-emoji"), "copy", e.c]) }));
                     root.bump(); } }
     JsonFetch { id: fProcs;    command: [root.bin("torii-sys"), "procs"];             onDataChanged: root.bump() }
-    JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: root.bump() }
+    JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: { root.bump(); root.rulesLoaded(); } }
     JsonFetch { id: fBootImgs; command: ["sh", "-c", "ls -1 \"$HOME\"/Pictures/wallpapers/* 2>/dev/null | jq -R -s -c 'split(\"\\n\")[:-1]'"]; onDataChanged: root.bump() }
     JsonFetch { id: fSyncStatus; command: [root.bin("torii-sync"), "status"];          onDataChanged: root.bump() }
     JsonFetch { id: fSyncApps; command: [root.bin("torii-sync"), "apps"];              onDataChanged: root.bump() }
@@ -373,9 +373,26 @@ Singleton {
     JsonFetch { id: fFocus; command: [root.bin("torii-rules"), "focused"]
                 onDataChanged: { const d = data; if (d && d["class"]) addRule(d["class"], d.title && d.title.length < 40 ? d.title : d["class"]); else say("No app has the focus"); } }
     function rule(args) { sh([bin("torii-rules")].concat(args)); rulesRefresh.restart(); }
+    // A rule is listed under its workspace, so changing the workspace moves it to another group and the open menu path
+    // (App rules > old group > the app > Workspace) stops existing. Follow it: once the new list is in, open the same place under the new group.
+    property var wsFollow: null          // { key, ws }
+    function setWorkspace(r, val) {
+        wsFollow = { key: r.key, ws: val };
+        rule(["set", r.key, "workspace", val]);
+    }
+    function rulesLoaded() {
+        const f = wsFollow;
+        if (!f) return;
+        const r = (fRules.data || []).find(x => x.key === f.key);
+        if (!r) return;
+        const now = r.workspace ? String(r.workspace) : "none";
+        if (now !== f.ws) return;                     // the old list: the change is not in yet
+        wsFollow = null;
+        goto(["setup", "rules", "g:" + (r.workspace ? String(r.workspace) : "-"), "r:" + f.key, "ws"]);
+    }
     function ruleSummary(r) {
         const p = [];
-        if (r.workspace) p.push((typeof r.workspace === "string" ? r.workspace.replace(":", " ") : "workspace " + r.workspace) + (r.silent ? " (background)" : ""));
+        if (r.workspace) p.push((/^[a-z]$/.test(r.workspace) ? "letter " + r.workspace.toUpperCase() : typeof r.workspace === "string" ? r.workspace.replace(":", " ") : "workspace " + r.workspace) + (r.silent ? " (background)" : ""));
         if (r.float && !r.remember) p.push("floating");
         if (r.remember) p.push("remembers place and size");
         if (r.autostart) p.push("starts at login");
@@ -387,24 +404,29 @@ Singleton {
         const pick = (cls, name) => ({ id: "add:" + cls, name: name || cls, sub: cls.replace("|", "  ·  popup: "), badge: have(cls) ? "●" : "", keep: true,
             run: () => addRule(cls, name) });
         const specials = (fSpecials.data || []).map(w => w.name);
-        const wsLabel = w => typeof w === "string" ? w.replace("special:", "Special ") : "Workspace " + w;
+        const wsLabel = w => /^[a-z]$/.test(w) ? "Letter " + w.toUpperCase() + "  (Alt+W, " + w.toUpperCase() + ")" : typeof w === "string" ? w.replace("special:", "Special ") : "Workspace " + w;
+        const usedLetters = rules.map(x => x.workspace).filter((w, i, a) => typeof w === "string" && /^[a-z]$/.test(w) && a.indexOf(w) === i).sort();
         return { id: "rules", name: "App rules", glyph: Icons.apps, keywords: "window workspace float background open rule deadlock steam",
                  sub: rules.length ? rules.length + " app" + (rules.length > 1 ? "s" : "") : "Workspace, background or floating per app",
                  onOpen: () => { fRules.refresh(); fSpecials.refresh(); },
                  children: () => {
             const ws = Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 1;
             const ruleNode = r => ({ id: "r:" + r.key, name: r.name || r.class, sub: ruleSummary(r), glyph: Icons.apps, sorted: true,
-                    badge: r.workspace ? String(r.workspace) : "",
+                    badge: r.workspace ? (/^[a-z]$/.test(r.workspace) ? r.workspace.toUpperCase() : String(r.workspace)) : "",
                     children: () => [
-                    { id: "ws", name: "Workspace", glyph: Icons.monitor, badge: r.workspace ? String(r.workspace) : "None", children: () =>
-                        [{ id: "none", name: "None", badge: r.workspace ? "" : "●", keep: true, run: () => rule(["set", r.key, "workspace", "none"]) }].concat(
+                    { id: "ws", name: "Workspace", glyph: Icons.monitor, badge: r.workspace ? (/^[a-z]$/.test(r.workspace) ? r.workspace.toUpperCase() : String(r.workspace)) : "None", children: () =>
+                        [{ id: "none", name: "None", badge: r.workspace ? "" : "●", keep: true, run: () => setWorkspace(r, "none") }].concat(
                             [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => ({ id: "w" + n, name: "Workspace " + n, badge: r.workspace === n ? "●" : "", keep: true,
-                                run: () => rule(["set", r.key, "workspace", String(n)]) })),
+                                run: () => setWorkspace(r, String(n)) })),
+                            usedLetters.map(l => ({ id: "l:" + l, name: wsLabel(l), sub: "Go there with Alt+W, " + l.toUpperCase(), badge: r.workspace === l ? "●" : "", keep: true,
+                                run: () => setWorkspace(r, l) })),
+                            [{ id: "newletter", name: "Letter…", sub: "A workspace named by one letter: Alt+W, then the letter", keep: true,
+                               run: () => ask("One letter a-z (Alt+W, then that letter goes there)", false, t => { if (/^[A-Za-z]$/.test(t.trim())) setWorkspace(r, t.trim().toLowerCase()); else say("Use one letter"); }) }],
                             (specials.indexOf("special:magic") < 0 ? ["special:magic"] : []).concat(specials).map(n => ({ id: "s:" + n, name: wsLabel(n),
                                 sub: "Hidden workspace you toggle with a key", badge: r.workspace === n ? "●" : "", keep: true,
-                                run: () => rule(["set", r.key, "workspace", n]) })),
+                                run: () => setWorkspace(r, n) })),
                             [{ id: "newspecial", name: "New special workspace…", keep: true,
-                               run: () => ask("Name of the special workspace (letters, digits)", false, t => { if (/^[A-Za-z0-9_-]+$/.test(t.trim())) rule(["set", r.key, "workspace", "special:" + t.trim()]); }) }]) },
+                               run: () => ask("Name of the special workspace (letters, digits)", false, t => { if (/^[A-Za-z0-9_-]+$/.test(t.trim())) setWorkspace(r, "special:" + t.trim()); }) }]) },
                     { id: "silent", name: "Open in the background", sub: "Don't switch to its workspace", badge: r.silent ? "On" : "Off", keep: true,
                       run: () => rule(["set", r.key, "silent", r.silent ? "false" : "true"]) },
                     { id: "float", name: "Open floating", badge: r.float ? "On" : "Off", keep: true, run: () => rule(["set", r.key, "float", r.float ? "false" : "true"]) },

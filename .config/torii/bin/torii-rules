@@ -2,7 +2,7 @@
 """torii-rules list | windows | focused | specials | autostart | set <rule> <key> <value> | remove <rule> | apply  -  per-app window rules.
 
 A rule says what happens when a window of an app opens:
-  workspace  1..10, special:NAME or none   send it there (in the background when `silent` is true)
+  workspace  1..10, a letter a-z (Alt+W then the letter goes there), special:NAME or none   send it there (in the background when `silent` is true)
   silent     true|false           open on that workspace without switching to it
   float      true|false           open floating
   remember   true|false           open floating where (and how big) it was last time (implies floating)
@@ -66,7 +66,13 @@ def rule_name(k):
     return name
 
 
+def is_letter(ws):
+    return isinstance(ws, str) and re.fullmatch(r"[a-z]", ws) is not None
+
+
 def ws_text(ws):
+    if is_letter(ws):
+        return "name:" + ws                    # a letter workspace is a named one
     return ws if isinstance(ws, str) else str(ws)
 
 
@@ -82,6 +88,9 @@ def lua(rules):
     live = set()
     remember = [r["class"] for r in rules if r.get("remember") and not r.get("title")]
     out.append("torii_remember_apps = {%s}" % ", ".join("[%s]=true" % lstr(c) for c in remember))     # read by hypr/modules/floatmode.lua
+    for ltr in sorted({r["workspace"] for r in rules if is_letter(r.get("workspace"))}):
+        live.add("ws:" + ltr)                  # a letter workspace stays (and shows in the notch) while a rule uses it
+        out.append('hl.workspace_rule({workspace="name:%s", persistent=true})' % ltr)
     for r in rules:
         ws, fl = r.get("workspace"), bool(r.get("float") or r.get("remember"))
         if not ws and not fl:
@@ -97,6 +106,9 @@ def lua(rules):
             fields.append("float=true")
         out.append("hl.window_rule({%s})" % ", ".join(fields))
     for k in sorted(seen - live):
+        if k.startswith("ws:"):
+            out.append('hl.workspace_rule({workspace="name:%s", persistent=false})' % k[3:])
+            continue
         out.append("hl.window_rule({name=%s, match={class=\"^torii-no-such-class$\"}, float=false})" % lstr(rule_name(k)))
     return "\n".join(out) + "\n", live | seen
 
@@ -158,6 +170,8 @@ def take(rules, c):
     ws = c["workspace"]["id"]
     if ws > 0:
         r["workspace"] = ws
+    elif is_letter(c["workspace"]["name"]):
+        r["workspace"] = c["workspace"]["name"]
     elif c["workspace"]["name"].startswith("special:") and c["workspace"]["name"] != "special:minimized":
         r["workspace"] = c["workspace"]["name"]
     r["float"] = bool(c.get("floating"))
@@ -323,10 +337,12 @@ def main(a):
                 r.pop("workspace", None)
             elif val.isdigit() and 1 <= int(val) <= 99:
                 r["workspace"] = int(val)
+            elif re.fullmatch(r"[A-Za-z]", val):
+                r["workspace"] = val.lower()
             elif re.fullmatch(r"special:[A-Za-z0-9_-]+", val) and val != "special:minimized":
                 r["workspace"] = val
             else:
-                sys.exit("workspace is 1..10, special:NAME or none")
+                sys.exit("workspace is 1..10, a letter, special:NAME or none")
         elif field in ("silent", "float", "remember"):
             r[field] = val == "true"
         elif field == "autostart":

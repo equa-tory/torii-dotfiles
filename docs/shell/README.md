@@ -389,3 +389,11 @@ Title bars are fully opaque now (the theme template used 95 % alpha, so blur and
 Per-monitor night light: wlsunset needs the cold side warmer than the warm side, so a fixed temperature is sent as T and T+1 K (before, the process refused to start and the screen went neutral).
 
 Alt+Tab: if the shell's window list is empty (it went stale once after a fullscreen game) the key now refreshes it and retries instead of doing nothing. `qs -c torii ipc call windows count` prints "listed/known" windows ("0/61" = stale list) for diagnosing.
+
+## Letter workspaces (Alt+W, letter)
+
+Alt+W then a letter (a-z) goes to the workspace of that letter, Alt+Shift+W then a letter moves the window there (Esc, any other key or 2 s cancels). Nothing else changed:
+the numbers and every other bind stay. A letter is a named Hyprland workspace; you give it apps in Setup > App rules > (an app) > Workspace > Letter…
+(or pick a letter already in use). The notch shows a pill for every letter that has an app rule or a window, left of the numbered workspaces
+(the clock stays in the middle); the pills get an outline while Alt+W waits for the letter. Removing the last rule that uses a letter
+removes its pill. Changing an app's workspace in the rules menu now keeps you in that menu (it used to fall back to the App rules list because the app moved to another group).

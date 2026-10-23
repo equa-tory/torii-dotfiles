@@ -218,6 +218,36 @@ for i = 1, 10 do
     hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
+-- keys: ALT + W, letter | Go to the workspace of that letter (a-z); the letters are chosen per app in Setup > App rules > Workspace
+-- keys: ALT + SHIFT + W, letter | Move the window to the workspace of that letter
+-- (implementation) Alt+W waits for one letter in a short-lived submap (Esc, any other key or 2 seconds cancels). Letter workspaces are
+-- named ones ("name:b"); they do not touch the numbered workspaces.
+local function letter_submap(name, label, action)
+    hl.define_submap(name, function()
+        for code = 97, 122 do
+            local l = string.char(code)
+            hl.bind(l, function()
+                action(l)
+                hl.dispatch(hl.dsp.submap("reset"))
+            end)
+        end
+        pcall(function() hl.bind("catchall", hl.dsp.submap("reset")) end)
+    end)
+end
+letter_submap("wsgo", "go", function(l) hl.dispatch(hl.dsp.focus({ workspace = "name:" .. l })) end)
+letter_submap("wsmove", "move", function(l) hl.dispatch(hl.dsp.window.move({ workspace = "name:" .. l })) end)
+local function wait_letter(name)
+    return function()
+        hl.dispatch(hl.dsp.submap(name))
+        hl.timer(function()
+            if hl.get_current_submap and hl.get_current_submap() == name then hl.dispatch(hl.dsp.submap("reset")) end
+        end, { timeout = 2000, type = "oneshot" })
+    end
+end
+hl.bind(mainMod .. " + W", wait_letter("wsgo"))
+hl.bind(mainMod .. " + SHIFT + W", wait_letter("wsmove"))
+
+
 -- Screenshots and recording (torii-capture): whole screen, a zone, and start/stop screen recording
 -- Screenshot of the whole screen
 hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("$HOME/.config/torii/bin/torii-capture screen"))
