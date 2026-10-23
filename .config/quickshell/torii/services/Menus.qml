@@ -106,7 +106,7 @@ Singleton {
         function onHyprChanged() { root.bump(); }
         function onDndChanged() { root.bump(); }
     }
-    Connections { target: Config.widgets; function onLeftChanged() { root.bump(); } function onRightChanged() { root.bump(); } }
+    Connections { target: Config.widgets; function onLeftChanged() { root.bump(); } function onRightChanged() { root.bump(); } function onOffChanged() { root.bump(); } function onOpenOnlyChanged() { root.bump(); } function onAlwaysChanged() { root.bump(); } }
     Connections { target: Notifs; function onHistoryChanged() { root.bump(); } function onUnreadChanged() { root.bump(); } function onDndChanged() { root.bump(); } }
     Connections { target: Todo; function onItemsChanged() { root.bump(); } function onSortDoneChanged() { root.bump(); } }
     property string darkNow: ""             // shown at once when you toggle dark mode, until the theme catches up
