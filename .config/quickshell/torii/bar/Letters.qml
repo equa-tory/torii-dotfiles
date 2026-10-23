@@ -16,7 +16,8 @@ Row {
     property bool picking: false          // Alt+W / Alt+Shift+W is waiting for the letter
 
     spacing: 4
-    visible: letters.length > 0
+    readonly property bool present: letters.length > 0
+    visible: present
 
     function refresh() {
         const out = [];

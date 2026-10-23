@@ -100,7 +100,9 @@ PanelWindow {
         Item {
             id: row
             readonly property real gap: 16
-            readonly property real side: Math.max(leftRow.implicitWidth, rightRow.implicitWidth)
+            // the control panel arrow always sits at the notch's right edge, whatever else is on the right
+            readonly property real rightFull: rightRow.implicitWidth + (rightRow.implicitWidth > 0 ? rightRow.spacing : 0) + control.width
+            readonly property real side: Math.max(leftRow.implicitWidth, rightFull)
             implicitWidth: clock.width + (side > 0 ? 2 * (side + gap) : 0)
             width: implicitWidth
             height: win.barH
@@ -111,10 +113,7 @@ PanelWindow {
                 spacing: 16
                 height: parent.height
                 anchors { right: clock.left; rightMargin: row.gap }
-                WidgetSlot { names: Config.widgets.left; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
-                LangWidget { anchors.verticalCenter: parent.verticalCenter }
-                Letters { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
-                Workspaces { screen: win.screen; anchors.verticalCenter: parent.verticalCenter }
+                WidgetSlot { names: Config.leftNames; screen: win.screen; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
             }
 
             Clock { id: clock; x: (parent.width - width) / 2; anchors.verticalCenter: parent.verticalCenter }
@@ -124,15 +123,12 @@ PanelWindow {
                 spacing: 16
                 height: parent.height
                 anchors { left: clock.right; leftMargin: row.gap }
-                Weather {
-                    anchors.verticalCenter: parent.verticalCenter
-                    open: win.panelHere && Panels.panel === "weather"
-                }
-                WidgetSlot { names: Config.widgets.right; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
+                WidgetSlot { names: Config.rightNames; screen: win.screen; shown: win.widgetsShown; anchors.verticalCenter: parent.verticalCenter }
                 VolumeOsd { anchors.verticalCenter: parent.verticalCenter }
                 NotifyOsd { visible: !win.notifSide && width > 0.5; anchors.verticalCenter: parent.verticalCenter }
-                ControlButton { anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
             }
+
+            ControlButton { id: control; x: parent.width - width; anchors.verticalCenter: parent.verticalCenter; open: win.panelHere && Panels.panel === "control" }
         }
 
         Loader {

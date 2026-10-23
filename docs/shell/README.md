@@ -406,3 +406,10 @@ Install > Edit web apps and TUIs: pick one and change it without removing it: a 
 program (`dd`, `ls`) is refused unless you end it with `!` (`dd!`): then yours comes first on the PATH and the real program stays at /usr/bin. `torii-apps tui alias <name> <word|none>`, `edit`, `rename` do the same from a terminal.
 
 Web apps on an address with a port (http://192.168.1.160:8123): the desktop entry's window class now leaves the port out like Chromium does, so "Start at login" in App rules finds the app (it used to fail with "Can't start").
+
+## Moving the notch widgets
+
+Setup > Widgets now moves every widget of the notch: keyboard layout, letter workspaces, workspaces, special workspaces and weather (next to Claude usage,
+battery and system load). Each one goes Left or Right of the clock, or Off, and "Move closer to the clock / away from the clock" changes the order.
+Where they were stays the default (language, letters, workspaces, special on the left next to the clock; weather first on the right).
+The control panel arrow is pinned to the notch's right edge, whatever is on the right. Layout: `widgets.left`, `widgets.right`, `widgets.off` in config.json.

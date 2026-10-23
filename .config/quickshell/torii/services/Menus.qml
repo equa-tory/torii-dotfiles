@@ -496,20 +496,42 @@ Singleton {
 
     // ---- widgets around the notch (shown while the launcher or the control panel is open)
     function widgetsMenu() {
-        const names = { system: "System load", claude: "Claude usage", battery: "Battery" };
-        const left = Config.widgets.left || [], right = Config.widgets.right || [];
+        const info = {
+            language: ["Keyboard layout", "EN / RU, click switches", false],
+            letters: ["Letter workspaces", "Alt+W, then the letter", false],
+            workspaces: ["Workspaces", "The numbered ones", false],
+            special: ["Special workspaces", "The rings for hidden workspaces (Alt+S)", false],
+            weather: ["Weather", "Temperature and icon, click opens the forecast", false],
+            claude: ["Claude usage", "Needs a signed-in Claude Code  ·  shows while the launcher is open", true],
+            battery: ["Battery", "Only on a laptop  ·  shows while the launcher is open", true],
+            system: ["System load", "CPU, RAM, GPU, temperatures  ·  shows while the launcher is open", true] };
+        const left = Config.leftNames, right = Config.rightNames, off = Config.widgets.off || [];
         const place = id => left.indexOf(id) >= 0 ? "Left" : right.indexOf(id) >= 0 ? "Right" : "Off";
+        // writes the whole layout (what is shown now, so the places things had by default are kept)
+        const write = (l, r, o) => sh(["sh", "-c", [["left", l], ["right", r], ["off", o]].map(x =>
+            bin("torii-config") + " set widgets." + x[0] + " '" + JSON.stringify(x[1]) + "'").join(" && ")]);
         const put = (id, side) => {
-            const l = left.filter(x => x !== id), r = right.filter(x => x !== id);
-            if (side === "Left") l.push(id); else if (side === "Right") r.push(id);
-            sh(["sh", "-c", bin("torii-config") + " set widgets.left '" + JSON.stringify(l) + "' && " + bin("torii-config") + " set widgets.right '" + JSON.stringify(r) + "'"]);
+            const l = left.filter(x => x !== id), r = right.filter(x => x !== id), o = off.filter(x => x !== id);
+            if (side === "Left") l.push(id); else if (side === "Right") r.push(id); else o.push(id);
+            write(l, r, o);
         };
-        return { id: "widgets", name: "Widgets", glyph: Icons.apps, keywords: "notch system battery claude cpu left right hide",
-                 sub: "What shows around the notch while the launcher is open",
-                 children: () => Object.keys(names).filter(id => id !== "system" || Config.features.systemInfo).map(id => ({
-                    id: id, name: names[id], sub: id === "battery" ? "Only on a laptop" : id === "claude" ? "Needs a signed-in Claude Code" : "CPU, RAM, GPU, temperatures",
-                    badge: place(id), children: () => ["Left", "Right", "Off"].map(side => ({
-                        id: side.toLowerCase(), name: side, badge: place(id) === side ? "●" : "", keep: true, run: () => put(id, side) })) })) };
+        // "closer": towards the clock (the end of the left list, the start of the right one)
+        const shift = (id, closer) => {
+            const l = left.slice(), r = right.slice();
+            const list = l.indexOf(id) >= 0 ? l : r, i = list.indexOf(id), step = (list === l ? 1 : -1) * (closer ? 1 : -1), j = i + step;
+            if (j < 0 || j >= list.length) return;
+            list[i] = list[j]; list[j] = id;
+            write(l, r, off);
+        };
+        const ids = Object.keys(info).filter(id => id !== "system" || Config.features.systemInfo);
+        return { id: "widgets", name: "Widgets", glyph: Icons.apps, keywords: "notch system battery claude cpu left right hide move workspaces letters language weather special order",
+                 sub: "Move what the notch shows: left or right of the clock, or off",
+                 children: () => ids.map(id => ({
+                    id: id, name: info[id][0], sub: info[id][1], badge: place(id), children: () => ["Left", "Right", "Off"].map(side => ({
+                        id: side.toLowerCase(), name: side, badge: place(id) === side ? "●" : "", keep: true, run: () => put(id, side) }))
+                        .concat(place(id) === "Off" ? [] : [
+                            { id: "closer", name: "Move closer to the clock", glyph: Icons.tune, keep: true, run: () => shift(id, true) },
+                            { id: "farther", name: "Move away from the clock", glyph: Icons.tune, keep: true, run: () => shift(id, false) }]) })) };
     }
 
     // panels that open in place of the launcher

@@ -9,7 +9,8 @@ Item {
 
     property bool open: false
 
-    visible: Weather.available
+    readonly property bool present: Weather.available
+    visible: present
     implicitWidth: wx.implicitWidth
     implicitHeight: 22
 

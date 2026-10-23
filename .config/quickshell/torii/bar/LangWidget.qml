@@ -7,7 +7,8 @@ import qs.services
 Item {
     id: root
 
-    visible: Lang.code !== ""
+    readonly property bool present: Lang.code !== ""
+    visible: present
     implicitWidth: label.implicitWidth
     implicitHeight: 22
 

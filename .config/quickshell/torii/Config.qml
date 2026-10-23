@@ -26,6 +26,16 @@ Singleton {
     readonly property var activities: adapter.activities
     readonly property var media: adapter.media
     readonly property var widgets: adapter.widgets
+    // What the notch shows left and right of the clock, in order from the left. A built-in widget that is in neither list (and not
+    // switched off) sits where it always did: language, letters, workspaces, special next to the clock on the left; weather first on the right.
+    readonly property var leftNames: {
+        const w = adapter.widgets, l = w.left || [], r = w.right || [], o = w.off || [];
+        return l.concat(["language", "letters", "workspaces", "special"].filter(id => l.indexOf(id) < 0 && r.indexOf(id) < 0 && o.indexOf(id) < 0));
+    }
+    readonly property var rightNames: {
+        const w = adapter.widgets, l = w.left || [], r = w.right || [], o = w.off || [];
+        return ["weather"].filter(id => l.indexOf(id) < 0 && r.indexOf(id) < 0 && o.indexOf(id) < 0).concat(r);
+    }
     readonly property var features: adapter.features
     readonly property string quicklinks: adapter.quicklinks
 
@@ -122,6 +132,8 @@ Singleton {
                 // shown only while the launcher or the control panel is open: system, claude, battery
                 property var left: ["claude"]
                 property var right: ["battery"]
+                // always-on widgets you moved off the notch (language, letters, workspaces, special, weather)
+                property var off: []
             }
             property JsonObject features: JsonObject {
                 property bool systemInfo: false        // CPU/RAM/GPU widget and the Processes menu: switched off for now, the code is kept

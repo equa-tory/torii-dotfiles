@@ -13,6 +13,9 @@ Row {
     readonly property int activeId: mon && mon.activeWorkspace ? mon.activeWorkspace.id : -1
     readonly property int focusedId: Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : -1
 
+    property bool numbers: true           // the numbered capsules
+    property bool specialsOn: true        // the special workspace rings (a widget of their own in the notch layout)
+    readonly property bool present: (numbers && ids.length > 0) || (specialsOn && specials.length > 0)
     property var ids: []
     // special workspaces that hold windows (or are open here), e.g. "special:magic"; minimized ones live in Alt+Tab
     property var specials: []
@@ -90,7 +93,7 @@ Row {
     Component.onCompleted: refresh()
 
     Repeater {
-        model: root.ids
+        model: root.numbers ? root.ids : []
 
         delegate: Item {
             id: cell
@@ -146,7 +149,7 @@ Row {
 
     // special workspaces: outlined while hidden, filled while open on this monitor
     Repeater {
-        model: root.specials
+        model: root.specialsOn ? root.specials : []
 
         delegate: Item {
             id: sp
