@@ -274,7 +274,8 @@ def sync_web():
         else:
             prof = f"--user-data-dir={Path.home()}/.local/share/torii/webapp/{slug(w['name'])} " if w.get("own") else ""
             exec_line = f"Exec=helium-browser {prof}--app={url}\n"
-            wm = f"StartupWMClass=chrome-{u.netloc}_{(u.path or '/').replace('/', '_')}-Default\n"
+            # Chromium leaves the port out of the window class (chrome-192.168.1.160__-Default for :8123)
+            wm = f"StartupWMClass=chrome-{u.hostname}_{(u.path or '/').replace('/', '_')}-Default\n"
         f.write_text("[Desktop Entry]\nType=Application\nVersion=1.0\n"
                      f"Name={w['name']}\nComment=Web app\nIcon={favicon(url, w['name'])}\n"
                      f"{exec_line}Terminal=false\nCategories=Network;\n{wm}"
