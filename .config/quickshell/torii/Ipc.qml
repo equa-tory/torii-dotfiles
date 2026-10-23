@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import QtQuick
 import qs.services
 
@@ -40,6 +41,8 @@ Scope {
         function left(): string { return Windows.arrow(-1); }
         function right(): string { return Windows.arrow(1); }
         function close(): string { return Windows.closeSelected(); }
+        // for debugging: windows Alt+Tab lists / windows the shell knows about ("0/7" = the list went stale)
+        function count(): string { return Windows.list.length + "/" + Hyprland.toplevels.values.length; }
         function state(): string { return Panels.panel === "windows" ? "open" : (Windows.pending ? "pending" : "closed"); }
     }
     IpcHandler {

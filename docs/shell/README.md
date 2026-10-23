@@ -387,3 +387,5 @@ TUI apps get ~/.local/bin and ~/.cargo/bin on the PATH (apps started from the la
 Title bars are fully opaque now (the theme template used 95 % alpha, so blur and the window shadow showed through the bar and its rounded corners).
 
 Per-monitor night light: wlsunset needs the cold side warmer than the warm side, so a fixed temperature is sent as T and T+1 K (before, the process refused to start and the screen went neutral).
+
+Alt+Tab: if the shell's window list is empty (it went stale once after a fullscreen game) the key now refreshes it and retries instead of doing nothing. `qs -c torii ipc call windows count` prints "listed/known" windows ("0/61" = stale list) for diagnosing.

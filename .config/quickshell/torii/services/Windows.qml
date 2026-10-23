@@ -69,9 +69,17 @@ Singleton {
     property string stepId: ""        // hold whose Tab was handled
     property string doneId: ""        // hold whose release arrived
 
-    function step(d, id) {
+    // the list can be empty when Hyprland's window data went stale (after a fullscreen game, for one): fetch it again and retry once
+    property var retry: null
+    Timer { id: retryTimer; interval: 120; onTriggered: { const r = root.retry; root.retry = null; if (r) root.step(r[0], r[1], true); } }
+
+    function step(d, id, again) {
         const n = list.length;
-        if (n === 0) return;
+        if (n === 0) {
+            Hyprland.refreshToplevels();
+            if (!again) { retry = [d, id]; retryTimer.restart(); }
+            return;
+        }
         if (id && id !== stepId) {
             stepId = id;
             if (id === doneId && Panels.panel !== "windows" && !pending) {
