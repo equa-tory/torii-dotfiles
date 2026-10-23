@@ -120,4 +120,3 @@ kdegraphics-thumbnailers
 kimageformats
 gcc
 qemu-desktop
-wlsunset

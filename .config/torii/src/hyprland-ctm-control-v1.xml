@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="hyprland_ctm_control_v1">
+  <!-- the protocol hyprsunset uses (Hyprland implements it); copied here because hyprland-protocols is not a dependency -->
+  <interface name="hyprland_ctm_control_manager_v1" version="2">
+    <request name="set_ctm_for_output">
+      <arg name="output" type="object" interface="wl_output"/>
+      <arg name="mat0" type="fixed"/>
+      <arg name="mat1" type="fixed"/>
+      <arg name="mat2" type="fixed"/>
+      <arg name="mat3" type="fixed"/>
+      <arg name="mat4" type="fixed"/>
+      <arg name="mat5" type="fixed"/>
+      <arg name="mat6" type="fixed"/>
+      <arg name="mat7" type="fixed"/>
+      <arg name="mat8" type="fixed"/>
+    </request>
+    <request name="commit"/>
+    <event name="blocked"/>
+    <request name="destroy" type="destructor" since="2"/>
+  </interface>
+</protocol>

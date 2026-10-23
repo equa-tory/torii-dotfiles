@@ -376,8 +376,11 @@ The game keys (Alt binds off in a fullscreen Steam game) only count while that g
 
 ## Night light per monitor
 
-Setup > Night light > Per monitor: a slider for each monitor (2000-6500 K); "Same temperature on all monitors" undoes it.
-hyprsunset can only colour every screen alike, so with an own temperature set, one `wlsunset` per monitor takes over (it fades on the schedule by itself); `torii-nightlight monitor <name> <kelvin>|reset`. Needs the `wlsunset` package.
+Setup > Night light > Per monitor: a slider for each monitor (2000-6500 K); "Same temperature on all monitors" undoes it. Works in the GPU
+and the Screen filter methods (the filter's dimming is applied per monitor too), not in the overlay.
+hyprsunset can only colour every screen alike, and wlsunset grabs all outputs for itself, so with an own temperature set `torii-ctm`
+(src/torii-ctm.c, built on first use into ~/.cache/torii) sets one colour matrix per monitor through the same Hyprland protocol as hyprsunset.
+It re-reads ~/.local/state/torii/ctm.txt when that changes, so moving a slider does not flicker. `torii-nightlight monitor <name|all> <kelvin>|reset`.
 
 TUI apps get ~/.local/bin and ~/.cargo/bin on the PATH (apps started from the launcher did not, so `claude` was not found).
 

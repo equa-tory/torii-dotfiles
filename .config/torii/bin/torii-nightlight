@@ -12,7 +12,7 @@
   apply                     restore after login (autostart runs this)
   dim <0..60>               filter mode only: how much darker the screen gets at full strength, in % (default 20, 0 = only the colour)
   fade <seconds>            how long the automatic fade takes (default 30, 0 = at once)
-  monitor <name> <kelvin>   a monitor of its own temperature (e.g. the second one looks too dark); needs wlsunset
+  monitor <name> <kelvin>   a monitor of its own temperature (e.g. the second one looks too dark)
   monitor <name|all> reset  that monitor (or all) follows the common temperature again
   tick                      the fade-out before the end of the window (a timer starts it)
 In auto mode the colour fades in over the fade time when the window starts and fades out the same way before it
@@ -130,45 +130,123 @@ def outputs():
 
 
 def permon(s):
-    """Own temperatures per monitor are done by one wlsunset per output (hyprsunset can only colour every screen alike)."""
-    return s["mode"] == "gpu" and bool(s.get("monitors"))
+    """Own temperatures per monitor: torii-ctm sets a colour matrix per output (hyprsunset can only colour every screen alike,
+    and wlsunset claims every output for itself, so two of them cannot share the screens). Not in overlay mode."""
+    return s["mode"] in ("gpu", "filter") and bool(s.get("monitors"))
 
 
-def hhmm_minus(t, seconds):
-    h, m = map(int, t.split(":"))
-    n = (h * 3600 + m * 60 - int(seconds)) % 86400
-    return "%02d:%02d" % (n // 3600, n % 3600 // 60)
+CTM = [  # kelvin, green, blue: what hyprsunset multiplies the screen by (red is always 1), every 100 K
+    (1000, 0.2664, 0.0000),
+    (1100, 0.3035, 0.0000),
+    (1200, 0.3375, 0.0000),
+    (1300, 0.3687, 0.0000),
+    (1400, 0.3976, 0.0000),
+    (1500, 0.4245, 0.0000),
+    (1600, 0.4497, 0.0000),
+    (1700, 0.4733, 0.0000),
+    (1800, 0.4956, 0.0000),
+    (1900, 0.5167, 0.0000),
+    (2000, 0.5367, 0.0545),
+    (2100, 0.5558, 0.1063),
+    (2200, 0.5739, 0.1536),
+    (2300, 0.5913, 0.1970),
+    (2400, 0.6079, 0.2373),
+    (2500, 0.6238, 0.2748),
+    (2600, 0.6391, 0.3098),
+    (2700, 0.6538, 0.3428),
+    (2800, 0.6680, 0.3738),
+    (2900, 0.6817, 0.4032),
+    (3000, 0.6949, 0.4310),
+    (3100, 0.7077, 0.4576),
+    (3200, 0.7201, 0.4828),
+    (3300, 0.7321, 0.5070),
+    (3400, 0.7437, 0.5301),
+    (3500, 0.7550, 0.5523),
+    (3600, 0.7660, 0.5736),
+    (3700, 0.7767, 0.5941),
+    (3800, 0.7871, 0.6138),
+    (3900, 0.7972, 0.6329),
+    (4000, 0.8071, 0.6513),
+    (4100, 0.8168, 0.6691),
+    (4200, 0.8262, 0.6864),
+    (4300, 0.8353, 0.7031),
+    (4400, 0.8443, 0.7193),
+    (4500, 0.8531, 0.7350),
+    (4600, 0.8616, 0.7503),
+    (4700, 0.8700, 0.7652),
+    (4800, 0.8782, 0.7797),
+    (4900, 0.8863, 0.7938),
+    (5000, 0.8942, 0.8076),
+    (5100, 0.9019, 0.8210),
+    (5200, 0.9095, 0.8341),
+    (5300, 0.9169, 0.8469),
+    (5400, 0.9242, 0.8593),
+    (5500, 0.9313, 0.8716),
+    (5600, 0.9384, 0.8835),
+    (5700, 0.9453, 0.8952),
+    (5800, 0.9521, 0.9066),
+    (5900, 0.9587, 0.9178),
+    (6000, 0.9653, 0.9288),
+    (6100, 0.9717, 0.9395),
+    (6200, 0.9781, 0.9501),
+    (6300, 0.9843, 0.9604),
+    (6400, 0.9905, 0.9706),
+    (6500, 0.9965, 0.9806),
+]
 
 
-def push_wlsunset(s):
-    want = {}
-    if s["on"]:
-        fade = int(s["fade"])
-        for out in outputs():
-            t = min(6500, int(s["monitors"].get(out, s["temp"])))
-            if s["auto"] and in_window(s) and fade > 0:
-                # wlsunset fades on its own: down from the start time, back up ending at the stop time
-                want[out] = ["-t", str(t), "-T", "6500", "-s", s["from"], "-S", hhmm_minus(s["to"], fade), "-d", str(fade)]
-            else:
-                # wlsunset wants day warmer-than-night and some times: 1 K apart is the same colour day and night
-                want[out] = ["-t", str(t), "-T", str(t + 1), "-S", "06:00", "-s", "18:00"]
-    have = {}
-    for line in sh("pgrep", "-ax", "wlsunset").stdout.splitlines():
-        a = line.split()[2:]
-        if "-o" in a:
-            have[a[a.index("-o") + 1]] = a[:a.index("-o")] + a[a.index("-o") + 2:]
-    if have == want and len(have) == len(want):
+def rgb(kelvin):
+    k = max(1000, min(6500, kelvin))
+    i = min(len(CTM) - 2, int((k - 1000) // 100))
+    (k0, g0, b0), (k1, g1, b1) = CTM[i], CTM[i + 1]
+    f = (k - k0) / (k1 - k0)
+    return 1.0, g0 + (g1 - g0) * f, b0 + (b1 - b0) * f
+
+
+SRC = Path(__file__).resolve().parent.parent / "src"
+CTM_BIN = Path(os.environ.get("TORII_CACHE", Path.home() / ".cache/torii")) / "torii-ctm"
+CTM_FILE = STATE.with_name("ctm.txt")
+
+
+def ctm_binary():
+    """Build torii-ctm once (gcc and wayland-scanner; both come with the base packages)."""
+    srcs = [SRC / "torii-ctm.c", SRC / "hyprland-ctm-control-v1.xml"]
+    if CTM_BIN.exists() and CTM_BIN.stat().st_mtime >= max(p.stat().st_mtime for p in srcs):
+        return True
+    work = CTM_BIN.parent / "ctm-build"
+    work.mkdir(parents=True, exist_ok=True)
+    xml = str(SRC / "hyprland-ctm-control-v1.xml")
+    steps = [["wayland-scanner", "client-header", xml, str(work / "hyprland-ctm-control-v1-client.h")],
+             ["wayland-scanner", "private-code", xml, str(work / "hyprland-ctm-control-v1-protocol.c")],
+             ["cc", "-O2", f"-I{work}", "-o", str(CTM_BIN), str(SRC / "torii-ctm.c"), str(work / "hyprland-ctm-control-v1-protocol.c"),
+              "-lwayland-client", "-lm"]]
+    return all(sh(*c).returncode == 0 for c in steps)
+
+
+def push_ctm(s):
+    if not s["on"]:
+        sh("pkill", "-x", "torii-ctm")
         return
-    sh("pkill", "-x", "wlsunset")
-    for _ in range(20):                             # the old ones must let go of the outputs first
-        if sh("pgrep", "-x", "wlsunset").returncode != 0:
-            break
-        time.sleep(0.05)
-    time.sleep(0.1)
-    for out, args in want.items():
-        cmd = ["wlsunset", "-o", out] + args
-        subprocess.Popen(["uwsm", "app", "--"] + cmd if sh("which", "uwsm").returncode == 0 else cmd,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    if not ctm_binary():
+        print("torii-nightlight: could not build torii-ctm (needs gcc and wayland)", file=sys.stderr)
+        return
+    base = s["temp"]
+    f = max(0.0, min(1.0, (6500 - s.get("eff", base)) / max(1.0, 6500 - base)))       # 0 = faded out, 1 = full strength
+    k = 1.0 - (max(0, min(60, s.get("dim", 20))) / 100.0) * f if s["mode"] == "filter" else 1.0
+    lines = []
+    for out in outputs():
+        t = int(s["monitors"].get(out, base))
+        r, g, b = rgb(round(6500 + (t - 6500) * f))
+        lines.append(f"{out} {r * k:.5f} {g * k:.5f} {b * k:.5f}")
+    tmp = CTM_FILE.with_suffix(".tmp")
+    tmp.write_text("\n".join(lines) + "\n")
+    os.replace(tmp, CTM_FILE)
+    if sh("pgrep", "-x", "torii-ctm").returncode != 0:
+        sh("pkill", "-x", "hyprsunset")                 # one program at a time owns the colour matrices
+        time.sleep(0.2)
+        cmd = [str(CTM_BIN), str(CTM_FILE)]
+        subprocess.Popen(["uwsm", "app", "--"] + cmd if shutil.which("uwsm") else cmd,
+                         stdout=subprocess.DEVNULL, stderr=open(STATE.with_name("nightlight-ctm.log"), "w"), start_new_session=True)
 
 
 def push(s):
@@ -176,11 +254,11 @@ def push(s):
         return
     eff = s.get("eff", s["temp"])
     if permon(s):
-        if running():
-            sh("pkill", "-x", "hyprsunset")        # two programs cannot both own an output's colours
         set_shader("")
-        push_wlsunset(s)
+        sh("pkill", "-x", "wlsunset")
+        push_ctm(s)
         return
+    sh("pkill", "-x", "torii-ctm")
     sh("pkill", "-x", "wlsunset")
     if s["mode"] != "filter":
         set_shader("")                            # nothing else may keep a shader on the screen
@@ -252,9 +330,6 @@ def main(a):
     elif cmd == "dim" and len(a) == 2 and a[1].isdigit() and int(a[1]) <= 60:
         s["dim"] = int(a[1])
     elif cmd == "monitor" and len(a) == 3 and (a[2] == "reset" or (a[2].isdigit() and 1000 <= int(a[2]) <= 6500)):
-        if a[2] != "reset" and not shutil.which("wlsunset"):
-            print("wlsunset is not installed (sudo pacman -S wlsunset)", file=sys.stderr)
-            sys.exit(3)
         mons = dict(s.get("monitors") or {})
         if a[2] == "reset":
             mons = {} if a[1] == "all" else {k: v for k, v in mons.items() if k != a[1]}
@@ -279,11 +354,6 @@ def main(a):
         sys.exit(2)
     stop_fade()
     s["eff"], wait = ramp_state(s)
-    if permon(s):
-        # wlsunset does the fading itself; only be there at the end of the window to switch the state off
-        s["eff"] = s["temp"]
-        w = window(s, datetime.now()) if s["auto"] else None
-        wait = (w[1] - datetime.now()).total_seconds() + 2 if w else None
     save(s)
     push(s)
     if wait is not None and wait < 5 and not os.environ.get("TORII_NO_HOOKS"):
