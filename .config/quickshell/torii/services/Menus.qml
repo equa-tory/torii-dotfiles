@@ -523,6 +523,13 @@ Singleton {
             list[i] = list[j]; list[j] = id;
             write(l, r, off);
         };
+        // new widgets: listed in openOnly when hidden while closed; system / claude / battery are hidden by default and listed in `always` when shown all the time
+        const toggleOpenOnly = id => {
+            const legacy = ["system", "claude", "battery"].indexOf(id) >= 0;
+            const key = legacy ? "always" : "openOnly", cur = (Config.widgets[key] || []).slice();
+            const has = cur.indexOf(id) >= 0, next = has ? cur.filter(x => x !== id) : cur.concat([id]);
+            sh([bin("torii-config"), "set", "widgets." + key, JSON.stringify(next)]);
+        };
         const ids = Object.keys(info).filter(id => id !== "system" || Config.features.systemInfo);
         return { id: "widgets", name: "Widgets", glyph: Icons.apps, keywords: "notch system battery claude cpu left right hide move workspaces letters language weather special order",
                  sub: "Move what the notch shows: left or right of the clock, or off",
@@ -530,6 +537,9 @@ Singleton {
                     id: id, name: info[id][0], sub: info[id][1], badge: place(id), children: () => ["Left", "Right", "Off"].map(side => ({
                         id: side.toLowerCase(), name: side, badge: place(id) === side ? "●" : "", keep: true, run: () => put(id, side) }))
                         .concat(place(id) === "Off" ? [] : [
+                            { id: "openonly", name: "Hide when the notch is closed", glyph: Icons.eyeOff, badge: Config.openOnly(id) ? "On" : "Off", keep: true,
+                              sub: "Show it only while the launcher or the control panel is open",
+                              run: () => toggleOpenOnly(id) },
                             { id: "closer", name: "Move closer to the clock", glyph: Icons.tune, keep: true, run: () => shift(id, true) },
                             { id: "farther", name: "Move away from the clock", glyph: Icons.tune, keep: true, run: () => shift(id, false) }]) })) };
     }

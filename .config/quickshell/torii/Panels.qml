@@ -35,8 +35,9 @@ Singleton {
 
     // the widgets around the notch only run while the launcher or the control panel is open
     readonly property bool widgetsOn: panel === "launcher" || panel === "control"
-    Binding { target: ClaudeUsage; property: "watching"; value: root.widgetsOn }
-    Binding { target: Sys; property: "watching"; value: root.widgetsOn }
+    // (a widget set to show all the time keeps its data fresh too)
+    Binding { target: ClaudeUsage; property: "watching"; value: root.widgetsOn || !Config.openOnly("claude") }
+    Binding { target: Sys; property: "watching"; value: root.widgetsOn || (Config.features.systemInfo && !Config.openOnly("system")) }
 
     function open(name) {
         panelScreen = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";

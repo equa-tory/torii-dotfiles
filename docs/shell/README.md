@@ -413,3 +413,6 @@ Setup > Widgets now moves every widget of the notch: keyboard layout, letter wor
 battery and system load). Each one goes Left or Right of the clock, or Off, and "Move closer to the clock / away from the clock" changes the order.
 Where they were stays the default (language, letters, workspaces, special on the left next to the clock; weather first on the right).
 The control panel arrow is pinned to the notch's right edge, whatever is on the right. Layout: `widgets.left`, `widgets.right`, `widgets.off` in config.json.
+
+Each widget in Setup > Widgets also has "Hide when the notch is closed": it then shows only while the launcher or the control panel is open
+(`widgets.openOnly`; system load, Claude usage and battery are like that by default, and `widgets.always` lists the ones you made permanent).

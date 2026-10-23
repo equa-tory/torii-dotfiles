@@ -19,7 +19,7 @@ Row {
             id: ld
             required property string modelData
             anchors.verticalCenter: parent.verticalCenter
-            visible: item ? (item.present === undefined ? true : item.present) : false
+            visible: item ? (item.present === undefined ? true : item.present) && (root.shown || !Config.openOnly(modelData)) : false
             sourceComponent: modelData === "system" ? (Config.features.systemInfo ? system : null)
                            : modelData === "claude" ? claude : modelData === "battery" ? battery
                            : modelData === "language" ? language : modelData === "letters" ? letters
@@ -28,9 +28,9 @@ Row {
         }
     }
 
-    Component { id: system; SystemWidget { shown: root.shown } }
-    Component { id: claude; ClaudeWidget { shown: root.shown } }
-    Component { id: battery; BatteryWidget { shown: root.shown } }
+    Component { id: system; SystemWidget { shown: root.shown || !Config.openOnly("system") } }
+    Component { id: claude; ClaudeWidget { shown: root.shown || !Config.openOnly("claude") } }
+    Component { id: battery; BatteryWidget { shown: root.shown || !Config.openOnly("battery") } }
     Component { id: language; LangWidget {} }
     Component { id: letters; Letters { screen: root.screen } }
     Component { id: workspaces; Workspaces { screen: root.screen; specialsOn: false } }

@@ -28,6 +28,11 @@ Singleton {
     readonly property var widgets: adapter.widgets
     // What the notch shows left and right of the clock, in order from the left. A built-in widget that is in neither list (and not
     // switched off) sits where it always did: language, letters, workspaces, special next to the clock on the left; weather first on the right.
+    // is this widget hidden while no panel (launcher, control panel) is open?
+    function openOnly(id) {
+        const w = adapter.widgets;
+        return ["system", "claude", "battery"].indexOf(id) >= 0 ? (w.always || []).indexOf(id) < 0 : (w.openOnly || []).indexOf(id) >= 0;
+    }
     readonly property var leftNames: {
         const w = adapter.widgets, l = w.left || [], r = w.right || [], o = w.off || [];
         return l.concat(["language", "letters", "workspaces", "special"].filter(id => l.indexOf(id) < 0 && r.indexOf(id) < 0 && o.indexOf(id) < 0));
@@ -134,6 +139,10 @@ Singleton {
                 property var right: ["battery"]
                 // always-on widgets you moved off the notch (language, letters, workspaces, special, weather)
                 property var off: []
+                // hidden while the launcher and the control panel are closed (any widget, except system / claude / battery: those are like that by default, see `always`)
+                property var openOnly: []
+                // system, claude and battery normally show only while the notch is open; the ones listed here show all the time
+                property var always: []
             }
             property JsonObject features: JsonObject {
                 property bool systemInfo: false        // CPU/RAM/GPU widget and the Processes menu: switched off for now, the code is kept
