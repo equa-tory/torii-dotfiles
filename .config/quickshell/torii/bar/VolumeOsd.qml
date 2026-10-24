@@ -41,14 +41,17 @@ Item {
             height: parent.height
             radius: 2
             color: Audio.muted ? Theme.muted : Theme.accent
-            Behavior on width { NumberAnimation { duration: 90 } }
+            Behavior on width { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
         }
     }
+    // the number counts along with the bar (headphones with their own volume control report a few big steps, not every notch)
+    property real shownPct: Math.round(Audio.volume * 100)
+    Behavior on shownPct { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
     Label {
         id: pct
         x: 102
         anchors.verticalCenter: parent.verticalCenter
-        text: Audio.muted ? "mute" : Math.round(Audio.volume * 100) + "%"
+        text: Audio.muted ? "mute" : Math.round(root.shownPct) + "%"
         color: Theme.fgDim
     }
 }

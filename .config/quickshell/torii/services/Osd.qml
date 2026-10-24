@@ -8,7 +8,7 @@ Singleton {
     id: root
 
     property bool shown: false
-    readonly property int holdMs: 1100
+    readonly property int holdMs: 1500
     property bool armed: false            // ignore the values PipeWire reports while it is still starting up
 
     function pulse() {
