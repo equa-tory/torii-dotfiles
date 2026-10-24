@@ -218,7 +218,7 @@ for i = 1, 10 do
     hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
--- keys: ALT + W, letter | Go to the workspace of that letter (a-z); the letters are chosen per app in Setup > App rules > Workspace
+-- keys: ALT + W, letter or digit | Go to the workspace of that letter (a-z) or number (1-9, 0 = 10); the letters are chosen per app in Setup > App rules > Workspace
 -- keys: ALT + SHIFT + W, letter | Move the window to the workspace of that letter
 -- (implementation) Alt+W waits for one letter in a short-lived submap (Esc, any other key or 2 seconds cancels). Letter workspaces are
 -- named ones ("name:b"); they do not touch the numbered workspaces.
@@ -231,11 +231,17 @@ local function letter_submap(name, label, action)
                 hl.dispatch(hl.dsp.submap("reset"))
             end)
         end
+        for d = 0, 9 do
+            hl.bind(tostring(d), function()
+                action(d == 0 and 10 or d)
+                hl.dispatch(hl.dsp.submap("reset"))
+            end)
+        end
         pcall(function() hl.bind("catchall", hl.dsp.submap("reset")) end)
     end)
 end
-letter_submap("wsgo", "go", function(l) hl.dispatch(hl.dsp.focus({ workspace = "name:" .. l })) end)
-letter_submap("wsmove", "move", function(l) hl.dispatch(hl.dsp.window.move({ workspace = "name:" .. l })) end)
+letter_submap("wsgo", "go", function(l) hl.dispatch(hl.dsp.focus({ workspace = type(l) == "number" and l or "name:" .. l })) end)
+letter_submap("wsmove", "move", function(l) hl.dispatch(hl.dsp.window.move({ workspace = type(l) == "number" and l or "name:" .. l })) end)
 local function wait_letter(name)
     return function()
         hl.dispatch(hl.dsp.submap(name))
