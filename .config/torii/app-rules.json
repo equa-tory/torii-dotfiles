@@ -48,12 +48,6 @@
     "float": true
   },
   {
-    "class": "helium",
-    "name": "helium",
-    "workspace": 2,
-    "silent": false
-  },
-  {
     "class": "deadlock-modmanager",
     "name": "Deadlock Mod Manager",
     "silent": true,
@@ -69,5 +63,48 @@
     "class": "imv",
     "name": "imv",
     "float": true
+  },
+  {
+    "class": "steam",
+    "name": "Steam",
+    "float": false,
+    "silent": false,
+    "workspace": 3
+  },
+  {
+    "class": "steam_app_4162040",
+    "name": "Zenless Zone Zero",
+    "silent": true,
+    "workspace": 3
+  },
+  {
+    "class": "unityhub",
+    "name": "Unity Hub 3.21.0",
+    "float": true
+  },
+  {
+    "class": "chrome-192.168.1.160__-Default",
+    "name": "Дом – Home Assistant",
+    "workspace": "h",
+    "silent": true,
+    "autostart": true,
+    "exec": "desktop:torii-web-home-assistant.desktop"
+  },
+  {
+    "class": "chrome-192.168.1.50__-Default",
+    "name": "Library",
+    "workspace": "m",
+    "silent": true,
+    "autostart": true,
+    "exec": "desktop:torii-web-mus.desktop"
+  },
+  {
+    "class": "helium",
+    "name": "New Tab - Helium"
+  },
+  {
+    "class": "steam_app_1422450",
+    "name": "Deadlock",
+    "workspace": 3
   }
 ]

@@ -14,11 +14,19 @@
     "location": "",
     "lat": 0,
     "lon": 0,
-    "refreshMin": 20
+    "refreshMin": 20,
+    "proxy": "http://127.0.0.1:10808"
   },
   "wallpaper": {
     "dir": "~/Pictures/wallpapers",
-    "transitionMs": 600
+    "transitionMs": 600,
+    "shuffle": "5",
+    "noShuffle": [
+      "wp12027008-3506138153.png",
+      "9770644-2067660354.png",
+      "mahiru-shiina-sakura-whisper.960x540.mp4",
+      "mahiru-shiina-christmas-eve.960x540.mp4"
+    ]
   },
   "theme": {
     "tint": 0.15
@@ -64,6 +72,36 @@
         "pin": 1792422759392,
         "where": ""
       },
+      "apps/app:torii-web-homeflix": {
+        "alias": "video",
+        "name": "Homeflix",
+        "where": ""
+      },
+      "apps/app:torii-web-telegram": {
+        "name": "Telegram",
+        "pin": 1792436632860,
+        "where": ""
+      },
+      "apps/app:torii-web-watchcat": {
+        "alias": "stats",
+        "name": "Watchcat",
+        "where": ""
+      },
+      "apps/portable:/home/equa/apps/claude-torii": {
+        "alias": "cx",
+        "name": "Claude Torii",
+        "where": ""
+      },
+      "apps/portable:/home/equa/apps/dorm": {
+        "alias": "dd",
+        "name": "dorm",
+        "where": ""
+      },
+      "install/appopts/tui:Claude Torii": {
+        "alias": "cx",
+        "name": "Claude Torii",
+        "where": "Install \u203a Edit web apps and TUIs"
+      },
       "link:aur": {
         "hide": true,
         "name": "AUR",
@@ -72,7 +110,28 @@
       "setup/rules": {
         "alias": "window rule",
         "name": "App rules",
+        "pin": 1792520314664,
         "where": "Setup"
+      },
+      "setup/rules/addfocused": {
+        "bind": "ALT + SHIFT + P",
+        "name": "Add the focused app",
+        "where": ""
+      },
+      "todo": {
+        "name": "Todo",
+        "pin": 1792527123545,
+        "where": ""
+      },
+      "trigger/automove": {
+        "name": "File auto mover",
+        "pin": 1792436427507,
+        "where": "Trigger"
+      },
+      "weather": {
+        "name": "Weather",
+        "where": "",
+        "pin": 1792866180967
       }
     }
   },
@@ -85,9 +144,20 @@
   },
   "widgets": {
     "left": [
-      "claude"
+      "language",
+      "claude",
+      "letters",
+      "special"
     ],
-    "right": []
+    "right": [
+      "workspaces",
+      "weather"
+    ],
+    "off": [
+      "battery"
+    ],
+    "openOnly": [],
+    "always": []
   },
   "capture": {
     "freeze": true,
@@ -99,6 +169,12 @@
         "Helium"
       ],
       "lanes": false
+    },
+    "audio": {
+      "apps": [
+        "Helium"
+      ],
+      "mic": true
     }
   },
   "limine": {

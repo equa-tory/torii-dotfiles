@@ -3,6 +3,7 @@
 [mgr]
 show_hidden = false
 sort_dir_first = true
+linemode = "size"
 
 [opener]
 torii = [
@@ -17,3 +18,6 @@ rules = [
   { url = "*/", use = ["torii"] },
   { mime = "*", use = ["torii", "edit"] },
 ]
+
+#[manager]
+#linemode = "size"
