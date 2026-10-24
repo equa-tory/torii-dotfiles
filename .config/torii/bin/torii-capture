@@ -3,6 +3,7 @@
 #   screen   whole focused monitor -> ~/Pictures/Screenshots + clipboard
 #   zone     drag a rectangle       -> same
 #   record   start recording the focused monitor to ~/Videos; run again to stop
+#   audio    record sound only (WAV in ~/Music/Recordings); run again to stop
 #   text     drag a rectangle, read the text in it (OCR) -> clipboard
 #   qr       drag a rectangle around a QR code           -> clipboard
 #   color    pick a colour on screen                     -> clipboard (#rrggbb)
@@ -37,6 +38,8 @@ case "${1:-}" in
     f="$pics/$ts.png"; grim -g "$geo" "$f" && { wl-copy < "$f"; note "Screenshot saved" "$f" -i "$f"; } ;;
   record)   # picture + sound, settings in Capture > Screen recording
     need wf-recorder; exec "$HOME/.config/torii/bin/torii-record" toggle ;;
+  audio)   # sound only (a WAV in ~/Music/Recordings), settings in Capture > Audio recording; run again to stop
+    exec "$HOME/.config/torii/bin/torii-record" audio ;;
   reset)   # after login: no recording survives a reboot
     st="${TORII_STATE:-$HOME/.local/state/torii}/recording.json"; mkdir -p "$(dirname "$st")"; printf '{"on": false}\n' > "$st" ;;
   text)

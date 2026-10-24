@@ -75,6 +75,13 @@ Singleton {
                     property bool folder: false         // a folder with the video and one audio file per source
                     property real micGain: 1.0          // louder or quieter microphone in the recording only
                 }
+                property JsonObject audio: JsonObject { // sound only, a WAV in ~/Music/Recordings (torii-record audio)
+                    property bool system: false         // what the computer plays
+                    property bool mic: false            // the microphone
+                    property var apps: []               // programs to record, e.g. ["Helium"] for a class in the browser
+                    property bool folder: false         // a folder with one WAV per source instead of one mixed file
+                    property real micGain: 1.0
+                }
             }
             property JsonObject install: JsonObject {
                 property bool track: true           // packages installed from the launcher are added to packages/*.txt (and removed from them)

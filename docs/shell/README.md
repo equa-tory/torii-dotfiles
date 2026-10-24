@@ -416,3 +416,11 @@ The control panel arrow is pinned to the notch's right edge, whatever is on the 
 
 Each widget in Setup > Widgets also has "Hide when the notch is closed": it then shows only while the launcher or the control panel is open
 (`widgets.openOnly`; system load, Claude usage and battery are like that by default, and `widgets.always` lists the ones you made permanent).
+
+## Audio recording (no picture)
+
+Capture > Audio recording: records sound only, as a WAV in ~/Music/Recordings (`torii-capture audio`, run again to stop; the red dot in the notch shows it, and
+Ctrl+K > Add binding on "Start audio recording" gives it a key). Pick the programs (e.g. **Helium** for an online class in the browser: only that program's
+sound, not the rest of the computer), optionally the microphone and/or everything the computer plays, and "folder" for one WAV per source instead of one mixed file.
+A program that is not playing yet is recorded from the moment it starts playing (and again if its sound stops and restarts); the gaps stay silent, so times in the file are real.
+PipeWire knows programs, not windows: every tab of the browser is one "Helium". (The screen recording's program tracks used to record silence; fixed.)

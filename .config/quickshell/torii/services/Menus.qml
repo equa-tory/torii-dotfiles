@@ -94,6 +94,8 @@ Singleton {
     Connections { target: Config.launcher; function onSearchHiddenChanged() { root.bump(); } }
     Connections { target: Config.notch; function onClockDateChanged() { root.bump(); } }
     Connections { target: Config.install; function onTrackChanged() { root.bump(); } }
+    Connections { target: Config.capture.audio; function onAppsChanged() { root.bump(); } function onMicChanged() { root.bump(); } function onSystemChanged() { root.bump(); } function onFolderChanged() { root.bump(); } }
+    Connections { target: Config.capture.rec; function onAppsChanged() { root.bump(); } function onMicChanged() { root.bump(); } function onSystemChanged() { root.bump(); } function onFolderChanged() { root.bump(); } function onLanesChanged() { root.bump(); } }
     readonly property string shapeNow: Config.notch.shape
     onShapeNowChanged: bump()
     Connections {
@@ -665,6 +667,32 @@ Singleton {
     property bool micHear: false
     Timer { id: micHearOff; interval: 120000; onTriggered: root.micHear = false }
     function recSet(key, json) { sh([bin("torii-config"), "set", "capture.rec." + key, json]); }
+    function audioSet(key, json) { sh([bin("torii-config"), "set", "capture.audio." + key, json]); }
+    function audioRecMenu() {
+        const r = Config.capture.audio;
+        const apps = (r.apps || []).slice();
+        const on = b => b ? "On" : "Off";
+        const toggle = (id, name, sub, key, cur, glyph) => ({ id: id, name: name, sub: sub, glyph: glyph, badge: on(cur), keep: true, run: () => audioSet(key, cur ? "false" : "true") });
+        const what = apps.concat(r.system ? ["computer sound"] : [], r.mic ? ["microphone"] : []);
+        return { id: "audiorec", name: "Audio recording", glyph: Icons.mic, keywords: "wav sound only record class lecture meeting call helium browser microphone no video",
+                 sub: (Live.recordingState.audio ? "Recording…  ·  " : "") + (what.length ? what.join(" + ") : "Pick what to record") + "  ·  WAV, no picture",
+                 onOpen: () => fRecApps.refresh(), children: () => [
+            { id: "go", name: Live.recording ? "Stop recording" : "Start audio recording", glyph: Icons.record, sub: "Saved as a WAV in ~/Music/Recordings", badge: Live.recording ? "●" : "",
+              run: () => app([bin("torii-capture"), "audio"]) },
+            { id: "apps", name: "Programs", glyph: Icons.apps, badge: apps.length ? String(apps.length) : "",
+              sub: apps.length ? apps.join(", ") : "Pick Helium for a class or call in the browser (only that program's sound)",
+              onOpen: () => fRecApps.refresh(), sorted: true, children: () => {
+                  const playing = (fRecApps.data || []).map(a => a.name);
+                  const names = playing.concat(apps.filter(a => playing.indexOf(a) < 0), ["Helium"].filter(n => playing.indexOf(n) < 0 && apps.indexOf(n) < 0));
+                  return names.map(n => ({ id: "a:" + n, name: n, glyph: Icons.speaker, badge: apps.indexOf(n) >= 0 ? "●" : "", keep: true,
+                      sub: playing.indexOf(n) >= 0 ? "Playing now" : "Not playing now: it is recorded from the moment it starts playing",
+                      run: () => audioSet("apps", JSON.stringify(apps.indexOf(n) >= 0 ? apps.filter(x => x !== n) : apps.concat([n]))) }));
+              } },
+            toggle("mic", "Record the microphone", "Your voice too (the default microphone)", "mic", r.mic, Icons.mic),
+            toggle("system", "Record everything the computer plays", "All programs together, instead of picking some", "system", r.system, Icons.speaker),
+            toggle("folder", "Folder with a file per source", "A folder in ~/Music/Recordings with one WAV for each program and the microphone, instead of one mixed WAV", "folder", r.folder, Icons.folder),
+            { id: "folderopen", name: "Open the recordings folder", glyph: Icons.folderMove, keep: true, run: () => sh(["xdg-open", home + "/Music/Recordings"]) } ] };
+    }
     function recMenu() {
         const r = Config.capture.rec;
         const on = b => b ? "On" : "Off";
@@ -706,6 +734,7 @@ Singleton {
             { id: "record", name: t.recording ? "Stop recording" : "Record screen", sub: "The focused monitor with sound, saved in ~/Videos  ·  settings in Screen recording", glyph: Icons.record,
               keywords: "video screencast", badge: t.recording ? "●" : "", run: cap("record") },
             recMenu(),
+            audioRecMenu(),
             { id: "text", name: "Text from screen", sub: "Drag a rectangle, the text is copied", glyph: Icons.textScan, keywords: "ocr read copy", run: cap("text") },
             { id: "qr", name: "QR code", sub: "Drag a rectangle around it", glyph: Icons.qr, keywords: "scan barcode", run: cap("qr") },
             { id: "freeze", name: "Freeze screen while selecting", sub: "Zone, text and QR: the picture stands still while you drag (needs wayfreeze)", glyph: Icons.camera,

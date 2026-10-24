@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""torii-record toggle | apps | monitor on|off|toggle  -  screen recording with sound (torii-capture record runs this).
+"""torii-record toggle | audio | apps | monitor on|off|toggle  -  screen recording with sound (torii-capture record runs this).
+
+  audio    start recording sound only (no picture) as a WAV in ~/Music/Recordings, or stop and save the one that runs; what is
+           recorded is capture.audio (Capture > Audio recording): programs (e.g. "Helium" for an online class in the browser),
+           the microphone, what the computer plays, and `folder` for one file per source instead of one mixed file.
+           A program that is not playing yet is recorded from the moment it starts, and again each time it restarts
+           (the gaps stay silent, so the recording keeps its real length).
 
   toggle   start recording the focused monitor, or stop it (and save) when one is running
   apps     JSON list of the programs that play sound now, for the per-app choice
@@ -34,6 +40,8 @@ PID = STATE / "recording.pid"
 MON = STATE / "mic-monitor.json"
 VIDEOS = Path(os.environ.get("XDG_VIDEOS_DIR", HOME / "Videos"))
 DEFAULTS = {"system": True, "mic": True, "apps": [], "lanes": True, "folder": False, "micGain": 1.0}
+AUDIO_DEFAULTS = {"system": False, "mic": False, "apps": [], "folder": False, "micGain": 1.0}
+MUSIC = Path(os.environ.get("XDG_MUSIC_DIR", HOME / "Music")) / "Recordings"
 
 
 def note(title, body=""):
@@ -47,6 +55,15 @@ def cfg():
     except ValueError:
         c = None
     return {**DEFAULTS, **(c if isinstance(c, dict) else {})}
+
+
+def acfg():
+    out = subprocess.run([str(HOME / ".config/torii/bin/torii-config"), "get", "capture.audio"], capture_output=True, text=True).stdout
+    try:
+        c = json.loads(out)
+    except ValueError:
+        c = None
+    return {**AUDIO_DEFAULTS, **(c if isinstance(c, dict) else {})}
 
 
 def write_flag(on, **extra):
@@ -71,7 +88,7 @@ def webapp_names():
     by_class = {}
     for w in apps:
         u = urlparse(w["url"] if "://" in w["url"] else "https://" + w["url"])
-        by_class[f"chrome-{u.netloc}_{(u.path or '/').replace('/', '_')}-Default"] = w["name"]
+        by_class[f"chrome-{u.hostname}_{(u.path or '/').replace('/', '_')}-Default"] = w["name"]
     pids = {}
     for c in clients:
         pids.setdefault(c.get("pid"), []).append(c.get("class") or "")
@@ -183,7 +200,7 @@ def record():
         if not ids:
             missing.append(want)
             continue
-        pw(want, ids[0], tmp / f"app-{safe(want)}.wav")
+        pw(want, ids[0], tmp / f"app-{safe(want)}.wav", "stream.capture.sink=true")      # without it a program's stream records as silence
 
     write_flag(True, start=int(time.time()))
     note("Recording started", "Click the red dot in the notch to stop" + ("  ·  not playing now: " + ", ".join(missing) if missing else ""))
@@ -209,6 +226,110 @@ def record():
     out = mux(c, tmp, video, [t for t in tracks if t[1].exists() and t[1].stat().st_size > 1000], stamp)
     shutil.rmtree(tmp, ignore_errors=True)
     note("Recording saved", str(out) if out else "ffmpeg failed; the pieces are in " + str(tmp))
+
+
+# ------------------------------------------------------------------ audio only
+def audio_record():
+    c = acfg()
+    wanted = list(c["apps"])
+    if not (c["system"] or c["mic"] or wanted):
+        note("Nothing to record", "Pick a program, the microphone or the computer's sound in Capture > Audio recording")
+        return
+    monitor("off")
+    STATE.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    tmp = HOME / ".cache/torii-rec" / ("audio-" + stamp)
+    tmp.mkdir(parents=True, exist_ok=True)
+    stop = []
+    signal.signal(signal.SIGINT, lambda *_: stop.append(1))
+    signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
+    PID.write_text(str(os.getpid()))
+    t0 = time.time()
+    segs = []                                  # {label, wav, at, mic, proc, node}
+
+    def start(label, target, wav, props=None, is_mic=False, node=None):
+        cmd = ["pw-record", "--rate", "48000", "--channels", "2", "--target", str(target)]
+        if props:
+            cmd += ["-P", props]
+        segs.append({"label": label, "wav": wav, "at": time.time() - t0, "mic": is_mic, "node": node,
+                     "proc": subprocess.Popen(cmd + [str(wav)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)})
+
+    if c["system"]:
+        start("System", inspect("@DEFAULT_AUDIO_SINK@", "node.name"), tmp / "system.wav", "stream.capture.sink=true")
+    if c["mic"]:
+        start("Microphone", inspect("@DEFAULT_AUDIO_SOURCE@", "node.name"), tmp / "mic.wav", None, True)
+    write_flag(True, start=int(time.time()), audio=True)
+    note("Audio recording started", "Click the red dot in the notch to stop" + ("  ·  waiting for " + ", ".join(wanted) + " to play" if wanted else ""))
+
+    count = {}
+    last = 0.0
+    while not stop:
+        time.sleep(0.2)
+        if not wanted or time.time() - last < 1.0:
+            continue
+        last = time.time()
+        now = sound_apps()
+        for name in wanted:
+            cur = next((s for s in reversed(segs) if s["label"] == name and s["proc"].poll() is None), None)
+            ids = now.get(name) or []
+            if cur is not None and cur["node"] not in ids:          # the program stopped playing: close this piece
+                cur["proc"].send_signal(signal.SIGINT)
+                cur = None
+            if cur is None and ids:
+                count[name] = count.get(name, 0) + 1
+                start(name, ids[0], tmp / f"app-{safe(name)}-{count[name]}.wav", "stream.capture.sink=true", node=ids[0])
+
+    for s in segs:
+        if s["proc"].poll() is None:
+            s["proc"].send_signal(signal.SIGINT)
+    for s in segs:
+        try:
+            s["proc"].wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            s["proc"].kill()
+    total = time.time() - t0
+    write_flag(False)
+    PID.unlink(missing_ok=True)
+    good = [s for s in segs if s["wav"].exists() and s["wav"].stat().st_size > 1000]
+    if not good:
+        note("Nothing was recorded", ("No sound from " + ", ".join(wanted) + " (it has to play sound)") if wanted else "No sound came in")
+        shutil.rmtree(tmp, ignore_errors=True)
+        return
+    note("Saving the recording…")
+    MUSIC.mkdir(parents=True, exist_ok=True)
+    out = mux_audio(c, good, stamp, total)
+    shutil.rmtree(tmp, ignore_errors=True)
+    note("Audio saved", str(out) if out else "ffmpeg failed; the pieces are in " + str(tmp))
+
+
+def mix_wav(segs, out, gain, total):
+    """One WAV from pieces placed at their real time (silence in between), padded to the whole length."""
+    inputs, chains = [], []
+    for i, s in enumerate(segs):
+        inputs += ["-i", str(s["wav"])]
+        ms = int(s["at"] * 1000)
+        f = f"[{i}:a]"
+        if s["mic"] and abs(gain - 1.0) > 0.01:
+            f += f"volume={gain:.2f},"
+        chains.append(f"{f}adelay={ms}|{ms}[a{i}]")
+    n = len(segs)
+    if n == 1:
+        mix = "[a0]anull[aout]"
+    else:
+        mix = "".join(f"[a{i}]" for i in range(n)) + f"amix=inputs={n}:normalize=0:duration=longest[aout]"
+    return ff(inputs + ["-filter_complex", ";".join(chains + [mix]), "-map", "[aout]", "-t", f"{total:.2f}", "-c:a", "pcm_s16le", str(out)])
+
+
+def mux_audio(c, segs, stamp, total):
+    gain = float(c["micGain"])
+    if c["folder"]:
+        d = MUSIC / stamp
+        d.mkdir(parents=True, exist_ok=True)
+        labels = sorted({s["label"] for s in segs})
+        ok = all(mix_wav([s for s in segs if s["label"] == l], d / f"{safe(l.lower())}.wav", gain, total) for l in labels)
+        return d if ok else None
+    out = MUSIC / f"{stamp}.wav"
+    return out if mix_wav(segs, out, gain, total) else None
 
 
 def ff(args):
@@ -266,6 +387,12 @@ def main(a):
             os.kill(pid, signal.SIGINT)
         else:
             record()
+    elif a == ["audio"]:
+        pid = running()
+        if pid:
+            os.kill(pid, signal.SIGINT)
+        else:
+            audio_record()
     elif a == ["apps"]:
         print(json.dumps([{"name": n} for n in sorted(sound_apps(), key=str.lower)]))
     elif len(a) == 2 and a[0] == "monitor" and a[1] in ("on", "off", "toggle"):
