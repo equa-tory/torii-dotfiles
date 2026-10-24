@@ -44,6 +44,13 @@ Singleton {
     readonly property var features: adapter.features
     readonly property string quicklinks: adapter.quicklinks
 
+    // wallpapers can be videos (the shell plays them); torii-theme keeps one frame of each as ~/.cache/torii/stills/<name>.jpg
+    readonly property var videoExt: ["mp4", "webm", "mkv", "mov", "gif"]
+    function isVideo(path) { return videoExt.indexOf(String(path).split(".").pop().toLowerCase()) >= 0; }
+    function still(path) {
+        return isVideo(path) ? home + "/.cache/torii/stills/" + String(path).split("/").pop() + ".jpg" : path;
+    }
+
     function expand(path) {
         return path.startsWith("~") ? home + path.slice(1) : path;
     }
@@ -100,6 +107,7 @@ Singleton {
                 property string dir: "~/Pictures/wallpapers"
                 property int transitionMs: 600
                 property string shuffle: "off"      // random wallpaper: off | 5 | 60 (minutes) | login
+                property var noShuffle: []          // file names the random change skips (Space in the wallpaper panel)
             }
             property JsonObject apps: JsonObject {
                 property string dir: "~/apps"

@@ -121,3 +121,4 @@ kimageformats
 gcc
 qemu-desktop
 gnome-keyring
+qt6-multimedia-ffmpeg

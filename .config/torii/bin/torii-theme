@@ -24,6 +24,8 @@ CONF = Path(os.environ.get("TORII_CONFIG", HOME / ".config/torii"))
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 THEME_DIR = STATE / "theme"
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+VIDEO_EXT = {".mp4", ".webm", ".mkv", ".mov", ".gif"}       # animated wallpapers: the shell plays them, the colours come from one frame
+STILLS = CACHE / "stills"
 VERBOSE = False
 FORCE = False
 
@@ -335,19 +337,46 @@ def get_mode():
         return "dark"
 
 
+def still(path):
+    """The picture for a wallpaper: the file itself, or for a video a frame from it (~/.cache/torii/stills/<name>.jpg, the shell
+    looks for the same name: thumbnails, the preview and the crossfade start from it)."""
+    path = Path(path)
+    if path.suffix.lower() not in VIDEO_EXT:
+        return path
+    out = STILLS / (path.name + ".jpg")
+    try:
+        if out.is_file() and out.stat().st_mtime >= path.stat().st_mtime:
+            return out
+    except OSError:
+        pass
+    STILLS.mkdir(parents=True, exist_ok=True)
+    try:
+        dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+                                   capture_output=True, text=True, timeout=20).stdout.strip() or 0)
+    except (ValueError, OSError, subprocess.SubprocessError):
+        dur = 0
+    for at in (min(1.0, dur / 3) if dur else 0, 0):          # a frame a little into the clip (not the first, often black)
+        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "%.2f" % at, "-i", str(path), "-frames:v", "1", "-q:v", "2", str(out)],
+                           capture_output=True, timeout=60)
+        if r.returncode == 0 and out.is_file() and out.stat().st_size > 0:
+            return out
+    raise SystemExit(f"cannot read a frame from {path}")
+
+
 def compute(image):
     image = Path(os.path.abspath(os.path.expanduser(str(image))))  # keep symlinks: ~/Pictures may be stow-linked
     if not image.is_file():
         raise SystemExit(f"no such image: {image}")
-    digest = sha256_file(image)
+    picture = still(image)
+    digest = sha256_file(picture)
     tint = float(read_config().get("theme", {}).get("tint", 0.15))
     override = override_for(image)
     mode = get_mode()
     tpl = hashlib.sha256(b"".join(p.read_bytes() for p in sorted(TEMPLATES.iterdir()) if p.is_file())).hexdigest()[:8]   # a changed template re-renders
     key = hashlib.sha256(f"v4|{digest}|{tint}|{override}|{mode}|{tpl}".encode()).hexdigest()[:16]
-    prim, others = palette_args(image, digest)
+    prim, others = palette_args(picture, digest)
     tokens = build_tokens(prim, tint, override, mode, others)
-    tokens.update({"wallpaper": str(image), "hash": key})
+    tokens.update({"wallpaper": str(image), "still": str(picture), "hash": key})
     return tokens
 
 
@@ -420,7 +449,7 @@ def limine_wallpaper(tokens):
     """The boot menu background: the chosen image (or the wallpaper), 1920x1080, blurred and dimmed to taste
     (packages/limine-theme.sh copies it to /boot)."""
     st = limine_settings()
-    src = os.path.expanduser(st["image"]) if st["image"] else (tokens.get("wallpaper") or "")
+    src = os.path.expanduser(st["image"]) if st["image"] else (tokens.get("still") or tokens.get("wallpaper") or "")
     dst = THEME_DIR / "limine-wallpaper.jpg"
     marker = THEME_DIR / "limine-wallpaper.src"
     try:
@@ -545,7 +574,13 @@ def wallpaper_dir():
 
 def wallpapers():
     d = wallpaper_dir()
-    return sorted(p for p in d.iterdir() if p.suffix.lower() in IMAGE_EXT) if d.is_dir() else []
+    return sorted(p for p in d.iterdir() if p.suffix.lower() in IMAGE_EXT | VIDEO_EXT) if d.is_dir() else []
+
+
+def shuffle_pool():
+    """What `random` picks from: everything but the files switched off for shuffling (config.json wallpaper.noShuffle, file names)."""
+    off = set(read_config().get("wallpaper", {}).get("noShuffle") or [])
+    return [p for p in wallpapers() if p.name not in off]
 
 
 def current():
@@ -597,11 +632,11 @@ def main(argv):
     elif cmd == "prev":
         apply(step(-1))
     elif cmd == "random":
-        imgs = wallpapers()
+        imgs = shuffle_pool()
         cur = current()
         pool = [p for p in imgs if not cur or str(p) != cur["wallpaper"]] or imgs
         if not pool:
-            raise SystemExit(f"no wallpapers in {wallpaper_dir()}")
+            raise SystemExit(f"no wallpapers to shuffle in {wallpaper_dir()} (all are switched off for shuffling?)")
         apply(random.choice(pool))
     elif cmd == "restore":
         cur = current()
@@ -635,6 +670,10 @@ def main(argv):
         write_if_changed(STATE / "mode", want + "\n")
         cur = current()
         apply(cur["wallpaper"] if cur and Path(cur["wallpaper"]).is_file() else step(0))
+    elif cmd == "stills":                 # make the pictures for the video wallpapers (the panel asks for them)
+        for p in wallpapers():
+            if p.suffix.lower() in VIDEO_EXT:
+                still(p)
     elif cmd == "palette" and rest:
         print(json.dumps(compute(rest[0]), indent=2))
     elif cmd == "current":

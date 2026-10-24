@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# torii-wallpaper shuffle [off|<minutes>|login] | apply   -  change the wallpaper by itself
+# torii-wallpaper shuffle [off|<minutes>|login] | skip <file> | apply   -  change the wallpaper by itself
 #
 #   shuffle          print the current mode (off, <minutes> or login)
 #   shuffle <min>    a random wallpaper every <min> minutes (1-1440) (a systemd user timer: torii-wallpaper.timer)
 #   shuffle login    a random wallpaper once per login (apply runs it from the autostart)
 #   shuffle off      stop
+#   skip <file>      take a wallpaper out of the random change, or put it back (Space in the wallpaper panel)
 #   apply            after login: switch to a random one when the mode is "login"
 # The mode is wallpaper.shuffle in ~/.config/torii/config.json. The pictures come from wallpaper.dir (default ~/Pictures/wallpapers).
 set -uo pipefail
@@ -44,6 +45,13 @@ UNIT
       systemctl --user daemon-reload
       systemctl --user enable --now torii-wallpaper.timer >/dev/null 2>&1
     fi
+    ;;
+  skip)
+    # toggle one file (by name) in or out of the random change: wallpaper.noShuffle in config.json
+    [ -n "${2:-}" ] || { echo "usage: torii-wallpaper skip <file name>"; exit 2; }
+    cur=$("$CFG" get wallpaper.noShuffle 2>/dev/null); [ -n "$cur" ] && [ "$cur" != null ] || cur='[]'
+    new=$(python3 -c 'import json,sys; l=json.loads(sys.argv[1]); n=sys.argv[2]; l.remove(n) if n in l else l.append(n); print(json.dumps(l))' "$cur" "$2")
+    "$CFG" set wallpaper.noShuffle "$new" >/dev/null
     ;;
   apply)
     [ "$(mode)" = login ] && { sleep 6; exec "$HOME/.config/torii/bin/torii-theme" random; }

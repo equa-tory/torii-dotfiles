@@ -1176,7 +1176,7 @@ Singleton {
         const shuffle = m => sh([bin("torii-wallpaper"), "shuffle", String(m)]);
         return { id: "wallpapers", name: "Wallpapers", glyph: Icons.image || Icons.apps, sub: "Random change: " + label + "  ·  " + Config.wallpaper.dir,
                  keywords: "wallpaper background picture image random shuffle slideshow switcher theme", children: () => [
-            { id: "panel", name: "Open the wallpaper panel", glyph: Icons.image || Icons.apps, sub: "Pick one; the colours follow it", run: () => Panels.open("switcher") },
+            { id: "panel", name: "Open the wallpaper panel", glyph: Icons.image || Icons.apps, sub: "Pick one (Enter); Space adds or removes it from the random change", keep: true, run: () => Panels.open("switcher") },
             { id: "dir", name: "Open the wallpapers folder", glyph: Icons.folder, sub: Config.wallpaper.dir, keep: true, run: () => sh(["xdg-open", dir]) },
             { id: "random", name: "Change randomly", glyph: Icons.refresh, sub: label, children: () => [
                 { id: "off", name: "Off", glyph: Icons.power, badge: cur === "off" ? "●" : "", keep: true, run: () => shuffle("off") },

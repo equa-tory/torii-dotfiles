@@ -363,6 +363,12 @@ Super+V opens the clipboard history in the notch: type to filter, Up/Down choose
 (Ctrl+Shift+V in a terminal), Delete forgets the chosen entry, Ctrl+Delete forgets all. `cliphist` records text and images
 (`torii-clip watch` runs from the autostart); `torii-clip list|paste|delete|clear` are the commands behind it.
 
+## Video wallpapers and the random change list
+
+Videos (`.mp4 .webm .mkv .mov`, and `.gif`) in the wallpapers folder work like pictures: the panel shows a frame of each with a "video" tag, Enter applies it, and the shell plays it in a loop on the wallpaper layer of every monitor (Qt multimedia, no extra program; no sound). The colours come from a frame of the clip (`torii-theme stills` makes `~/.cache/torii/stills/<name>.jpg`; the boot menu and the fallback wallpaper use that frame too). The clip stops while a fullscreen window covers that monitor. Cost: roughly a quarter of one CPU core for two 960x540 clips; 1080p 30 fps H.264 is a good size.
+
+In the wallpaper panel, **Space** takes the selected wallpaper out of the random change (tag "not shuffled") or puts it back; Enter applies it. The list is `wallpaper.noShuffle` in `config.json` (file names); `torii-wallpaper skip <file>` does the same from a terminal. Setup > Wallpapers > "Open the wallpaper panel" now stays open in the panel (it closed straight away before).
+
 ## Wallpapers menu and a random wallpaper
 
 Setup > Wallpapers: open the wallpaper panel, open the wallpapers folder, "Change randomly" (off, a minutes slider from 5 to 120, on login) and "Random wallpaper now".

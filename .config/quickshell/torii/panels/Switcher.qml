@@ -6,7 +6,7 @@ import Qt.labs.folderlistmodel
 import QtQuick
 import QtQuick.Effects
 
-// Wallpaper / theme switcher. Left/Right moves and previews on this monitor, Space/Enter applies
+// Wallpaper / theme switcher. Left/Right moves and previews on this monitor, Enter applies, Space adds / removes it from the random change
 // (torii-theme restyles everything), Esc cancels. The folder is watched: drop an image in, it shows up.
 Item {
     id: root
@@ -36,9 +36,26 @@ Item {
         Panels.close();
     }
 
+    // Space: this wallpaper joins / leaves the random change (config.json wallpaper.noShuffle)
+    readonly property var skipped: Config.wallpaper.noShuffle || []
+    function inShuffle(name) { return skipped.indexOf(name) < 0; }
+    function toggleShuffle() {
+        if (!list.currentItem) return;
+        Quickshell.execDetached([Config.home + "/.config/torii/bin/torii-wallpaper", "skip", list.currentItem.fileName]);
+    }
+
+    // the pictures for the video wallpapers (one frame each) are made on first open
+    property bool stillsReady: false
+    Process {
+        running: true
+        command: [Config.home + "/.config/torii/bin/torii-theme", "stills"]
+        onExited: root.stillsReady = true
+    }
+
     function step(d) {
         if (count === 0)
             return;
+        moved = true;
         list.currentIndex = Math.max(0, Math.min(count - 1, list.currentIndex + d));
     }
 
@@ -46,19 +63,23 @@ Item {
     Keys.onRightPressed: step(1)
     Keys.onReturnPressed: confirm()
     Keys.onEnterPressed: confirm()
-    Keys.onSpacePressed: confirm()
+    Keys.onSpacePressed: toggleShuffle()
     Keys.onEscapePressed: Panels.close()
 
     FolderListModel {
         id: folder
         folder: "file://" + Config.expand(Config.wallpaper.dir)
-        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp"]
+        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp", "*.mp4", "*.webm", "*.mkv", "*.mov", "*.gif"]
         caseSensitive: false
         showDirs: false
         sortField: FolderListModel.Name
-        onStatusChanged: if (status === FolderListModel.Ready) selectCurrent()
-        onCountChanged: if (status === FolderListModel.Ready && list.currentIndex < 0) selectCurrent()
+        onStatusChanged: if (status === FolderListModel.Ready) { selectCurrent(); settle.restart(); }
+        onCountChanged: if (status === FolderListModel.Ready) { if (list.currentIndex < 0) selectCurrent(); settle.restart(); }
     }
+
+    // the folder fills in steps: once it has settled (and you have not moved yet) look again for the wallpaper that is active
+    property bool moved: false
+    Timer { id: settle; interval: 200; onTriggered: if (!root.moved) root.selectCurrent() }
 
     // start on the wallpaper that is active now
     function selectCurrent() {
@@ -152,7 +173,7 @@ Item {
                     id: img
                     anchors.fill: parent
                     anchors.margins: frame.border.width
-                    source: "file://" + cell.filePath
+                    source: (Config.isVideo(cell.filePath) && !root.stillsReady) ? "" : "file://" + Config.still(cell.filePath)
                     sourceSize: Qt.size(root.thumbW * 2, root.thumbH * 2)
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
@@ -173,6 +194,23 @@ Item {
                     maskEnabled: true
                     maskSource: round
                 }
+                // small markers: a video, and "not in the random change"
+                Row {
+                    anchors { left: parent.left; top: parent.top; leftMargin: 8; topMargin: 8 }
+                    spacing: 4
+                    Rectangle {
+                        visible: Config.isVideo(cell.filePath)
+                        height: 16; width: vlabel.implicitWidth + 10; radius: 8
+                        color: Qt.rgba(0, 0, 0, 0.6)
+                        Label { id: vlabel; anchors.centerIn: parent; text: "▶ video"; color: "white"; font.pixelSize: 10 }
+                    }
+                    Rectangle {
+                        visible: !root.inShuffle(cell.fileName)
+                        height: 16; width: slabel.implicitWidth + 10; radius: 8
+                        color: Qt.rgba(0, 0, 0, 0.6)
+                        Label { id: slabel; anchors.centerIn: parent; text: "not shuffled"; color: "white"; font.pixelSize: 10 }
+                    }
+                }
             }
 
             MouseArea {
@@ -180,7 +218,7 @@ Item {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     if (cell.selected) root.confirm();
-                    else list.currentIndex = cell.index;
+                    else { root.moved = true; list.currentIndex = cell.index; }
                 }
             }
         }
@@ -212,6 +250,10 @@ Item {
         }
         Label {
             text: (list.currentIndex + 1) + " / " + root.count
+            color: Theme.muted
+        }
+        Label {
+            text: list.currentItem && !root.inShuffle(list.currentItem.fileName) ? "Space: add to the random change" : "Space: leave the random change"
             color: Theme.muted
         }
     }
