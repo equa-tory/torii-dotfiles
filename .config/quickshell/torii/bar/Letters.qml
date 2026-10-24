@@ -61,8 +61,8 @@ Row {
             height: 20
             radius: 10
             anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-            color: active ? (focused ? Theme.accent : Theme.accentDim) : (occupied ? Theme.overlay : "transparent")
-            border.width: root.picking ? 1.5 : (active || occupied ? 0 : 1)
+            color: active ? (focused ? Theme.accent : Theme.accentDim) : (occupied ? Theme.subtle : Theme.overlay)
+            border.width: root.picking ? 1.5 : 0
             border.color: root.picking ? Theme.accent : Theme.overlay
             Behavior on color { ColorAnimation { duration: 180 } }
 
@@ -73,7 +73,7 @@ Row {
                 font.family: Config.font.family
                 font.pixelSize: Config.font.size - 2
                 font.bold: true
-                color: pill.active ? Theme.accentFg : (pill.occupied ? Theme.fg : Theme.subtle)
+                color: pill.active ? Theme.accentFg : Theme.bg
             }
             MouseArea {
                 anchors.fill: parent
