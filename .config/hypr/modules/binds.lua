@@ -240,7 +240,16 @@ local function letter_submap(name, label, action)
         pcall(function() hl.bind("catchall", hl.dsp.submap("reset")) end)
     end)
 end
-letter_submap("wsgo", "go", function(l) hl.dispatch(hl.dsp.focus({ workspace = type(l) == "number" and l or "name:" .. l })) end)
+-- A letter workspace comes to the monitor you are on instead of sending you to the monitor it was last shown on
+-- (otherwise an emptied letter workspace stays open on the other screen).
+local function focused_monitor()
+    for _, m in ipairs(hl.get_monitors()) do if m.focused then return m.name end end
+end
+letter_submap("wsgo", "go", function(l)
+    local mon = type(l) == "string" and focused_monitor()
+    if mon then pcall(function() hl.dispatch(hl.dsp.workspace.move({ workspace = "name:" .. l, monitor = mon })) end) end
+    hl.dispatch(hl.dsp.focus({ workspace = type(l) == "number" and l or "name:" .. l }))
+end)
 letter_submap("wsmove", "move", function(l) hl.dispatch(hl.dsp.window.move({ workspace = type(l) == "number" and l or "name:" .. l })) end)
 local function wait_letter(name)
     return function()
