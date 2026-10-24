@@ -88,9 +88,9 @@ def lua(rules):
     live = set()
     remember = [r["class"] for r in rules if r.get("remember") and not r.get("title")]
     out.append("torii_remember_apps = {%s}" % ", ".join("[%s]=true" % lstr(c) for c in remember))     # read by hypr/modules/floatmode.lua
-    for ltr in sorted({r["workspace"] for r in rules if is_letter(r.get("workspace"))}):
-        live.add("ws:" + ltr)                  # a letter workspace stays (and shows in the notch) while a rule uses it
-        out.append('hl.workspace_rule({workspace="name:%s", persistent=true})' % ltr)
+    letters_used = {r["workspace"] for r in rules if is_letter(r.get("workspace"))}
+    for ltr in sorted(letters_used):
+        out.append('hl.workspace_rule({workspace="name:%s", persistent=false})' % ltr)    # a letter workspace goes when it is empty
     for r in rules:
         ws, fl = r.get("workspace"), bool(r.get("float") or r.get("remember"))
         if not ws and not fl:
@@ -107,6 +107,8 @@ def lua(rules):
         out.append("hl.window_rule({%s})" % ", ".join(fields))
     for k in sorted(seen - live):
         if k.startswith("ws:"):
+            if k[3:] in letters_used:
+                continue
             out.append('hl.workspace_rule({workspace="name:%s", persistent=false})' % k[3:])
             continue
         out.append("hl.window_rule({name=%s, match={class=\"^torii-no-such-class$\"}, float=false})" % lstr(rule_name(k)))

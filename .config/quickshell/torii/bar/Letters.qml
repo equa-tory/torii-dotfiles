@@ -78,7 +78,11 @@ Row {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: Hyprland.dispatch('hl.dsp.focus({ workspace = "name:' + pill.modelData + '" })')
+                onClicked: {
+                    // the letter workspace comes to this monitor (like Alt+W), it does not send you to the one it was last on
+                    if (root.mon) Hyprland.dispatch('hl.dsp.workspace.move({ workspace = "name:' + pill.modelData + '", monitor = "' + root.mon.name + '" })');
+                    Hyprland.dispatch('hl.dsp.focus({ workspace = "name:' + pill.modelData + '" })');
+                }
             }
         }
     }
