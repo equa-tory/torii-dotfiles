@@ -434,3 +434,7 @@ PipeWire knows programs, not windows: every tab of the browser is one "Helium". 
 ## Keys in fullscreen games
 
 While a Steam game is fullscreen and focused, only the combinations listed in `.config/hypr/game-keys.lua` stay active (the rest, e.g. Alt+1..0, goes to the game). Edit that file (launcher: Setup > Configs > Hyprland > Keys in fullscreen games) to allow or disallow one (one line each, written like the binds in `modules/binds.lua`; only binds made there can be listed, not the launcher's Ctrl+K bindings) and run `hyprctl reload`. By default: Alt+Shift+F, Alt+Tab, Alt+Space, Alt+N, Alt+Enter, Alt+Shift+Enter, Alt+W, Alt+Shift+W and Super+Shift+Q/W/E/R (screenshots, recording, text from the screen).
+
+## yazi
+
+Config in `.config/yazi`. Enter / `o` open through `torii-open` (the apps chosen in Setup > Defaults > Open files with): text opens in nvim inside yazi, mpv / imv / zathura and the others start on their own. Folders show no size until you ask: **U** scans them (sorts by size, biggest first; `,n` sorts back by name; `,s` / `,S` are the stock keys for the same sort), **g u** opens the folder in gdu (`torii-gdu`).
