@@ -77,14 +77,15 @@ Row {
                 font.bold: true
                 color: pill.active ? Theme.accentFg : Theme.bg
             }
-            // a window on this workspace is fullscreen (it hides the others, so it is easy to lose)
+            // a window on this workspace is fullscreen (it hides the others, so it is easy to lose): the letter is underlined
             Rectangle {
                 visible: pill.fullscreen
-                x: parent.width - 7; y: 2
-                width: 5; height: 4; radius: 1
-                color: "transparent"
-                border.width: 1
-                border.color: pill.active ? Theme.accentFg : Theme.bg
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: txt.y + txt.height - 1
+                width: txt.implicitWidth
+                height: 2
+                radius: 1
+                color: txt.color
             }
             MouseArea {
                 anchors.fill: parent

@@ -124,18 +124,17 @@ Row {
                 Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
                 Behavior on color { ColorAnimation { duration: 180 } }
 
-                // marker: a window on this workspace is fullscreen (it hides the others, so it is easy to lose)
+                // marker: a window on this workspace is fullscreen (it hides the others, so it is easy to lose): a dot on top,
+                // like the one at the bottom for "a window lives here"
                 Rectangle {
                     visible: cell.fullscreen
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.top
-                    anchors.topMargin: 2
-                    width: 5
-                    height: 4
-                    radius: 1
-                    color: "transparent"
-                    border.width: 1
-                    border.color: cell.active ? Theme.accentFg : Theme.bg
+                    anchors.topMargin: 3
+                    width: 3
+                    height: 3
+                    radius: 1.5
+                    color: cell.active ? Theme.accentFg : Theme.bg
                 }
                 // marker: a window lives here
                 Rectangle {
