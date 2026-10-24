@@ -424,3 +424,7 @@ Ctrl+K > Add binding on "Start audio recording" gives it a key). Pick the progra
 sound, not the rest of the computer), optionally the microphone and/or everything the computer plays, and "folder" for one WAV per source instead of one mixed file.
 A program that is not playing yet is recorded from the moment it starts playing (and again if its sound stops and restarts); the gaps stay silent, so times in the file are real.
 PipeWire knows programs, not windows: every tab of the browser is one "Helium". (The screen recording's program tracks used to record silence; fixed.)
+
+## Keys in fullscreen games
+
+While a Steam game is fullscreen and focused, only the combinations listed in `.config/hypr/game-keys.lua` stay active (the rest, e.g. Alt+1..0, goes to the game). Edit that file to allow or disallow one (one line each, written like the binds in `modules/binds.lua`; only binds made there can be listed, not the launcher's Ctrl+K bindings) and run `hyprctl reload`. By default: Alt+Shift+F, Alt+Tab, Alt+Space, Alt+N, Alt+Enter, Alt+Shift+Enter, Alt+W, Alt+Shift+W and Super+Shift+Q/W/E/R (screenshots, recording, text from the screen).
