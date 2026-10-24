@@ -28,7 +28,7 @@ Singleton {
         if (!o["class"] && !o.title) return false;
         const w = o.workspace;
         if (!w) return false;
-        return w.id > 0 || String(w.name).indexOf("special:") === 0;
+        return w.id > 0 || /^[a-z]$/.test(String(w.name)) || String(w.name).indexOf("special:") === 0;     // numbered, letter or special
     }
 
     readonly property var list: {

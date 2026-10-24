@@ -84,7 +84,10 @@ Row {
 
     Connections {
         target: Hyprland
-        function onRawEvent(event) { debounce.restart(); }
+        function onRawEvent(event) {
+            if (event.name === "fullscreen" || event.name === "openwindow" || event.name === "closewindow" || event.name === "movewindowv2") Hyprland.refreshWorkspaces();
+            debounce.restart();
+        }
     }
     Connections {
         target: Config.workspaces
@@ -102,6 +105,7 @@ Row {
             readonly property bool active: modelData === root.activeId || modelData === root.focusedId
             readonly property bool focused: modelData === root.focusedId
             readonly property bool occupied: ws ? ws.toplevels.values.length > 0 : false
+            readonly property bool fullscreen: ws && ws.lastIpcObject ? ws.lastIpcObject.hasfullscreen === true : false
 
             width: capsule.width
             height: 22
@@ -120,6 +124,19 @@ Row {
                 Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
                 Behavior on color { ColorAnimation { duration: 180 } }
 
+                // marker: a window on this workspace is fullscreen (it hides the others, so it is easy to lose)
+                Rectangle {
+                    visible: cell.fullscreen
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 2
+                    width: 5
+                    height: 4
+                    radius: 1
+                    color: "transparent"
+                    border.width: 1
+                    border.color: cell.active ? Theme.accentFg : Theme.bg
+                }
                 // marker: a window lives here
                 Rectangle {
                     visible: cell.occupied

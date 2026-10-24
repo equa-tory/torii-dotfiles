@@ -41,6 +41,7 @@ Row {
     Connections {
         target: Hyprland
         function onRawEvent(event) {
+            if (event.name === "fullscreen" || event.name === "openwindow" || event.name === "closewindow" || event.name === "movewindowv2") Hyprland.refreshWorkspaces();
             if (event.name === "submap") root.picking = event.data === "wsgo" || event.data === "wsmove";
             debounce.restart();
         }
@@ -56,6 +57,7 @@ Row {
             readonly property bool active: modelData === root.activeName || modelData === root.focusedName
             readonly property bool focused: modelData === root.focusedName
             readonly property bool occupied: ws ? ws.toplevels.values.length > 0 : false
+            readonly property bool fullscreen: ws && ws.lastIpcObject ? ws.lastIpcObject.hasfullscreen === true : false
 
             width: Math.max(20, txt.implicitWidth + 10)
             height: 20
@@ -74,6 +76,15 @@ Row {
                 font.pixelSize: Config.font.size - 2
                 font.bold: true
                 color: pill.active ? Theme.accentFg : Theme.bg
+            }
+            // a window on this workspace is fullscreen (it hides the others, so it is easy to lose)
+            Rectangle {
+                visible: pill.fullscreen
+                x: parent.width - 7; y: 2
+                width: 5; height: 4; radius: 1
+                color: "transparent"
+                border.width: 1
+                border.color: pill.active ? Theme.accentFg : Theme.bg
             }
             MouseArea {
                 anchors.fill: parent
