@@ -310,6 +310,13 @@ bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"), { submap_universal = true, locked = true, repeating = true })
 -- Volume down
 bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),      { submap_universal = true, locked = true, repeating = true })
+-- keys: ALT + SHIFT + + / - | Volume up / down (keyboard without media keys); works in fullscreen games too
+for _, k in ipairs({ "equal", "plus", "KP_Add" }) do
+    bind(mainMod .. " + SHIFT + " .. k, hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"), { submap_universal = true, repeating = true })
+end
+for _, k in ipairs({ "minus", "KP_Subtract" }) do
+    bind(mainMod .. " + SHIFT + " .. k, hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), { submap_universal = true, repeating = true })
+end
 -- Mute / unmute the sound
 bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),     { submap_universal = true, locked = true, repeating = true })
 -- Mute / unmute the microphone

@@ -5,6 +5,8 @@
 hl.on("hyprland.start", function () 
   -- torii shell: notch bar, control panel, launcher, wallpaper (replaces waybar + hyprpaper).
   -- `torii-shell fallback` brings the old ones back if it ever misbehaves.
+  -- secret service for apps that keep a login (Unity Hub...): a keyring with an empty password, unlocked without a prompt
+  hl.exec_cmd("sh -c 'command -v gnome-keyring-daemon >/dev/null && { printf \"\" | gnome-keyring-daemon --unlock --components=secrets >/dev/null; }'")
   hl.exec_cmd("$HOME/.config/torii/bin/torii-shell start")
   hl.exec_cmd("$HOME/.config/torii/bin/torii-nightlight apply")
   hl.exec_cmd("$HOME/.config/torii/bin/torii-automove apply")

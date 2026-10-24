@@ -120,3 +120,4 @@ kdegraphics-thumbnailers
 kimageformats
 gcc
 qemu-desktop
+gnome-keyring
