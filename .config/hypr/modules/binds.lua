@@ -332,7 +332,7 @@ hl.bind(mainMod .. " + SHIFT + " .. mainMod:sub(1, 1) .. mainMod:sub(2):lower() 
 
 -- Games: Alt is the main modifier here, so Alt+1..0 and friends would never reach a game that uses them. While a Steam game
 -- (Proton windows are "steam_app_<id>") is fullscreen and has the focus, the normal binds are off and only these few stay
--- (Alt+Space launcher, Alt+N control centre, Alt+Tab, Alt+Enter terminal, Alt+Shift+Enter browser; the media keys are "submap_universal", so they work as always). Out of fullscreen (Alt+Shift+F) every bind works again.
+-- (Alt+Space launcher, Alt+N control centre, Alt+Tab, Alt+Enter terminal, Alt+Shift+Enter browser, Alt+W / Alt+Shift+W workspace letter; the media keys are "submap_universal", so they work as always). Out of fullscreen (Alt+Shift+F) every bind works again.
 -- While a panel (launcher, control centre, Alt+Tab) is open every bind works too. Alt+Shift+G switches the game keys off by hand (until the focus or fullscreen changes).
 hl.define_submap("game", function()
     hl.bind(mainMod .. " + SHIFT + F", function()
@@ -345,6 +345,8 @@ hl.define_submap("game", function()
     -- Alt+Enter is "toggle fullscreen" in most Windows games, so the app launchers must be caught here too
     hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
     hl.bind(mainMod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(browser))
+    hl.bind(mainMod .. " + W", wait_letter("wsgo"))
+    hl.bind(mainMod .. " + SHIFT + W", wait_letter("wsmove"))
     hl.bind(mainMod .. " + SHIFT + G", hl.dsp.submap("reset"))
 end)
 local function game_keys()
@@ -356,6 +358,7 @@ local function game_keys()
         if ws and cur and ws.id ~= cur.id then game = false end
     end
     local now = hl.get_current_submap and hl.get_current_submap() or ""
+    if now == "wsgo" or now == "wsmove" then return end -- waiting for the workspace letter: do not cancel it
     if game and now ~= "game" then hl.dispatch(hl.dsp.submap("game"))
     elseif not game and now == "game" then hl.dispatch(hl.dsp.submap("reset")) end
 end
