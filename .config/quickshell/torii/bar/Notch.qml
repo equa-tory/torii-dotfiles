@@ -29,7 +29,7 @@ PanelWindow {
     // an open panel (launcher, control centre, Alt+Tab...) shows over a fullscreen window too; the bar itself stays under it
     WlrLayershell.layer: panelHere ? WlrLayer.Overlay : WlrLayer.Top
     // an open media activity can take the keyboard (click it): Left/Right then seek
-    readonly property bool mediaOpen: Svc.Live.expanded === "media" && Svc.Media.active
+    readonly property bool mediaOpen: Svc.Live.expanded.indexOf("media") === 0 && Svc.Media.active
     WlrLayershell.keyboardFocus: panelHere ? WlrKeyboardFocus.Exclusive : (mediaOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
     anchors { top: true; left: true; right: true }
     // full height: while a panel is open the whole window takes input so a click outside the panel closes it
@@ -45,9 +45,9 @@ PanelWindow {
         anchors.fill: parent
         focus: true
         Keys.onEscapePressed: { if (win.panelHere) Panels.close(); else Svc.Live.expanded = ""; }
-        Keys.onLeftPressed: if (win.mediaOpen) Svc.Media.seekBy(-Config.media.seekSeconds)
-        Keys.onRightPressed: if (win.mediaOpen) Svc.Media.seekBy(Config.media.seekSeconds)
-        Keys.onSpacePressed: if (win.mediaOpen) Svc.Media.toggle()
+        Keys.onLeftPressed: if (win.mediaOpen) Svc.Media.seekBy(-Config.media.seekSeconds, Svc.Media.forKey(Svc.Live.expanded))
+        Keys.onRightPressed: if (win.mediaOpen) Svc.Media.seekBy(Config.media.seekSeconds, Svc.Media.forKey(Svc.Live.expanded))
+        Keys.onSpacePressed: if (win.mediaOpen) Svc.Media.toggle(Svc.Media.forKey(Svc.Live.expanded))
     }
     // the same editing keys for the control panel's text fields (the launcher handles its own)
     Connections {

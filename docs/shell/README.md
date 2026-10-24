@@ -254,7 +254,7 @@ Sounds (`torii-sound`, Setup › Sounds picks them and plays a preview): `sounds
 **Media** (`Media`, MPRIS: players and browsers): whatever plays shows up as an activity (not while the player's own window has focus: `media.onlyWhenUnfocused`, a browser counts as focused whenever one of its windows is), a circle with the cover and a
 ring that fills with the track. Click it: title, artist and album (click them to bring the player forward), previous /
 play / next, a seek bar you can drag, wheel or Left/Right (`media.seekSeconds`, default 10) to seek. Also from a key bind:
-`qs -c torii ipc call media toggle|next|previous|seek 10`.
+`qs -c torii ipc call media toggle|next|previous|seek 10`. Every player that is playing gets its own circle (a browser and mpv at once); tabs of one browser share one player, so they stay one circle.
 
 **Widgets** (`widgets.left` / `widgets.right` in `config.json`, or Setup › Widgets): they only take room while the launcher or the
 control panel is open (defaults: `claude` on the left with the 5-hour usage and the time until it resets, `battery` on the right,

@@ -35,6 +35,26 @@ Singleton {
     readonly property real progress: length > 0 ? Math.max(0, Math.min(1, position / length)) : -1
     readonly property bool canSeek: player !== null && player.canSeek
 
+    // every player that is playing something right now gets its own activity (two browsers, a browser and mpv...);
+    // when none plays, the last one stays (paused) as before. Tabs of one browser share a single player, so they cannot be split.
+    function isMedia(p) {
+        return p !== null && (p.trackTitle || "") !== "" && !(p.lengthSupported && p.length > 0 && p.length < 3);
+    }
+    readonly property var list: {
+        const out = Mpris.players.values.filter(p => p.isPlaying && isMedia(p));
+        if (out.length === 0 && active) out.push(player);
+        return out;
+    }
+    function forKey(key) {            // "media" = the first one, "media:<n>" the others
+        const n = key === "media" ? 0 : parseInt((key || "").split(":")[1]);
+        return list[n] || player;
+    }
+    function playerKeyOf(p) { return p ? (p.desktopEntry || p.identity || "").toLowerCase() : ""; }
+    function focusedOn(p) {
+        const k = playerKeyOf(p);
+        return activeClass !== "" && k !== "" && (activeClass.indexOf(k) >= 0 || k.indexOf(activeClass) >= 0);
+    }
+
     // is the player's own window the focused one? (then the notch does not need to tell you what plays)
     property string activeClass: ""
     readonly property string playerKey: player ? (player.desktopEntry || player.identity || "").toLowerCase() : ""
@@ -55,29 +75,32 @@ Singleton {
     // the position only moves when asked
     Timer {
         interval: 1000
-        running: root.playing
+        running: root.list.length > 0
         repeat: true
-        onTriggered: if (root.player) root.player.positionChanged()
+        onTriggered: { for (const p of root.list) p.positionChanged(); }
     }
 
-    function toggle() { if (player && player.canTogglePlaying) player.togglePlaying(); }
-    function next() { if (player && player.canGoNext) player.next(); }
-    function previous() { if (player && player.canGoPrevious) player.previous(); }
-    function seekBy(seconds) {
-        if (!player || !player.canSeek) return;
-        player.position = Math.max(0, Math.min(length > 0 ? length : 1e9, player.position + seconds));
-        player.positionChanged();
+    function toggle(p) { p = p || player; if (p && p.canTogglePlaying) p.togglePlaying(); }
+    function next(p) { p = p || player; if (p && p.canGoNext) p.next(); }
+    function previous(p) { p = p || player; if (p && p.canGoPrevious) p.previous(); }
+    function seekBy(seconds, p) {
+        p = p || player;
+        if (!p || !p.canSeek) return;
+        p.position = Math.max(0, Math.min(p.lengthSupported && p.length > 0 ? p.length : 1e9, p.position + seconds));
+        p.positionChanged();
     }
-    function seekTo(fraction) {
-        if (!player || !player.canSeek || length <= 0) return;
-        player.position = Math.max(0, Math.min(1, fraction)) * length;
-        player.positionChanged();
+    function seekTo(fraction, p) {
+        p = p || player;
+        if (!p || !p.canSeek || !p.lengthSupported || p.length <= 0) return;
+        p.position = Math.max(0, Math.min(1, fraction)) * p.length;
+        p.positionChanged();
     }
 
     // bring the player's window forward (the Hyprland client whose class matches the player)
-    function focus() {
-        if (!player) return;
-        focusProc.key = (player.desktopEntry || player.identity || "").toLowerCase();
+    function focus(p) {
+        p = p || player;
+        if (!p) return;
+        focusProc.key = playerKeyOf(p);
         if (focusProc.key !== "") focusProc.running = true;
     }
     Process {

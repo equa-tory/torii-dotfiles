@@ -27,7 +27,10 @@ Row {
         if (Live.dnd) return [{ kind: "dnd", key: "dnd" }];       // do not disturb: nothing else is shown
         const out = [];
         for (const r of Live.reminders) out.push({ kind: "reminder", key: "r" + r.id, r: r });
-        if (Media.active && (Live.expanded === "media" || !(Config.media.onlyWhenUnfocused && Media.playerFocused))) out.push({ kind: "media", key: "media" });
+        Media.list.forEach((mp, i) => {
+            const key = i === 0 ? "media" : "media:" + i;
+            if (Live.expanded === key || !(Config.media.onlyWhenUnfocused && Media.focusedOn(mp))) out.push({ kind: "media", key: key, mp: mp });
+        });
         if (Live.sudoOn) out.push({ kind: "sudo", key: "sudo" });
         if (Live.recording) out.push({ kind: "rec", key: "rec" });
         if (Audio.sourceMuted) out.push({ kind: "mic", key: "mic" });
@@ -37,7 +40,7 @@ Row {
         return out;
     }
 
-    Component { id: mediaBody; MediaBody {} }
+    Component { id: mediaBody; MediaBody { player: Media.forKey(Live.expanded) } }
 
     Repeater {
         id: repeater
@@ -48,6 +51,8 @@ Row {
             required property var modelData
             readonly property string kind: modelData.kind
             readonly property var r: modelData.r
+            readonly property var mp: modelData.mp
+            readonly property real mprogress: mp && mp.lengthSupported && mp.length > 0 && mp.positionSupported ? Math.max(0, Math.min(1, mp.position / mp.length)) : -1
 
             pad: root.pad
             backing: root.backing
@@ -56,14 +61,14 @@ Row {
                  : kind === "media" ? Icons.music : kind === "mic" ? Icons.micOff : kind === "automove" ? Icons.folderMove : kind === "night" ? Icons.nightLight : Icons.bellOff
             tint: kind === "rec" || kind === "mic" ? Theme.red : kind === "sudo" ? Theme.yellow : kind === "dnd" ? Theme.subtle : Theme.accent
             openable: kind === "reminder" || kind === "media"
-            image: kind === "media" ? Media.art : ""
+            image: kind === "media" ? (mp ? mp.trackArtUrl || "" : "") : ""
             content: kind === "media" ? mediaBody : null
             contentWidth: 430
             closable: kind === "reminder"
-            remain: kind === "media" ? Media.progress : kind === "reminder" ? Math.min(1, Live.remaining(r) / Math.max(1, r.due - r.start))
+            remain: kind === "media" ? mprogress : kind === "reminder" ? Math.min(1, Live.remaining(r) / Math.max(1, r.due - r.start))
                   : (kind === "sudo" && Live.sudoState.until > 0) ? Math.min(1, Math.max(0, Live.sudoState.until - Live.now / 1000) / Math.max(1, Live.sudoState.until - Live.sudoState.start))
                   : -1
-            text: kind === "media" ? Media.title + (Media.artist ? "  ·  " + Media.artist : "")
+            text: kind === "media" ? (mp ? mp.trackTitle || "" : "") + (mp && mp.trackArtist ? "  ·  " + mp.trackArtist : "")
                 : kind === "mic" ? "Microphone muted · click to unmute"
                 : kind === "rec" ? "Recording · click to stop"
                 : kind === "automove" ? "Auto mover on · click to turn off"
