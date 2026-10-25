@@ -17,15 +17,12 @@ need() { command -v "$1" >/dev/null 2>&1 || { note "torii-capture" "$1 is not in
 focused() { hyprctl monitors -j | jq -r '.[] | select(.focused) | .name'; }
 # drag a rectangle; the screen is frozen while you choose when capture.freeze is on (default) and wayfreeze is installed
 freeze_on() { [ "$("$HOME/.config/torii/bin/torii-config" get capture.freeze 2>/dev/null)" != "false" ] && command -v wayfreeze >/dev/null 2>&1; }
-zone() {                                   # empty when you press Esc
-  if freeze_on; then
-    wayfreeze --hide-cursor & fp=$!
-    sleep 0.25
-    slurp -d; r=$?
-    kill "$fp" 2>/dev/null; wait "$fp" 2>/dev/null
-    return $r
-  fi
-  slurp -d
+# The freeze stays up until the script exits, so grim copies the frozen picture (not the live screen) and
+# a hover popup that closes when slurp grabs the pointer is still in it. `zone` must not run in $(...).
+fp=""; trap '[ -n "$fp" ] && kill "$fp" 2>/dev/null' EXIT
+zone() {                                   # sets $geo; empty when you press Esc
+  if freeze_on; then wayfreeze --hide-cursor & fp=$!; sleep 0.25; fi
+  geo=$(slurp -d) || geo=""
 }
 
 case "${1:-}" in
@@ -34,7 +31,7 @@ case "${1:-}" in
     f="$pics/$ts.png"; grim -o "$(focused)" "$f" && { wl-copy < "$f"; note "Screenshot saved" "$f" -i "$f"; } ;;
   zone)
     need grim; need slurp; mkdir -p "$pics"
-    geo=$(zone) || exit 0; [ -n "$geo" ] || exit 0; sleep 0.2
+    zone; [ -n "$geo" ] || exit 0; [ -n "$fp" ] || sleep 0.2
     f="$pics/$ts.png"; grim -g "$geo" "$f" && { wl-copy < "$f"; note "Screenshot saved" "$f" -i "$f"; } ;;
   record)   # picture + sound, settings in Capture > Screen recording
     need wf-recorder; exec "$HOME/.config/torii/bin/torii-record" toggle ;;
@@ -44,14 +41,14 @@ case "${1:-}" in
     st="${TORII_STATE:-$HOME/.local/state/torii}/recording.json"; mkdir -p "$(dirname "$st")"; printf '{"on": false}\n' > "$st" ;;
   text)
     need grim; need slurp; need tesseract
-    geo=$(zone) || exit 0; [ -n "$geo" ] || exit 0; sleep 0.2
+    zone; [ -n "$geo" ] || exit 0; [ -n "$fp" ] || sleep 0.2
     langs=eng; tesseract --list-langs 2>/dev/null | grep -qx rus && langs=eng+rus
     txt=$(grim -g "$geo" - | tesseract - - -l "$langs" 2>/dev/null | sed 's/[[:space:]]*$//')
     if [ -n "$txt" ]; then printf '%s' "$txt" | wl-copy; note "Text copied" "$(printf '%s' "$txt" | head -c 200)"
     else note "No text found"; fi ;;
   qr)
     need grim; need slurp; need zbarimg
-    geo=$(zone) || exit 0; [ -n "$geo" ] || exit 0; sleep 0.2
+    zone; [ -n "$geo" ] || exit 0; [ -n "$fp" ] || sleep 0.2
     code=$(grim -g "$geo" - | zbarimg -q --raw - 2>/dev/null | head -n1)
     if [ -n "$code" ]; then printf '%s' "$code" | wl-copy; note "QR code copied" "$code"
     else note "No QR code found"; fi ;;
