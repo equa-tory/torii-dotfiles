@@ -438,3 +438,9 @@ While a Steam game is fullscreen and focused, only the combinations listed in `.
 ## yazi
 
 Config in `.config/yazi`. Enter / `o` open through `torii-open` (the apps chosen in Setup > Defaults > Open files with): text opens in nvim inside yazi, mpv / imv / zathura and the others start on their own. Folders show no size until you ask: **U** scans them (sorts by size, biggest first; `,n` sorts back by name; `,s` / `,S` are the stock keys for the same sort), **g u** opens the folder in gdu (`torii-gdu`).
+
+## Helium profile copies and restore
+
+Two Helium browsers on one profile corrupt it (extensions stop, thumbnails are missing, "Something went wrong when opening your profile"), and a pull of the old manual copy loses what changed since. So `torii-helium-backup` keeps dated copies on the home server (`torii-private/snapshots/helium/<date>_<time>`, the newest 7; unchanged files are hard links, caches are left out), made by a daily systemd user timer (20 minutes after login, then every day; `torii-helium-backup timer on|off`) or by hand (`torii-helium-backup now`). It refuses to copy while two browsers share the profile. Restore: launcher > Install > Sync torii > Restore Helium > pick a copy (`torii-sync restore-helium <name>`): Helium and the web apps close, the profile now here is kept in `~/.cache/torii/helium-profile-before-restore`, the copy is put back and the windows open again. Login autostart opens the Helium windows one after the other so the race that caused the corruption does not happen.
+
+(The older "Sync torii > helium" push / pull is still there; it is manual and keeps one copy only.)

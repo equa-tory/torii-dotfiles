@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# torii-sync apps | status | toggle-app FILE | push ITEM... | pull ITEM...   -  what the launcher's Install > Sync menu runs.
+# torii-sync apps | status | toggle-app FILE | push ITEM... | pull ITEM... | restore-helium COPY   -  what the launcher's Install > Sync menu runs.
 #
 # Items (you tick them in the menu):
 #   configs    the dotfiles repo (GitHub): push = commit + push, pull = pull (your uncommitted changes are kept)
@@ -151,6 +151,26 @@ PY
     if [ -n "$private" ]; then say "torii-private <-$private"; PULL_ONLY="${private# }" bash "$REPO/packages/personal.sh"; fi
     needs_helium $items && reopen_helium
     case " $private " in *" apps "*|*" webapps "*) "$HOME/.config/torii/bin/torii-apps" generate >/dev/null 2>&1; "$HOME/.config/torii/bin/torii-apps" webapp sync >/dev/null 2>&1 ;; esac
+    say "Done"; pause ;;
+  restore-helium)
+    # put an earlier copy of the Helium profile back (the copies: torii-helium-backup, daily on the home server)
+    name="${2:-}"; [ -n "$name" ] || { echo "usage: torii-sync restore-helium <copy name>  (see: torii-helium-backup list)"; pause; exit 2; }
+    say "Restore Helium from the copy of $name"
+    echo "  Helium and the web apps will be closed; the profile now here is kept in ~/.cache/torii/helium-profile-before-restore"
+    echo "  (replacing the one kept from an earlier restore) and everything is opened again after."
+    printf '\nContinue? [y/N] '; read -r yn; case "$yn" in y|Y) ;; *) echo "Nothing was changed."; pause; exit 0 ;; esac
+    close_helium
+    dst="$HOME/.cache/torii/helium-profile-before-restore"
+    mkdir -p "$HOME/.cache/torii"; rm -rf "$dst"
+    if [ -d "$HOME/.config/net.imput.helium" ]; then mv "$HOME/.config/net.imput.helium" "$dst"; fi
+    mkdir -p "$HOME/.config/net.imput.helium"
+    if rsync -a -e "ssh -o ConnectTimeout=6 -o BatchMode=yes" "equa@192.168.1.50:torii-private/snapshots/helium/$name/" "$HOME/.config/net.imput.helium/"; then
+      echo "  restored"
+    else
+      echo "  !! copy failed, putting the old profile back"; rm -rf "$HOME/.config/net.imput.helium"; [ -d "$dst" ] && mv "$dst" "$HOME/.config/net.imput.helium"
+    fi
+    reopen_helium
+    "$HOME/.config/torii/bin/torii-apps" webapp sync >/dev/null 2>&1
     say "Done"; pause ;;
   *) sed -n '2,13p' "$0" | sed 's/^# \?//'; exit 2 ;;
 esac

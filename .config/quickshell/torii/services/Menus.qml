@@ -68,6 +68,7 @@ Singleton {
     JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: { root.bump(); root.rulesLoaded(); } }
     JsonFetch { id: fBootImgs; command: ["sh", "-c", "ls -1 \"$HOME\"/Pictures/wallpapers/* 2>/dev/null | jq -R -s -c 'split(\"\\n\")[:-1]'"]; onDataChanged: root.bump() }
     JsonFetch { id: fSyncStatus; command: [root.bin("torii-sync"), "status"];          onDataChanged: root.bump() }
+    JsonFetch { id: fHeliumSnaps; command: [root.bin("torii-helium-backup"), "list"];  onDataChanged: root.bump() }
     JsonFetch { id: fSyncApps; command: [root.bin("torii-sync"), "apps"];              onDataChanged: root.bump() }
     JsonFetch { id: fSpecials; command: [root.bin("torii-rules"), "specials"];        onDataChanged: root.bump() }
     JsonFetch { id: fWins;     command: [root.bin("torii-rules"), "windows"];         onDataChanged: root.bump() }
@@ -906,6 +907,18 @@ Singleton {
             return syncItems.map(tick).concat([
                 { id: "appslist", name: "Choose desktop apps…", sub: "Which of your .desktop apps “My desktop apps” saves", glyph: Icons.apps, onOpen: () => fSyncApps.refresh(),
                   children: () => apps.length ? apps : [{ id: "none", name: "No own .desktop apps", sub: "Apps made by torii are rebuilt on install and not listed" }] },
+                { id: "heliumrestore", name: "Restore Helium…", glyph: Icons.download, keywords: "browser profile broken extensions thumbnails repair backup restore",
+                  sub: "Earlier copies of the browser profile: a daily copy on the server, the last 7 are kept", onOpen: () => fHeliumSnaps.refresh(),
+                  children: () => {
+                      fHeliumSnaps.ensure();
+                      const list = (fHeliumSnaps.data || []).map((n, i) => ({ id: "s:" + n, name: n.replace("_", "  "), glyph: Icons.download, badge: i === 0 ? "newest" : "",
+                          sub: "Put this copy back (closes Helium and the web apps; the profile now here is kept for one more restore)",
+                          run: () => floatTerm("Restore Helium", [bin("torii-sync"), "restore-helium", n]) }));
+                      return [{ id: "copynow", name: "Copy the profile now", glyph: Icons.upload, keep: true,
+                               sub: "Not while two Helium browsers share the profile",
+                               run: () => { floatTerm("Helium copy", ["sh", "-c", bin("torii-helium-backup") + " now; printf '\\nEnter to close '; read _"]); later(fHeliumSnaps, 20000); } }]
+                          .concat(list.length ? list : [{ id: "none", name: "No copy yet", sub: "The first one is made 20 minutes after login, or use the row above" }]);
+                  } },
                 run("push", "Push ticked now", "Saves this computer's version, replacing the copy on GitHub / the server. Asks first"),
                 { id: "pull", name: "Pull everything now", sub: "Brings all of it from GitHub and torii-private, whatever is ticked. Replaces files here (private ones: old copies kept as .bak; configs: your uncommitted changes stay). Asks first",
                   glyph: Icons.download, run: () => floatTerm("Sync pull", [bin("torii-sync"), "pull", "all"]) } ]);

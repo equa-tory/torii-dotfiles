@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# torii-helium-backup now | list | timer on|off|status  -  dated copies of the Helium profile on the home server
+#
+#   now       copy the profile (no caches) to torii-private/snapshots/helium/<date>_<time>/ on the server; unchanged files are
+#             hard links of the last copy, so a copy costs only what changed. The newest 7 are kept.
+#   list      the copies, newest first (JSON for the launcher: Install > Sync torii > Restore Helium)
+#   timer on  a daily copy (systemd user timer torii-helium-backup.timer, 20 minutes after login and then every day)
+# Restore: the launcher (Install > Sync torii > Restore Helium) or  torii-sync restore-helium <name>.
+# Nothing is copied while two Helium browsers share the profile (that is the state that corrupts it: a copy of it would be
+# worth nothing) and the copies are never overwritten, so an older one is still there when the newest turns out bad.
+set -uo pipefail
+SRV="${HELIUM_BACKUP_DST:-equa@192.168.1.50}"
+DIR="${HELIUM_BACKUP_DIR:-torii-private/snapshots/helium}"
+KEEP=7
+PROFILE="$HOME/.config/net.imput.helium"
+SSH=(ssh -o ConnectTimeout=6 -o BatchMode=yes "$SRV")
+UNITS="$HOME/.config/systemd/user"
+
+case "${1:-}" in
+  now)
+    exec 9>"${XDG_RUNTIME_DIR:-/tmp}/torii-helium-backup.lock"
+    flock -n 9 || { echo "a copy is already running"; exit 0; }
+    [ -d "$PROFILE/Default" ] || { echo "no Helium profile yet"; exit 0; }
+    # browser processes (not helpers) on the shared profile: web apps with their own --user-data-dir do not count
+    n=$(ps -eo args= | grep -E '^/opt/helium-browser-bin/helium( |$)' | grep -v -- '--type=' | grep -vc -- '--user-data-dir')
+    [ "$n" -le 1 ] || { echo "$n Helium browsers run on one profile: not copying a possibly damaged profile"; exit 1; }
+    stamp=$(date +%Y-%m-%d_%H%M%S)
+    "${SSH[@]}" "mkdir -p '$DIR/$stamp'" || { echo "the server is not reachable"; exit 1; }
+    rsync -a --delete --link-dest="../latest" \
+      --exclude='Singleton*' --exclude='Cache/' --exclude='Code Cache/' --exclude='GPUCache/' --exclude='GrShaderCache/' \
+      --exclude='ShaderCache/' --exclude='DawnCache/' --exclude='DawnGraphiteCache/' --exclude='DawnWebGPUCache/' --exclude='GPUPersistentCache/' \
+      --exclude='Crash Reports/' --exclude='BrowserMetrics*' --exclude='component_crx_cache/' --exclude='CacheStorage/' --exclude='Local Traces/' \
+      -e "ssh -o ConnectTimeout=6 -o BatchMode=yes" "$PROFILE/" "$SRV:$DIR/$stamp/"
+    rc=$?
+    # 24 = a file vanished while copying: normal for a browser that is running
+    if [ "$rc" -ne 0 ] && [ "$rc" -ne 24 ]; then "${SSH[@]}" "rm -rf '$DIR/$stamp'"; echo "copy failed ($rc)"; exit 1; fi
+    "${SSH[@]}" "cd '$DIR' && ln -sfn '$stamp' latest && ls -1d 20* | sort | head -n -$KEEP | xargs -r rm -rf"
+    echo "copied to $stamp" ;;
+  list)
+    "${SSH[@]}" "cd '$DIR' 2>/dev/null && ls -1d 20* 2>/dev/null | sort -r" 2>/dev/null | python3 -c '
+import json, sys
+print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))' || true ;;
+  timer)
+    case "${2:-status}" in
+      on)
+        mkdir -p "$UNITS"
+        cat > "$UNITS/torii-helium-backup.service" <<UNIT
+[Unit]
+Description=Copy the Helium profile to the home server
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/torii/bin/torii-helium-backup now
+UNIT
+        cat > "$UNITS/torii-helium-backup.timer" <<UNIT
+[Unit]
+Description=Daily copy of the Helium profile
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=1d
+Persistent=true
+AccuracySec=5min
+
+[Install]
+WantedBy=timers.target
+UNIT
+        systemctl --user daemon-reload && systemctl --user enable --now torii-helium-backup.timer >/dev/null 2>&1 && echo "daily copy on" ;;
+      off) systemctl --user disable --now torii-helium-backup.timer >/dev/null 2>&1; echo "daily copy off" ;;
+      *) systemctl --user is-enabled torii-helium-backup.timer 2>/dev/null || echo disabled ;;
+    esac ;;
+  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

@@ -122,6 +122,8 @@ UNIT
       echo '--proxy-server=socks5://127.0.0.1:10808,direct://' >> "$flags"
       echo '--proxy-bypass-list="<local>;localhost;127.0.0.1;192.168.0.0/16;10.0.0.0/8;172.16.0.0/12;*.local"' >> "$flags"
     }
+    # a dated copy of the profile on the home server every day (torii-private/snapshots/helium, the last 7); restore: launcher > Install > Sync torii > Restore Helium
+    "$HOME/.config/torii/bin/torii-helium-backup" timer on >/dev/null 2>&1 || true
     if [[ $(xdg-settings get default-web-browser 2>/dev/null) != helium.desktop ]]; then
       xdg-settings set default-web-browser helium.desktop || echo "!!  could not set the default browser"
     fi
