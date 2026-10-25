@@ -399,6 +399,8 @@ Alt+Tab: if the shell's window list is empty (it went stale once after a fullscr
 ## Letter workspaces (Alt+W, letter)
 
 Alt+W then a letter (a-z) or a digit (1-9, 0 = 10) goes to the workspace of that letter, Alt+Shift+W then a letter moves the window there (it waits as long as you like; Esc or any other key cancels). Nothing else changed:
+
+Silent move (the window goes, you stay): Alt+Super+Shift+1…0 for numbered workspaces and Alt+Super+Shift+W then a letter or digit for the others. Not on the fullscreen-game list by default; add `ALT+SUPER+SHIFT+W` to `game-keys.lua` if you want it there.
 the numbers and every other bind stay. A letter is a named Hyprland workspace; you give it apps in Setup > App rules > (an app) > Workspace > Letter…
 (or pick a letter already in use). The notch shows a pill for every letter that has an app rule or a window, left of the numbered workspaces
 (the clock stays in the middle); the pills get an outline while Alt+W waits for the letter. Removing the last rule that uses a letter

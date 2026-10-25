@@ -231,6 +231,8 @@ for i = 1, 10 do
     local key = i % 10
     bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
     bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+    -- keys: ALT + SUPER + SHIFT + 1 … 0 | Send the window to workspace 1 … 10 without going there
+    bind(mainMod .. " + SUPER + SHIFT + " .. key, hl.dsp.window.move({ workspace = i, follow = false }))
 end
 
 -- keys: ALT + W, letter or digit | Go to the workspace of that letter (a-z) or number (1-9, 0 = 10); the letters are chosen per app in Setup > App rules > Workspace
@@ -267,11 +269,14 @@ letter_submap("wsgo", "go", function(l)
     hl.dispatch(hl.dsp.focus({ workspace = type(l) == "number" and l or "name:" .. l }))
 end)
 letter_submap("wsmove", "move", function(l) hl.dispatch(hl.dsp.window.move({ workspace = type(l) == "number" and l or "name:" .. l })) end)
+letter_submap("wssend", "send", function(l) hl.dispatch(hl.dsp.window.move({ workspace = type(l) == "number" and l or "name:" .. l, follow = false })) end)
 local function wait_letter(name)
     return function() hl.dispatch(hl.dsp.submap(name)) end
 end
 bind(mainMod .. " + W", wait_letter("wsgo"))
 bind(mainMod .. " + SHIFT + W", wait_letter("wsmove"))
+-- keys: ALT + SUPER + SHIFT + W, letter or digit | Send the window to that workspace without going there
+bind(mainMod .. " + SUPER + SHIFT + W", wait_letter("wssend"))
 
 
 -- Screenshots and recording (torii-capture): whole screen, a zone, and start/stop screen recording
@@ -380,7 +385,7 @@ local function game_keys()
         if ws and cur and ws.id ~= cur.id then game = false end
     end
     local now = hl.get_current_submap and hl.get_current_submap() or ""
-    if now == "wsgo" or now == "wsmove" then return end -- waiting for the workspace letter: do not cancel it
+    if now == "wsgo" or now == "wsmove" or now == "wssend" then return end -- waiting for the workspace letter: do not cancel it
     if game and now ~= "game" then hl.dispatch(hl.dsp.submap("game"))
     elseif not game and now == "game" then hl.dispatch(hl.dsp.submap("reset")) end
 end
