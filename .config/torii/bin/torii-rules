@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -242,10 +243,24 @@ def snapshot_workspace(ws=None):
     subprocess.run(["notify-send", "-a", "torii", "Saved workspace %s" % ws, msg], capture_output=True)
 
 
+def is_helium_app(what):
+    """A web app / Helium window that opens in the shared browser profile (not an own-process one with its own user-data-dir)."""
+    try:
+        t = (HOME / ".local/share/applications" / what).read_text()
+    except OSError:
+        return False
+    ex = next((l for l in t.splitlines() if l.startswith("Exec=")), "")
+    return "helium" in ex and "--user-data-dir" not in ex
+
+
 def autostart(only_missing=False, ws=None):
     """Start every app that has autostart on. At login all of them; with only_missing (the launcher's "open all saved apps")
-    just those that have no window yet, so what is open stays as it is. ws limits it to one workspace."""
+    just those that have no window yet, so what is open stays as it is. ws limits it to one workspace.
+    Helium windows start one after the other: two of them starting at the same moment each become a browser process on the
+    one profile, which breaks it (extensions, thumbnails, "something went wrong when opening your profile"). The first one
+    takes the profile lock, the next ones then join that browser."""
     running = {c.get("class") for c in hypr_clients()} if only_missing else set()
+    todo = []
     for r in load(RULES, []):
         if not r.get("autostart") or not r.get("exec") or r.get("title"):
             continue
@@ -255,10 +270,26 @@ def autostart(only_missing=False, ws=None):
             continue
         kind, _, what = r["exec"].partition(":")
         if kind == "desktop":
-            argv = [str(HOME / ".config/torii/bin/torii-apps"), "open", what]
+            todo.append((["%s" % (HOME / ".config/torii/bin/torii-apps"), "open", what], is_helium_app(what)))
         else:
-            argv = ["uwsm", "app", "--", what] if shutil.which("uwsm") else [what]
+            todo.append((["uwsm", "app", "--", what] if shutil.which("uwsm") else [what], False))
+    if os.fork() != 0:                      # the waiting happens in the background, the caller returns at once
+        return
+    os.setsid()
+    lock = HOME / ".config/net.imput.helium/SingletonLock"
+    helium_seen = False
+    for argv, helium in todo:
+        if helium and helium_seen:
+            time.sleep(2)
         subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        if helium and not helium_seen:
+            helium_seen = True
+            for _ in range(30):             # until the browser holds the profile lock, then a moment to settle
+                if os.path.islink(lock):
+                    break
+                time.sleep(0.5)
+            time.sleep(3)
+    os._exit(0)
 
 
 def windows():
