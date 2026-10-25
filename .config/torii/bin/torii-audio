@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# torii-audio monitor on|off|toggle|status   hear your own microphone (a loopback from the default input to the default output)
+#            silent                           make "Silent" the default output (a sink that plays nowhere), creating it if needed
+# The loopback is a PipeWire-pulse module tagged torii-mic-monitor, so it can always be found and removed again.
+set -uo pipefail
+tag=torii-mic-monitor
+mod() { pactl list short modules | awk -v t="$tag" '$2=="module-loopback" && index($0,t){print $1}'; }
+
+case "${1:-}" in
+  monitor)
+    case "${2:-status}" in
+      on)     [ -n "$(mod)" ] || pactl load-module module-loopback latency_msec=30 \
+                  source_output_properties="media.name=$tag" sink_input_properties="media.name=$tag" >/dev/null ;;
+      off)    for m in $(mod); do pactl unload-module "$m"; done ;;
+      toggle) if [ -n "$(mod)" ]; then "$0" monitor off; else "$0" monitor on; fi ;;
+      status) [ -n "$(mod)" ] && echo on || echo off ;;
+    esac ;;
+  silent)
+    pactl list short sinks | grep -q torii_silent || \
+      pactl load-module module-null-sink sink_name=torii_silent sink_properties=device.description=Silent >/dev/null
+    pactl set-default-sink torii_silent ;;
+  *) sed -n '2,4p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac

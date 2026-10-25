@@ -12,6 +12,7 @@ Singleton {
 
     readonly property var notch: adapter.notch
     readonly property var capture: adapter.capture
+    readonly property var audio: adapter.audio
     readonly property var install: adapter.install
     readonly property var workspaces: adapter.workspaces
     readonly property var weather: adapter.weather
@@ -108,6 +109,10 @@ Singleton {
                 property int transitionMs: 600
                 property string shuffle: "off"      // random wallpaper: off | 5 | 60 (minutes) | login
                 property var noShuffle: []          // file names the random change skips (Space in the wallpaper panel)
+            }
+            property JsonObject audio: JsonObject {
+                property string pinnedOutput: ""    // node name of an output (e.g. the AirPods) that audio never leaves, even while it is disconnected
+                property string pinnedLabel: ""
             }
             property JsonObject apps: JsonObject {
                 property string dir: "~/apps"

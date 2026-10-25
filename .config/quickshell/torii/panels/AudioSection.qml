@@ -53,8 +53,14 @@ Section {
         Layout.fillWidth: true
         glyph: Icons.speaker
         title: Audio.sinkLabel
-        subtitle: "Output"
+        subtitle: Audio.pinned === "" ? "Output" : "Output  ·  kept on " + Config.audio.pinnedLabel + (Audio.pinnedHere ? "" : " (not connected)")
         onClicked: { root.outOpen = !root.outOpen; root.inOpen = false; }
+        IconButton {
+            glyph: Audio.pinned !== "" ? Icons.pin : Icons.pinOff
+            size: 14
+            accent: Audio.pinned !== ""
+            onClicked: Audio.pinned !== "" ? Audio.unpin() : Audio.pinCurrent()
+        }
         Glyph { text: root.outOpen ? Icons.chevronUp : Icons.chevronDown; size: 14 }
     }
     Repeater {
@@ -79,6 +85,12 @@ Section {
         title: Audio.sourceLabel
         subtitle: "Input"
         onClicked: { root.inOpen = !root.inOpen; root.outOpen = false; }
+        IconButton {
+            glyph: Icons.headphones
+            size: 14
+            accent: Audio.monitoring
+            onClicked: Audio.toggleMonitor()
+        }
         IconButton {
             glyph: Audio.sourceMuted ? Icons.micOff : Icons.mic
             size: 14

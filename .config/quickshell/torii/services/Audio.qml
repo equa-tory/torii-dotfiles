@@ -1,6 +1,7 @@
 pragma Singleton
 import qs
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Pipewire
 import QtQuick
 
@@ -95,4 +96,55 @@ Singleton {
         const n = sourceNodes.find(x => x.name === key);
         if (n) Pipewire.preferredDefaultAudioSource = n;
     }
+
+    // ---- hear your own microphone (torii-audio monitor)
+    readonly property string audioBin: Quickshell.env("HOME") + "/.config/torii/bin/torii-audio"
+    property bool monitoring: false
+    function refreshMonitor() { if (!mock) monStatus.running = true; }
+    function toggleMonitor() { if (mock) monitoring = !monitoring; else monToggle.running = true; }
+    Process {
+        id: monStatus
+        command: [root.audioBin, "monitor", "status"]
+        stdout: StdioCollector { onStreamFinished: root.monitoring = text.trim() === "on" }
+    }
+    Process { id: monToggle; command: [root.audioBin, "monitor", "toggle"]; onExited: root.refreshMonitor() }
+    Component.onCompleted: refreshMonitor()
+
+    // ---- keep audio off other outputs: while the pinned output (AirPods) is not connected, "Silent" is the default
+    // output instead of the next one PipeWire would pick (the TV)
+    readonly property string pinned: Config.audio.pinnedOutput
+    readonly property bool pinnedHere: pinned !== "" && sinkNodes.some(n => n.name === pinned)
+    readonly property bool isPinned: sinkNode !== null && pinned !== "" && sinkNode.name === pinned
+    function pinCurrent() {
+        if (!sinkNode || sinkNode.name === "torii_silent") return;
+        pendingLabel = label(sinkNode);
+        pinSet.command = [Quickshell.env("HOME") + "/.config/torii/bin/torii-config", "set", "audio.pinnedOutput", JSON.stringify(sinkNode.name)];
+        pinSet.running = true;
+    }
+    property string pendingLabel: ""
+    function unpin() {
+        pinSet.command = [Quickshell.env("HOME") + "/.config/torii/bin/torii-config", "set", "audio.pinnedOutput", '""'];
+        pinSet.running = true;
+    }
+    Process {   // one write after the other: both edit the same file
+        id: pinSet
+        onExited: if (root.pendingLabel !== "") {
+            pinLabel.command = [Quickshell.env("HOME") + "/.config/torii/bin/torii-config", "set", "audio.pinnedLabel", JSON.stringify(root.pendingLabel)];
+            root.pendingLabel = "";
+            pinLabel.running = true;
+        }
+    }
+    Process { id: pinLabel }
+    Process { id: silentProc; command: [root.audioBin, "silent"] }
+
+    property bool wasHere: false
+    function enforce(transition) {
+        if (mock || pinned === "") return;
+        if (pinnedHere) { if (transition && !wasHere) setSink(pinned); }
+        else if (transition && (wasHere || sinkNode === null || sinkNode.name !== "torii_silent")) silentProc.running = true;
+        wasHere = pinnedHere;
+    }
+    onPinnedHereChanged: settle.restart()
+    Timer { id: settle; interval: 800; onTriggered: root.enforce(true) }
+    Timer { running: !root.mock && root.pinned !== ""; interval: 5000; onTriggered: root.enforce(true) }   // once after login, when the devices are known
 }
