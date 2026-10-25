@@ -3,6 +3,10 @@
 #   g u      disk usage of this folder in gdu (torii-gdu: reads an NTFS drive in seconds, skips network shares)
 [mgr]
 prepend_keymap = [
+  { on = "<Enter>", run = "plugin torii-open", desc = "Enter the folder / open the file with the default app" },
+  { on = "<Right>", run = "plugin torii-open", desc = "Enter the folder / open the file with the default app" },
+  { on = "l",       run = "plugin torii-open", desc = "Enter the folder / open the file with the default app" },
+  { on = "o",       run = "plugin torii-open", desc = "Open the file with the default app" },
   { on = "U", run = [ "sort size --reverse=yes", "linemode size" ], desc = "Scan folder sizes (biggest first)" },
   { on = [ "g", "u" ], run = 'shell --block -- torii-gdu "$PWD"', desc = "Disk usage of this folder (gdu)" },
 ]
