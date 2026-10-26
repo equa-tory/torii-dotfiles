@@ -22,8 +22,8 @@ UUID=1C1A6F1C1A6EF266  /mnt/ssd02  ntfs3  uid=1000,gid=1000,umask=022,defaults,n
 UUID=3A6C2C426C2BF773  /mnt/hdd01  ntfs3  uid=1000,gid=1000,umask=022,defaults,nofail,x-systemd.device-timeout=2s  0  0
 UUID=9EBE50C6BE50991B  /mnt/hdd02  ntfs3  uid=1000,gid=1000,umask=022,defaults,nofail,x-systemd.device-timeout=2s  0  0
 //192.168.1.50/@  /mnt/@  cifs  credentials=/root/.smb-dorm,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=10s,uid=1000,gid=1000,file_mode=0664,dir_mode=0775  0  0
-#//192.168.1.50/mass  /mnt/mass  cifs  credentials=/root/.smb-dorm,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=10s,uid=1000,gid=1000,file_mode=0664,dir_mode=0775  0  0
-//192.168.1.50/mass/Games  /mnt/mass cifs  credentials=/root/.smb-dorm,_netdev,nofail,x-systemd.automount,uid=1000,gid=1000,file_mode=0775,dir_mode=0775,nobrl,mfsymlinks  0 0
+//192.168.1.50/mass  /mnt/mass  cifs  credentials=/root/.smb-dorm,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=10s,uid=1000,gid=1000,file_mode=0664,dir_mode=0775  0  0
+//192.168.1.50/mass/Games  /mnt/games cifs  credentials=/root/.smb-dorm,_netdev,nofail,x-systemd.automount,uid=1000,gid=1000,file_mode=0775,dir_mode=0775,nobrl,mfsymlinks  0 0
 //192.168.1.39/media  /mnt/media  cifs  credentials=/root/.smb-media,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=10s,uid=1000,gid=1000,file_mode=0664,dir_mode=0775  0  0
 //192.168.1.23/equa\047s\040Umbrel  /mnt/umbrel  cifs  credentials=/root/.smb-umbrel,vers=3.0,nofail,x-systemd.automount,_netdev,x-systemd.mount-timeout=10s,uid=1000,gid=1000,file_mode=0664,dir_mode=0775  0  0
 # <<< torii personal mounts <<<
