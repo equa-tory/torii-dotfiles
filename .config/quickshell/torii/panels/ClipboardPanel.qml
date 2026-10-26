@@ -38,6 +38,7 @@ Item {
         Quickshell.execDetached([bin, "paste", e.id]);
         Panels.close();
     }
+    function clearAll() { Quickshell.execDetached([bin, "clear"]); items = []; search.forceActiveFocus(); }
     function forget(e) {
         if (!e) return;
         Quickshell.execDetached([bin, "delete", e.id]);
@@ -54,7 +55,7 @@ Item {
         Glyph { x: 12; anchors.verticalCenter: parent.verticalCenter; text: Icons.g(0xF0147); color: Theme.accent }
         TextInput {
             id: search
-            anchors { left: parent.left; right: parent.right; leftMargin: 40; rightMargin: 12; verticalCenter: parent.verticalCenter }
+            anchors { left: parent.left; right: parent.right; leftMargin: 40; rightMargin: root.items.length > 0 ? 80 : 12; verticalCenter: parent.verticalCenter }
             color: Theme.fg
             selectionColor: Theme.accent
             font.pixelSize: Config.font.size
@@ -66,7 +67,7 @@ Item {
             Keys.onEscapePressed: Panels.close()
             Keys.onPressed: event => {
                 if (event.key === Qt.Key_Delete && (event.modifiers & Qt.ControlModifier)) {
-                    Quickshell.execDetached([root.bin, "clear"]); root.items = []; event.accepted = true;
+                    root.clearAll(); event.accepted = true;
                 } else if (event.key === Qt.Key_Delete && text === "") {
                     root.forget(root.shown[root.sel]); event.accepted = true;
                 }
@@ -88,6 +89,16 @@ Item {
                 font: search.font
             }
         }
+    }
+
+    // forget everything (same as Ctrl+Delete)
+    Rectangle {
+        visible: root.items.length > 0
+        x: 18 + parent.width - 36 - width - 6; y: 8
+        width: clearLabel.implicitWidth + 16; height: 28; radius: 8
+        color: clearArea.containsMouse ? Theme.surface2 : "transparent"
+        Label { id: clearLabel; anchors.centerIn: parent; text: "Clear all"; color: clearArea.containsMouse ? Theme.red : Theme.subtle; font.pixelSize: Config.font.size - 1 }
+        MouseArea { id: clearArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.clearAll() }
     }
 
     Column {

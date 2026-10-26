@@ -10,11 +10,30 @@ Section {
     id: root
 
     property string hovered: ""
+    property int sel: -1                                  // chosen with the arrow keys; -1 = none
+    readonly property int cols: Math.max(1, Math.floor((width - 4 + 6) / 42))
+    readonly property string selTitle: sel >= 0 && sel < Tray.items.length ? (Tray.items[sel].title || Tray.items[sel].id) : ""
+    // arrows: the first press picks the first app, then they move through the grid; false when there is nothing to move to
+    function step(dx, dy) {
+        const n = Tray.items.length;
+        if (n === 0) return false;
+        if (sel < 0) { sel = 0; return true; }
+        sel = Math.max(0, Math.min(n - 1, sel + dx + dy * cols));
+        return true;
+    }
+    function activateSel() {
+        if (sel < 0 || sel >= Tray.items.length) return false;
+        const it = Tray.items[sel];
+        if (it.onlyMenu && it.hasMenu) { const c = flow.children[sel]; const p = c.mapToItem(null, c.width / 2, c.height); it.display(QsWindow.window, p.x, p.y); }
+        else it.activate();
+        return true;
+    }
 
     title: "Background apps"
     visible: Tray.items.length > 0
 
     Flow {
+        id: flow
         Layout.fillWidth: true
         Layout.leftMargin: 4
         spacing: 6
@@ -24,11 +43,14 @@ Section {
             delegate: Rectangle {
                 id: cell
                 required property var modelData
+                required property int index
 
                 width: 36
                 height: 36
                 radius: 10
-                color: area.containsMouse ? Theme.surface2 : Theme.surface
+                color: area.containsMouse || index === root.sel ? Theme.surface2 : Theme.surface
+                border.width: index === root.sel ? 1 : 0
+                border.color: Theme.accent
                 Behavior on color { ColorAnimation { duration: 120 } }
 
                 Image {
@@ -73,8 +95,8 @@ Section {
     }
 
     Label {
-        visible: root.hovered !== ""
-        text: root.hovered
+        visible: root.hovered !== "" || root.selTitle !== ""
+        text: root.hovered !== "" ? root.hovered : root.selTitle
         color: Theme.subtle
         font.pixelSize: Config.font.size - 2
         Layout.leftMargin: 10

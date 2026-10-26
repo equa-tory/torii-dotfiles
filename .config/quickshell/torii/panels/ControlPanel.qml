@@ -12,7 +12,16 @@ Item {
     implicitHeight: Math.min(660, col.implicitHeight + 28)
 
     opacity: 0
-    Component.onCompleted: opacity = 1
+    focus: true
+    Component.onCompleted: { opacity = 1; forceActiveFocus(); }
+    // arrows pick a background app, Enter opens it, Esc first lets go of the pick, then closes the panel
+    Keys.onLeftPressed: tray.step(-1, 0)
+    Keys.onRightPressed: tray.step(1, 0)
+    Keys.onUpPressed: { if (tray.sel >= tray.cols) tray.step(0, -1); else tray.sel = -1; }
+    Keys.onDownPressed: tray.step(0, 1)
+    Keys.onReturnPressed: tray.activateSel()
+    Keys.onEnterPressed: tray.activateSel()
+    Keys.onEscapePressed: { if (tray.sel >= 0) tray.sel = -1; else Panels.close(); }
     Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
     Flickable {
@@ -57,7 +66,7 @@ Item {
             AudioSection { Layout.fillWidth: true }
             BluetoothSection { Layout.fillWidth: true }
             NetworkSection { Layout.fillWidth: true }
-            TraySection { Layout.fillWidth: true }
+            TraySection { id: tray; Layout.fillWidth: true }
         }
     }
 }
