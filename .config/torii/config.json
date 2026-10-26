@@ -25,7 +25,8 @@
       "wp12027008-3506138153.png",
       "9770644-2067660354.png",
       "mahiru-shiina-sakura-whisper.960x540.mp4",
-      "mahiru-shiina-christmas-eve.960x540.mp4"
+      "mahiru-shiina-christmas-eve.960x540.mp4",
+      "thumb-1920-1325101-1312023514.png"
     ]
   },
   "theme": {
@@ -182,5 +183,9 @@
   },
   "install": {
     "track": false
+  },
+  "audio": {
+    "pinnedOutput": "bluez_output.08_FF_44_3E_1D_AA.1",
+    "pinnedLabel": "Alex\u2019s AirPods Max"
   }
 }

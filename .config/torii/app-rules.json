@@ -93,7 +93,7 @@
   {
     "class": "chrome-192.168.1.50__-Default",
     "name": "Library",
-    "workspace": "m",
+    "workspace": "w",
     "silent": true,
     "autostart": true,
     "exec": "desktop:torii-web-mus.desktop"
