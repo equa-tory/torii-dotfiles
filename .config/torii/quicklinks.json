@@ -1,6 +1,6 @@
 [
   {"keyword": "ddg", "name": "DuckDuckGo", "url": "https://duckduckgo.com/?q={input}", "icon": "󰇥"},
-  {"keyword": "g", "name": "DuckDuckGo", "url": "https://duckduckgo.com/?q={input}", "icon": "󰍉"},
+  {"keyword": "g", "name": "DuckDuckGo", "url": "https://duckduckgo.com/?q={input}", "icon": "󰇥"},
   {"keyword": "gg", "name": "ChatGPT", "url": "https://chatgpt.com/?q={input}", "icon": "󰚩"},
   {"keyword": "x", "name": "X", "url": "https://x.com/search?q={input}", "icon": ""},
   {"keyword": "v", "name": "YouTube", "url": "https://www.youtube.com/results?search_query={input}", "icon": "󰗃"},
