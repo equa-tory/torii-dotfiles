@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# torii-vm [iso]  -  a throwaway desktop with a browser in a window, for visiting sites you do not trust.
+# Boots a live ISO (default: the Ubuntu desktop one on the Vessel drive, which has Firefox) with no disk, no shared folders and
+# no clipboard sharing: closing the window wipes everything. The network is a NAT of its own: the guest reaches the internet
+# (and the LAN through this PC), but nothing can reach into the guest.
+set -euo pipefail
+vessel=/run/media/$USER/Vessel
+iso="${1:-}"
+if [ -z "$iso" ]; then
+  [ -d "$vessel/ventoy/ISO" ] || udisksctl mount -b /dev/disk/by-label/Vessel >/dev/null
+  iso=$(ls "$vessel"/ventoy/ISO/ubuntu-*-desktop-amd64.iso 2>/dev/null | tail -n1)
+fi
+[ -f "$iso" ] || { notify-send -a torii "torii-vm" "No ISO found (plug in the Vessel drive or pass one)"; exit 1; }
+exec qemu-system-x86_64 -enable-kvm -cpu host -smp 4 -m 6G -name "torii-vm (nothing is saved)" \
+  -cdrom "$iso" -boot d -vga virtio -display gtk,zoom-to-fit=on -device qemu-xhci -device usb-tablet \
+  -nic user,model=virtio-net-pci -audiodev pipewire,id=a -device intel-hda -device hda-duplex,audiodev=a

@@ -460,3 +460,7 @@ Arrows move through Sound (volume, output, input), Bluetooth devices and backgro
 ### Bluetooth headphones never switch to the headset (mic) profile
 
 `.config/wireplumber/wireplumber.conf.d/51-torii-bluetooth.conf` turns off WirePlumber's "auto-switch to headset profile", which is what made the AirPods Max drop to the bad-sounding HSP/HFP mode whenever an app wanted a microphone. The computer's own mic is used. If you ever need the headset's mic, pick the headset profile by hand in a Bluetooth settings tool (`pactl set-card-profile <card> headset-head-unit`). After changing the file: `systemctl --user restart wireplumber` and reconnect the headphones.
+
+### Throwaway browser VM
+
+`torii-vm` (terminal) opens a QEMU window that boots the Ubuntu desktop live ISO from the Vessel drive (`ventoy/ISO`; mounted automatically if needed) with 4 cores, 6 GB RAM, no disk and no shared folders or clipboard: use Firefox there for sites you do not trust and close the window to wipe everything. `torii-vm path/to.iso` boots another ISO. Network is QEMU's NAT, so the guest can go online but nothing can connect into it.
