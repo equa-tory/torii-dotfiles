@@ -1,16 +1,64 @@
 #!/usr/bin/env bash
-# torii-vm [iso]  -  a throwaway desktop with a browser in a window, for visiting sites you do not trust.
-# Boots a live ISO (default: the Ubuntu desktop one on the Vessel drive, which has Firefox) with no disk, no shared folders and
-# no clipboard sharing: closing the window wipes everything. The network is a NAT of its own: the guest reaches the internet
-# (and the LAN through this PC), but nothing can reach into the guest.
-set -euo pipefail
-vessel=/run/media/$USER/Vessel
-iso="${1:-}"
-if [ -z "$iso" ]; then
-  [ -d "$vessel/ventoy/ISO" ] || udisksctl mount -b /dev/disk/by-label/Vessel >/dev/null
-  iso=$(ls "$vessel"/ventoy/ISO/ubuntu-*-desktop-amd64.iso 2>/dev/null | tail -n1)
-fi
-[ -f "$iso" ] || { notify-send -a torii "torii-vm" "No ISO found (plug in the Vessel drive or pass one)"; exit 1; }
-exec qemu-system-x86_64 -enable-kvm -cpu host -smp 4 -m 6G -name "torii-vm (nothing is saved)" \
-  -cdrom "$iso" -boot d -vga virtio -display gtk,zoom-to-fit=on -device qemu-xhci -device usb-tablet \
-  -nic user,model=virtio-net-pci -audiodev pipewire,id=a -device intel-hda -device hda-duplex,audiodev=a
+# torii-vm  -  virtual machines with QEMU/KVM. No arguments = the throwaway browser VM.
+#   quick [iso]            a disposable desktop with a browser (no disk, nothing saved); default ISO: Ubuntu desktop on the Vessel drive
+#   new <iso> [name] [GB]  a VM with its own disk in ~/VMs/<name>; asks for the missing answers; boots the ISO to install
+#   start <name>           boots it (the ISO stays attached while the disk is empty, so an unfinished install can go on)
+#   delete <name>          stops it and removes the whole VM, disk included (asks first)
+#   list | isos            JSON for the launcher: the VMs / the ISOs found (Vessel drive, Downloads, ~/VMs)
+# The network is QEMU's NAT: the guest reaches the internet, nothing reaches into the guest. No shared folders or clipboard.
+set -uo pipefail
+vms="$HOME/VMs"; vessel="/run/media/$USER/Vessel"; mkdir -p "$vms"
+ovmf=/usr/share/edk2/x64/OVMF_CODE.4m.fd
+vessel_mount() { [ -d "$vessel/ventoy/ISO" ] || udisksctl mount -b /dev/disk/by-label/Vessel >/dev/null 2>&1; }
+running() { [ -f "$vms/$1/pid" ] && kill -0 "$(cat "$vms/$1/pid")" 2>/dev/null; }
+conf() { grep -m1 "^$2=" "$vms/$1/vm.conf" 2>/dev/null | cut -d= -f2-; }
+
+run_qemu() {   # run_qemu <name or ""> <extra qemu args...>
+  local name="$1"; shift
+  exec qemu-system-x86_64 -enable-kvm -cpu host -smp "${CPUS:-4}" -m "${RAM:-6G}" -vga virtio -display gtk,zoom-to-fit=on \
+    -device qemu-xhci -device usb-tablet -nic user,model=virtio-net-pci -audiodev pipewire,id=a -device intel-hda -device hda-duplex,audiodev=a "$@"
+}
+
+case "${1:-quick}" in
+  quick)
+    iso="${2:-}"
+    if [ -z "$iso" ]; then vessel_mount; iso=$(ls "$vessel"/ventoy/ISO/ubuntu-*-desktop-amd64.iso 2>/dev/null | tail -n1); fi
+    [ -f "$iso" ] || { notify-send -a torii "torii-vm" "No ISO found (plug in the Vessel drive or pass one)"; exit 1; }
+    run_qemu "" -name "torii-vm (nothing is saved)" -cdrom "$iso" -boot d ;;
+  new)
+    iso="${2:-}"; [ -f "$iso" ] || { echo "ISO not found: $iso"; exit 1; }
+    name="${3:-}"; size="${4:-}"
+    stem=$(basename "$iso" | sed 's/\.[iI][sS][oO]$//; s/[^A-Za-z0-9._-]/_/g' | cut -c1-30)
+    [ -n "$name" ] || { read -rp "Name [$stem]: " name; name="${name:-$stem}"; }
+    [ -n "$size" ] || { read -rp "Disk size in GB [40]: " size; size="${size:-40}"; }
+    read -rp "RAM in GB [6]: " ram; ram="${ram:-6}"
+    [ ! -e "$vms/$name" ] || { echo "A VM called $name already exists."; read -rp "Enter to close "; exit 1; }
+    mkdir -p "$vms/$name"; qemu-img create -f qcow2 "$vms/$name/disk.qcow2" "${size}G" >/dev/null
+    printf 'iso=%s\nram=%sG\nuefi=%s\n' "$iso" "$ram" "$(case "$iso" in *[Ww]in*1[01]*|*[Ww]indows*) echo 1;; *) echo 0;; esac)" > "$vms/$name/vm.conf"
+    echo "Created $vms/$name"; exec "$0" start "$name" ;;
+  start)
+    name="${2:?name}"; [ -d "$vms/$name" ] || { echo "No VM $name"; exit 1; }
+    running "$name" && { notify-send -a torii "torii-vm" "$name is already running"; exit 0; }
+    RAM=$(conf "$name" ram); RAM="${RAM:-6G}"; iso=$(conf "$name" iso)
+    args=(-name "$name" -pidfile "$vms/$name/pid" -drive "file=$vms/$name/disk.qcow2,if=virtio,format=qcow2" -boot order=cd)
+    [ "$(conf "$name" uefi)" = 1 ] && [ -f "$ovmf" ] && args+=(-drive "if=pflash,format=raw,readonly=on,file=$ovmf")
+    [ -n "$iso" ] && { [ -f "$iso" ] || { vessel_mount; }; [ -f "$iso" ] && args+=(-drive "file=$iso,media=cdrom,readonly=on"); }
+    export RAM; run_qemu "$name" "${args[@]}" ;;
+  delete)
+    name="${2:?name}"; [ -d "$vms/$name" ] || { echo "No VM $name"; exit 1; }
+    du -sh "$vms/$name" | cut -f1 | xargs -I{} echo "Delete the VM $name and its disk ({})? This cannot be undone."
+    read -rp "Type yes: " a; [ "$a" = yes ] || { echo "Kept."; sleep 1; exit 0; }
+    if running "$name"; then kill "$(cat "$vms/$name/pid")"; sleep 1; fi
+    rm -rf "${vms:?}/$name" && echo "Deleted." ; sleep 1 ;;
+  list)
+    for d in "$vms"/*/; do
+      [ -f "${d}vm.conf" ] || continue; n=$(basename "$d")
+      printf '{"name":"%s","ram":"%s","used":"%s","running":%s}\n' "$n" "$(conf "$n" ram)" "$(du -sh "$d" | cut -f1)" "$(running "$n" && echo true || echo false)"
+    done | jq -s . ;;
+  isos)
+    vessel_mount
+    { ls "$vessel"/ventoy/ISO/*.[iI][sS][oO] "$HOME"/Downloads/*.[iI][sS][oO] "$vms"/*.[iI][sS][oO] 2>/dev/null; } | while read -r f; do
+      printf '{"path":%s,"name":%s,"size":"%s"}\n' "$(jq -Rn --arg v "$f" '$v')" "$(jq -Rn --arg v "$(basename "$f")" '$v')" "$(du -h --apparent-size "$f" | cut -f1)"
+    done | jq -s . ;;
+  *) sed -n '2,10p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac

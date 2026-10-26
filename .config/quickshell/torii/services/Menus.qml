@@ -68,6 +68,8 @@ Singleton {
     JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: { root.bump(); root.rulesLoaded(); } }
     JsonFetch { id: fBootImgs; command: ["sh", "-c", "ls -1 \"$HOME\"/Pictures/wallpapers/* 2>/dev/null | jq -R -s -c 'split(\"\\n\")[:-1]'"]; onDataChanged: root.bump() }
     JsonFetch { id: fSyncStatus; command: [root.bin("torii-sync"), "status"];          onDataChanged: root.bump() }
+    JsonFetch { id: fVms;  command: [root.bin("torii-vm"), "list"] }
+    JsonFetch { id: fIsos; command: [root.bin("torii-vm"), "isos"] }
     JsonFetch { id: fHeliumSnaps; command: [root.bin("torii-helium-backup"), "list"];  onDataChanged: root.bump() }
     JsonFetch { id: fSyncApps; command: [root.bin("torii-sync"), "apps"];              onDataChanged: root.bump() }
     JsonFetch { id: fSpecials; command: [root.bin("torii-rules"), "specials"];        onDataChanged: root.bump() }
@@ -272,7 +274,7 @@ Singleton {
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
-    function rootNodes() { return ordered("", [appsMenu(), triggerMenu()].concat(Config.features.systemInfo ? [processesMenu()] : []).concat([weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), cleanMenu(), learnMenu(), todoMenu(), systemMenu()])); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu()].concat(Config.features.systemInfo ? [processesMenu()] : []).concat([weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), cleanMenu(), learnMenu(), todoMenu(), vmMenu(), systemMenu()])); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
@@ -985,6 +987,28 @@ Singleton {
 
     // ================= System (last)
     function confirm(label, args) { ask(label + "?  Enter to confirm, Esc to cancel", false, () => sh(args)); }
+    // ================= Virtual machines (torii-vm)
+    function vmMenu() {
+        return { id: "vms", name: "Virtual machines", glyph: Icons.apps, sub: "A throwaway browser VM, or VMs of your own from an ISO", keywords: "qemu kvm vm virtual machine iso windows linux sandbox unsafe site",
+                 onOpen: () => { fVms.refresh(); fIsos.refresh(); },
+                 children: () => {
+            fVms.ensure(); fIsos.ensure();
+            const vms = (fVms.data || []).map(v => ({ id: "vm:" + v.name, name: v.name, glyph: Icons.apps, badge: v.running ? "running" : "", sub: v.used + " on disk  ·  " + v.ram + " RAM",
+                children: () => [
+                    { id: "start", name: "Start", glyph: Icons.record, sub: v.running ? "Already running" : "Opens its window", run: () => { app([bin("torii-vm"), "start", v.name]); later(fVms, 3000); } },
+                    { id: "del", name: "Delete the VM and its disk", glyph: Icons.trash, sub: "Removes ~/VMs/" + v.name + " completely. Asks first",
+                      run: () => { floatTerm("Delete VM", [bin("torii-vm"), "delete", v.name]); later(fVms, 4000); } } ] }));
+            const isos = (fIsos.data || []).map(i => ({ id: "iso:" + i.path, name: i.name, badge: i.size, glyph: Icons.download, sub: "Make a new VM with its own disk and boot this ISO",
+                run: () => { floatTerm("New VM", [bin("torii-vm"), "new", i.path]); later(fVms, 20000); } }));
+            return [
+                { id: "quick", name: "Throwaway browser", glyph: Icons.web, sub: "Ubuntu live with Firefox, no disk: closing the window wipes it. For sites you do not trust",
+                  run: () => app([bin("torii-vm"), "quick"]) },
+                { id: "new", name: "New VM from an ISO…", glyph: Icons.download, sub: "ISOs on the Vessel drive (ventoy/ISO), in Downloads and in ~/VMs",
+                  children: () => isos.length ? isos : [{ id: "none", name: "No ISO found", sub: "Plug in the Vessel drive or put one in ~/Downloads" }] }
+            ].concat(vms);
+        } };
+    }
+
     function systemMenu() {
         return { id: "system", name: "System", glyph: Icons.poweroff, sub: "Shut down, restart, log out, sleep", keywords: "power shutdown poweroff reboot restart logout suspend",
                  children: () => [
