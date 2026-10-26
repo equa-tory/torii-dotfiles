@@ -17,6 +17,25 @@ Section {
     onSignatureChanged: shown = Bt.devices
     Component.onCompleted: shown = Bt.devices
 
+    // keyboard (the control panel forwards the keys): sel = the highlighted device
+    property int sel: -1
+    readonly property bool canNav: visible && Bt.powered && shown.length > 0
+    function take(last) { sel = last ? shown.length - 1 : 0; }
+    function release() { sel = -1; }
+    function nav(k) {
+        if (k === "up") { if (sel > 0) { sel--; return true; } return false; }
+        if (k === "down") { if (sel < shown.length - 1) { sel++; return true; } return false; }
+        if (k === "enter") {
+            const d = shown[sel];
+            if (!d) return true;
+            if (!d.paired) { d.trusted = true; d.pair(); }
+            else if (d.connected) d.disconnect();
+            else { d.trusted = true; d.connect(); }
+            return true;
+        }
+        return k === "left" || k === "right";
+    }
+
     actions: [
         IconButton {
             visible: Bt.powered
@@ -56,7 +75,9 @@ Section {
                 delegate: ListRow {
                     id: row
                     required property var modelData
+                    required property int index
                     readonly property var d: modelData
+                    current: index === root.sel
 
                     Layout.fillWidth: true
                     glyph: Icons[Bt.glyph(d)]

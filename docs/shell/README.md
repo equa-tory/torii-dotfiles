@@ -452,3 +452,11 @@ Two Helium browsers on one profile corrupt it (extensions stop, thumbnails are m
 In the notch control panel, Sound section:
 - **Headphones button next to the mic mute button**: plays your microphone (the default input) into the default output so you can hear how it sounds. Click again to stop. Use headphones, speakers will squeal. It is a PipeWire loopback made by `torii-audio monitor`.
 - **Pin button on the Output row**: remembers the current output (e.g. the AirPods Max). While it is not connected, "Silent" becomes the default output (a sink that plays nowhere) instead of the next device PipeWire would pick, such as the TV. When it connects again it becomes the default. Click the pin again to forget it. You can still choose another output by hand in the list. Stored as `audio.pinnedOutput` / `audio.pinnedLabel` in `config.json`.
+
+### Control panel (Alt+N) from the keyboard
+
+Arrows move through Sound (volume, output, input), Bluetooth devices and background apps; the highlighted thing has a lighter row or an accent colour. Left/Right change the volume (5 % steps) or move between background apps; Enter mutes, opens the output/input list (then Up/Down choose, Enter applies), connects/disconnects a Bluetooth device or opens a background app. M mutes the microphone, L listens to it, P pins the output. Esc steps back (closes a list, drops the highlight), then closes the panel. Network is mouse-only (it has password fields).
+
+### Bluetooth headphones never switch to the headset (mic) profile
+
+`.config/wireplumber/wireplumber.conf.d/51-torii-bluetooth.conf` turns off WirePlumber's "auto-switch to headset profile", which is what made the AirPods Max drop to the bad-sounding HSP/HFP mode whenever an app wanted a microphone. The computer's own mic is used. If you ever need the headset's mic, pick the headset profile by hand in a Bluetooth settings tool (`pactl set-card-profile <card> headset-head-unit`). After changing the file: `systemctl --user restart wireplumber` and reconnect the headphones.

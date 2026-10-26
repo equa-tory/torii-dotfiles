@@ -123,7 +123,7 @@ want tmux  && paths+=(.config/tmux)
 want nvim  && paths+=(.config/nvim)
 want kitty && paths+=(.config/kitty)
 want hypr  && paths+=(.config/hypr .config/uwsm .config/autostart/localsend_app.desktop)
-want torii && paths+=(.config/torii .config/quickshell .config/waybar)
+want torii && paths+=(.config/torii .config/quickshell .config/waybar .config/wireplumber)
 if [ ${#paths[@]} -gt 0 ]; then
   say "Linking configs (anything in the way is moved to ~/.local/state/torii/backup first)"
   mkdir -p ~/.config ~/.local/share ~/.local/state

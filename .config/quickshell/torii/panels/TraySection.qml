@@ -21,6 +21,17 @@ Section {
         sel = Math.max(0, Math.min(n - 1, sel + dx + dy * cols));
         return true;
     }
+    readonly property bool canNav: visible
+    function take(last) { sel = last ? Tray.items.length - 1 : 0; }
+    function release() { sel = -1; }
+    function nav(k) {
+        if (k === "left") { step(-1, 0); return true; }
+        if (k === "right") { step(1, 0); return true; }
+        if (k === "up") { if (sel >= cols) { step(0, -1); return true; } return false; }
+        if (k === "down") { if (sel + cols < Tray.items.length) step(0, 1); return true; }
+        if (k === "enter") return activateSel();
+        return false;
+    }
     function activateSel() {
         if (sel < 0 || sel >= Tray.items.length) return false;
         const it = Tray.items[sel];
