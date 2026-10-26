@@ -51,6 +51,7 @@ Singleton {
     function sh(args) { Quickshell.execDetached({ command: args, workingDirectory: home }); }
     function app(args) { sh(Apps.wrap(args)); }
     function edit(path) { app(["kitty", "sh", "-c", 'exec "${EDITOR:-nvim}" "$1"', "sh", path]); }
+    function editRoot(path) { app(["kitty", "sh", "-c", 'exec sudoedit "$1"', "sh", path]); }   // system files: asks for the password
     function bin(name) { return home + "/.config/torii/bin/" + name; }
     function later(fetch, ms) { fetchTimer.target = fetch; fetchTimer.interval = ms || 400; fetchTimer.restart(); }
     Timer { id: fetchTimer; property var target; onTriggered: if (target) { target.refresh(); } }
@@ -1251,7 +1252,11 @@ Singleton {
             file("tmux", "Tmux", home + "/.config/tmux/tmux.conf"),
             file("nvim", "Neovim", home + "/.config/nvim/init.lua"),
             file("zsh", "Zsh", home + "/.zshrc"),
-            file("shellrc", "Shell aliases", home + "/.config/dotfiles/shellrc") ] };
+            file("shellrc", "Shell aliases", home + "/.config/dotfiles/shellrc"),
+            file("yazi", "Yazi keys", home + "/.config/yazi/keymap.toml"),
+            file("wireplumber", "Bluetooth audio (WirePlumber)", home + "/.config/wireplumber/wireplumber.conf.d/51-torii-bluetooth.conf"),
+            { id: "fstab", name: "Mounts (fstab)", sub: "/etc/fstab  ·  drives and network shares, asks for the password", glyph: Icons.pencil, keywords: "edit config mount drive disk share smb cifs samba",
+              run: () => editRoot("/etc/fstab") } ] };
     }
 
     function defaultsKind(id, name, glyph, fetch, kind) {
