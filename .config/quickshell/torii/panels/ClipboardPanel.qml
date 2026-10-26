@@ -11,6 +11,7 @@ Item {
 
     property var items: []
     property int sel: 0
+    property bool onClear: false          // Tab moves to the Clear all button, Enter presses it
     readonly property string bin: Config.home + "/.config/torii/bin/torii-clip"
     readonly property var shown: {
         const q = search.text.trim().toLowerCase();
@@ -38,7 +39,7 @@ Item {
         Quickshell.execDetached([bin, "paste", e.id]);
         Panels.close();
     }
-    function clearAll() { Quickshell.execDetached([bin, "clear"]); items = []; search.forceActiveFocus(); }
+    function clearAll() { Quickshell.execDetached([bin, "clear"]); items = []; onClear = false; search.forceActiveFocus(); }
     function forget(e) {
         if (!e) return;
         Quickshell.execDetached([bin, "delete", e.id]);
@@ -60,11 +61,13 @@ Item {
             selectionColor: Theme.accent
             font.pixelSize: Config.font.size
             clip: true
-            onTextChanged: root.sel = 0
-            Keys.onUpPressed: root.sel = Math.max(0, root.sel - 1)
-            Keys.onDownPressed: root.sel = Math.min(root.shown.length - 1, root.sel + 1)
-            Keys.onReturnPressed: root.pick(root.shown[root.sel])
-            Keys.onEscapePressed: Panels.close()
+            onTextChanged: { root.sel = 0; root.onClear = false; }
+            Keys.onUpPressed: { root.onClear = false; root.sel = Math.max(0, root.sel - 1); }
+            Keys.onDownPressed: { root.onClear = false; root.sel = Math.min(root.shown.length - 1, root.sel + 1); }
+            Keys.onTabPressed: root.onClear = root.items.length > 0 && !root.onClear
+            Keys.onBacktabPressed: root.onClear = root.items.length > 0 && !root.onClear
+            Keys.onReturnPressed: { if (root.onClear) root.clearAll(); else root.pick(root.shown[root.sel]); }
+            Keys.onEscapePressed: { if (root.onClear) root.onClear = false; else Panels.close(); }
             Keys.onPressed: event => {
                 if (event.key === Qt.Key_Delete && (event.modifiers & Qt.ControlModifier)) {
                     root.clearAll(); event.accepted = true;
@@ -84,7 +87,7 @@ Item {
             }
             Label {
                 visible: search.text === ""
-                text: root.items.length === 0 ? "Nothing copied yet" : "Clipboard history  ·  Enter pastes  ·  Del forgets"
+                text: root.items.length === 0 ? "Nothing copied yet" : "Clipboard history  ·  Enter pastes  ·  Del forgets  ·  Tab: clear all"
                 color: Theme.muted
                 font: search.font
             }
@@ -96,7 +99,9 @@ Item {
         visible: root.items.length > 0
         x: 18 + parent.width - 36 - width - 6; y: 8
         width: clearLabel.implicitWidth + 16; height: 28; radius: 8
-        color: clearArea.containsMouse ? Theme.surface2 : "transparent"
+        color: clearArea.containsMouse || root.onClear ? Theme.surface2 : "transparent"
+        border.width: root.onClear ? 1 : 0
+        border.color: Theme.red
         Label { id: clearLabel; anchors.centerIn: parent; text: "Clear all"; color: clearArea.containsMouse ? Theme.red : Theme.subtle; font.pixelSize: Config.font.size - 1 }
         MouseArea { id: clearArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.clearAll() }
     }
@@ -111,7 +116,7 @@ Item {
                 implicitHeight: root.rowH
                 glyph: modelData.image ? Icons.g(0xF02E9) : Icons.g(0xF0147)
                 title: modelData.text
-                current: index === root.sel
+                current: index === root.sel && !root.onClear
                 onClicked: root.pick(modelData)
                 IconButton {
                     glyph: Icons.close
