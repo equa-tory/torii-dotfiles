@@ -369,6 +369,8 @@ Videos (`.mp4 .webm .mkv .mov`, and `.gif`) in the wallpapers folder work like p
 
 In the wallpaper panel, **Space** takes the selected wallpaper out of the random change (tag "not shuffled") or puts it back; Enter applies it. The list is `wallpaper.noShuffle` in `config.json` (file names); `torii-wallpaper skip <file>` does the same from a terminal. Setup > Wallpapers > "Open the wallpaper panel" now stays open in the panel (it closed straight away before).
 
+**Down** in the wallpaper panel goes to the "Random change" row (Off, 5 min, 30 min, 1 hour, On login; the active one is filled): Left/Right choose, Enter or Space applies, Up or Esc goes back to the pictures. Same setting as Setup > Wallpaper > Random change.
+
 ## Wallpapers menu and a random wallpaper
 
 Setup > Wallpapers: open the wallpaper panel, open the wallpapers folder, "Change randomly" (off, a minutes slider from 5 to 120, on login) and "Random wallpaper now".

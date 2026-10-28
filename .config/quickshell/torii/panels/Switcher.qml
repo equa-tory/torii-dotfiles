@@ -20,7 +20,7 @@ Item {
     property string accentPreview: ""
 
     implicitWidth: Math.min(maxWidth, Math.max(520, count * (thumbW + 14) + 80))
-    implicitHeight: 214
+    implicitHeight: 252
 
     opacity: 0
     focus: true
@@ -52,7 +52,22 @@ Item {
         onExited: root.stillsReady = true
     }
 
+    // Down: the row of random-change choices at the bottom (Left/Right choose, Enter or Space applies, Up goes back to the pictures)
+    readonly property var modes: [{ key: "off", label: "Off" }, { key: "5", label: "5 min" }, { key: "30", label: "30 min" }, { key: "60", label: "1 hour" }, { key: "login", label: "On login" }]
+    readonly property string curMode: Config.wallpaper.shuffle || "off"
+    property bool onBar: false
+    property int barSel: 0
+    function enterBar() {
+        const i = modes.findIndex(m => m.key === curMode);
+        barSel = i >= 0 ? i : 0;
+        onBar = true;
+    }
+    function applyMode() {
+        Quickshell.execDetached([Config.home + "/.config/torii/bin/torii-wallpaper", "shuffle", modes[barSel].key]);
+    }
+
     function step(d) {
+        if (onBar) { barSel = Math.max(0, Math.min(modes.length - 1, barSel + d)); return; }
         if (count === 0)
             return;
         moved = true;
@@ -61,10 +76,12 @@ Item {
 
     Keys.onLeftPressed: step(-1)
     Keys.onRightPressed: step(1)
-    Keys.onReturnPressed: confirm()
-    Keys.onEnterPressed: confirm()
-    Keys.onSpacePressed: toggleShuffle()
-    Keys.onEscapePressed: Panels.close()
+    Keys.onReturnPressed: { if (onBar) applyMode(); else confirm(); }
+    Keys.onEnterPressed: { if (onBar) applyMode(); else confirm(); }
+    Keys.onSpacePressed: { if (onBar) applyMode(); else toggleShuffle(); }
+    Keys.onDownPressed: enterBar()
+    Keys.onUpPressed: onBar = false
+    Keys.onEscapePressed: { if (onBar) onBar = false; else Panels.close(); }
 
     FolderListModel {
         id: folder
@@ -232,7 +249,7 @@ Item {
 
     // caption: name · n/N · accent swatch
     Row {
-        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 14 }
+        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 48 }
         spacing: 10
         visible: root.count > 0
 
@@ -255,6 +272,27 @@ Item {
         Label {
             text: list.currentItem && !root.inShuffle(list.currentItem.fileName) ? "Space: add to the random change" : "Space: leave the random change"
             color: Theme.muted
+        }
+    }
+
+    // random change of the wallpaper: the active choice has a dot, the key-selected one an outline
+    Row {
+        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 10 }
+        spacing: 6
+        Label { anchors.verticalCenter: parent.verticalCenter; text: root.onBar ? "Random change" : "↓ Random change"; color: Theme.muted; rightPadding: 6 }
+        Repeater {
+            model: root.modes
+            Rectangle {
+                required property var modelData
+                required property int index
+                readonly property bool active: modelData.key === root.curMode
+                width: chipLabel.implicitWidth + 22; height: 26; radius: 8
+                color: active ? Theme.accent : Theme.surface
+                border.width: root.onBar && index === root.barSel ? 1 : 0
+                border.color: Theme.fg
+                Label { id: chipLabel; anchors.centerIn: parent; text: modelData.label; color: parent.active ? Theme.accentFg : Theme.fgDim; font.pixelSize: Config.font.size - 1 }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.barSel = index; root.applyMode(); } }
+            }
         }
     }
 
