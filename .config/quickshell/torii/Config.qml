@@ -113,6 +113,7 @@ Singleton {
             property JsonObject audio: JsonObject {
                 property string pinnedOutput: ""    // node name of an output (e.g. the AirPods) that audio never leaves, even while it is disconnected
                 property string pinnedLabel: ""
+                property var appModes: ({})         // per program: "mute" (always silent) or "focus" (silent unless its window is focused)
             }
             property JsonObject apps: JsonObject {
                 property string dir: "~/apps"

@@ -457,7 +457,7 @@ In the notch control panel, Sound section:
 
 ### Control panel (Alt+N) from the keyboard
 
-Arrows move through Sound (volume, output, input), Apps (one volume slider per program playing sound: tap its icon to mute it; with the keys Left/Right change it, Enter mutes), Bluetooth devices and background apps; the highlighted thing has a lighter row or an accent colour. Left/Right change the volume (5 % steps) or move between background apps; Enter mutes, opens the output/input list (then Up/Down choose, Enter applies), connects/disconnects a Bluetooth device or opens a background app. M mutes the microphone, L listens to it, P pins the output. Esc steps back (closes a list, drops the highlight), then closes the panel. Network is mouse-only (it has password fields).
+Arrows move through Sound (volume, output, input), Apps (a vertical volume slider per program playing sound; the icon under it is its mute button: tap to cycle normal › silent always › silent while its window is not focused › normal, remembered by program name in `audio.appModes`; with the keys Left/Right pick a program, Up/Down change the volume, Enter changes the mode), Bluetooth devices and background apps; the highlighted thing has a lighter row or an accent colour. Left/Right change the volume (5 % steps) or move between background apps; Enter mutes, opens the output/input list (then Up/Down choose, Enter applies), connects/disconnects a Bluetooth device or opens a background app. M mutes the microphone, L listens to it, P pins the output. Esc steps back (closes a list, drops the highlight), then closes the panel. Network is mouse-only (it has password fields).
 
 ### Bluetooth headphones never switch to the headset (mic) profile
 

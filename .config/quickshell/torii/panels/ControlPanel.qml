@@ -25,8 +25,8 @@ Item {
             return;
         }
         const s = stops[stop];
-        if (s.nav(k) || (k !== "up" && k !== "down")) return;
-        const n = stop + (k === "down" ? 1 : -1);
+        if (s.nav(k)) return;
+        const n = stop + (k === "down" || k === "right" ? 1 : -1);
         s.release();
         if (n < 0) stop = -1;
         else if (n < stops.length) { stop = n; stops[n].take(k === "up"); }
