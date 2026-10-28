@@ -17,8 +17,8 @@ Singleton {
     // ---- real nodes
     readonly property var sinkNode: Pipewire.defaultAudioSink
     readonly property var sourceNode: Pipewire.defaultAudioSource
-    readonly property var sinkNodes: Pipewire.nodes.values.filter(n => !n.isStream && n.type === PwNodeType.AudioSink)
-    readonly property var sourceNodes: Pipewire.nodes.values.filter(n => !n.isStream && n.type === PwNodeType.AudioSource)
+    readonly property var sinkNodes: (Pipewire.nodes.values || []).filter(n => !n.isStream && n.type === PwNodeType.AudioSink)
+    readonly property var sourceNodes: (Pipewire.nodes.values || []).filter(n => !n.isStream && n.type === PwNodeType.AudioSource)
 
     PwObjectTracker {
         objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource].concat(root.sinkNodes, root.sourceNodes)

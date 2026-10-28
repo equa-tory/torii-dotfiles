@@ -69,6 +69,7 @@ Singleton {
     JsonFetch { id: fRules;    command: [root.bin("torii-rules"), "list"];            onDataChanged: { root.bump(); root.rulesLoaded(); } }
     JsonFetch { id: fBootImgs; command: ["sh", "-c", "ls -1 \"$HOME\"/Pictures/wallpapers/* 2>/dev/null | jq -R -s -c 'split(\"\\n\")[:-1]'"]; onDataChanged: root.bump() }
     JsonFetch { id: fSyncStatus; command: [root.bin("torii-sync"), "status"];          onDataChanged: root.bump() }
+    JsonFetch { id: fStream; command: [root.bin("torii-stream"), "apps"] }
     JsonFetch { id: fVms;  command: [root.bin("torii-vm"), "list"] }
     JsonFetch { id: fIsos; command: [root.bin("torii-vm"), "isos"] }
     JsonFetch { id: fHeliumSnaps; command: [root.bin("torii-helium-backup"), "list"];  onDataChanged: root.bump() }
@@ -744,8 +745,25 @@ Singleton {
             { id: "freeze", name: "Freeze screen while selecting", sub: "Zone, text and QR: the picture stands still while you drag (needs wayfreeze)", glyph: Icons.camera,
               badge: Config.capture.freeze ? "On" : "Off", keep: true,
               run: () => sh([bin("torii-config"), "set", "capture.freeze", Config.capture.freeze ? "false" : "true"]) },
+            streamMenu(),
             { id: "color", name: "Colour picker", sub: "Click a pixel, the hex is copied", glyph: Icons.eyedropper, keywords: "color eyedropper hex", run: cap("color") }
         ] };
+    }
+
+    // sound of one program into a call in the browser (torii-stream)
+    function streamMenu() {
+        return { id: "stream", name: "App sound into Discord", glyph: Icons.speaker, keywords: "discord stream share screen audio game app sound browser call virtual microphone",
+                 sub: "Browsers can only share tab sound. This adds a program's sound to a virtual microphone", onOpen: () => fStream.refresh(),
+                 children: () => {
+            fStream.ensure();
+            const toggle = a => ({ id: "a:" + a.id, name: a.name, sub: a.media, badge: a.inStream ? "● in the stream" : "", glyph: Icons.speaker, keep: true,
+                run: () => { sh([bin("torii-stream"), a.inStream ? "remove" : "add", String(a.id)]); later(fStream, 700); } });
+            const apps = (fStream.data || []).map(toggle);
+            return apps.concat([
+                { id: "help", name: "In Discord choose “Discord mic (voice + app)”", glyph: Icons.mic, keep: true,
+                  sub: "Voice settings > Microphone; turn off noise suppression and echo cancellation. Use headphones" },
+                { id: "off", name: "Stop and put everything back", glyph: Icons.close, keep: true, run: () => { sh([bin("torii-stream"), "off"]); later(fStream, 700); } } ]).concat(apps.length ? [] : [{ id: "none", name: "No program is playing sound", sub: "Start it, then open this again", keep: true }]);
+        } };
     }
 
     // transcode: file -> format -> size

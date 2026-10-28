@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# torii-stream  -  send one app's sound into Discord (or any call) running in a browser, which can only share browser tabs.
+#   apps               JSON: the programs playing sound now (not the browser) and whether they are in the stream
+#   add <id>           send that program's sound to the stream (it is moved off your speakers/headphones onto the stream,
+#                      and you still hear it); the first call builds the virtual devices
+#   remove <id>        take the program back out
+#   off                everything back as it was; the virtual devices are removed
+#   status             on | off
+# In Discord > Voice settings choose the microphone "Discord mic (voice + app)": your voice and the app's sound together.
+# Turn off "noise suppression" and "echo cancellation" there, they spoil music. Use headphones, or the app sound returns through the mic.
+set -uo pipefail
+mods() { pactl list short modules | awk -v n="$1" 'index($0,n){print $1}'; }
+on() { pactl list short sinks | grep -q "torii_stream"; }
+
+build() {
+  on && return 0
+  local src; src=$(pactl get-default-source)
+  case "$src" in *.monitor|torii_*) src=$(pactl list short sources | awk '$2!~/monitor|torii_/{print $2; exit}') ;; esac
+  [ -n "$src" ] || { echo "no microphone found"; return 1; }
+  pactl load-module module-null-sink sink_name=torii_stream sink_properties=device.description="Stream-(app-audio)" >/dev/null
+  pactl load-module module-null-sink sink_name=torii_dmix sink_properties=device.description="Discord-mix" >/dev/null
+  pactl load-module module-loopback source=torii_stream.monitor latency_msec=30 sink_input_properties=media.name=torii-listen >/dev/null          # you hear it (follows the default output)
+  pactl load-module module-loopback source=torii_stream.monitor sink=torii_dmix latency_msec=30 sink_input_properties=media.name=torii-to-mix >/dev/null
+  pactl load-module module-loopback source="$src" sink=torii_dmix latency_msec=30 sink_input_properties=media.name=torii-mic >/dev/null
+  pactl load-module module-remap-source master=torii_dmix.monitor source_name=torii_dmic source_properties=device.description="Discord-mic-(voice-+-app)" >/dev/null
+}
+
+case "${1:-status}" in
+  apps)
+    pactl -f json list sink-inputs | jq -c --arg s "$(pactl list short sinks | awk '$2=="torii_stream"{print $1}')" '
+      [ .[] | select((.properties["application.process.binary"] // "") | test("helium|chrom|firefox") | not)
+            | select((.properties["media.name"] // "") | test("^torii-") | not)
+            | {id: .index, name: (.properties["application.name"] // "?"), media: (.properties["media.name"] // ""), inStream: (($s != "") and (.sink|tostring) == $s)} ]' ;;
+  add)  build || exit 1; pactl move-sink-input "${2:?id}" torii_stream ;;
+  remove) pactl move-sink-input "${2:?id}" "$(pactl get-default-sink)" ;;
+  off)
+    for i in $(pactl list short sink-inputs | awk -v s="$(pactl list short sinks | awk '$2=="torii_stream"{print $1}')" 's!="" && $2==s{print $1}'); do
+      pactl move-sink-input "$i" "$(pactl get-default-sink)"; done
+    for m in $(mods torii_dmic) $(mods torii-mic) $(mods torii-to-mix) $(mods torii-listen) $(mods sink_name=torii_dmix) $(mods sink_name=torii_stream); do pactl unload-module "$m"; done ;;
+  status) on && echo on || echo off ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \?//'; exit 2 ;;
+esac
