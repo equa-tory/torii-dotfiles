@@ -17,7 +17,7 @@ Item {
     // Keyboard: arrows move through Sound, Bluetooth and the background apps (Enter acts on the highlighted thing, Left/Right
     // change the volume, M mutes the mic, L listens to it, P pins the output); Esc steps back, then closes the panel.
     property int stop: -1
-    readonly property var stops: [audioSec, btSec, traySec].filter(s => s.canNav)
+    readonly property var stops: [audioSec, appSec, btSec, traySec].filter(s => s.canNav)
     function press(k) {
         if (stops.length === 0) return;
         if (stop < 0 || stop >= stops.length) {
@@ -91,6 +91,7 @@ Item {
             }
 
             AudioSection { id: audioSec; Layout.fillWidth: true }
+            AppSoundSection { id: appSec; Layout.fillWidth: true }
             BluetoothSection { id: btSec; Layout.fillWidth: true }
             NetworkSection { Layout.fillWidth: true }
             TraySection { id: traySec; Layout.fillWidth: true }
