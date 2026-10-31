@@ -12,7 +12,6 @@ return {
     "ALT + SHIFT + RETURN",    -- browser
     "ALT + W",                 -- workspace letter / digit
     "ALT + SHIFT + W",
-    "ALT + SHIFT",
     "SUPER + SHIFT + Q",       -- screenshot: screen
     "SUPER + SHIFT + W",       -- screenshot: zone
     "SUPER + SHIFT + E",       -- screen recording

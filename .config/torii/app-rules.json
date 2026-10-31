@@ -68,7 +68,7 @@
     "class": "steam",
     "name": "Steam",
     "float": false,
-    "silent": false,
+    "silent": true,
     "workspace": 3
   },
   {
@@ -106,5 +106,31 @@
     "class": "steam_app_1422450",
     "name": "Deadlock",
     "workspace": 3
+  },
+  {
+    "class": "v2rayN",
+    "name": "v2rayN - V7.24.8 - X64",
+    "float": true,
+    "silent": true,
+    "remember": true
+  },
+  {
+    "class": "steam_app_1262350",
+    "name": "SIGNALIS",
+    "workspace": 3,
+    "silent": true
+  },
+  {
+    "class": "steam_app_3195790",
+    "name": "White Knuckle",
+    "workspace": 3,
+    "silent": true
+  },
+  {
+    "class": "Happ",
+    "name": "Happ 4.5.4 (333)",
+    "float": true,
+    "silent": true,
+    "remember": true
   }
 ]

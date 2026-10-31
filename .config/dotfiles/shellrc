@@ -68,7 +68,14 @@ claude-xray() {
   https_proxy="http://127.0.0.1:10808" http_proxy="http://127.0.0.1:10808" \
   NO_PROXY="" claude "$@"
 }
-alias cx='claude-xray'
+alias cx='codex-xray'
+
+# Codex through the local xray proxy
+codex-xray() {
+  HTTPS_PROXY="http://127.0.0.1:10808" HTTP_PROXY="http://127.0.0.1:10808" \
+  https_proxy="http://127.0.0.1:10808" http_proxy="http://127.0.0.1:10808" \
+  NO_PROXY="" codex "$@"
+}
 
 # ==============================
 # ALIASES - GENERAL
