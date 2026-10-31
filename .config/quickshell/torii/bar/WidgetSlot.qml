@@ -1,7 +1,7 @@
 import qs
 import QtQuick
 
-// A row of the widgets named in the notch layout (Config.leftNames / rightNames, set in Setup > Widgets). system, claude and battery only take
+// A row of the widgets named in the notch layout (Config.leftNames / rightNames, set in Setup > Widgets). system, claude, codex and battery only take
 // room while `shown` (the launcher or the control panel is open); language, letters, workspaces, special and weather are always there.
 Row {
     id: root
@@ -21,7 +21,7 @@ Row {
             anchors.verticalCenter: parent.verticalCenter
             visible: item ? (item.present === undefined ? true : item.present) && (root.shown || !Config.openOnly(modelData)) : false
             sourceComponent: modelData === "system" ? (Config.features.systemInfo ? system : null)
-                           : modelData === "claude" ? claude : modelData === "battery" ? battery
+                           : modelData === "claude" ? claude : modelData === "codex" ? codex : modelData === "battery" ? battery
                            : modelData === "language" ? language : modelData === "letters" ? letters
                            : modelData === "workspaces" ? workspaces : modelData === "special" ? special
                            : modelData === "weather" ? weather : null
@@ -30,6 +30,7 @@ Row {
 
     Component { id: system; SystemWidget { shown: root.shown || !Config.openOnly("system") } }
     Component { id: claude; ClaudeWidget { shown: root.shown || !Config.openOnly("claude") } }
+    Component { id: codex; CodexWidget { shown: root.shown || !Config.openOnly("codex") } }
     Component { id: battery; BatteryWidget { shown: root.shown || !Config.openOnly("battery") } }
     Component { id: language; LangWidget {} }
     Component { id: letters; Letters { screen: root.screen } }

@@ -510,6 +510,7 @@ Singleton {
             special: ["Special workspaces", "The rings for hidden workspaces (Alt+S)", false],
             weather: ["Weather", "Temperature and icon, click opens the forecast", false],
             claude: ["Claude usage", "Needs a signed-in Claude Code  ·  shows while the launcher is open", true],
+            codex: ["ChatGPT / Codex usage", "Needs Codex signed in with ChatGPT  ·  usage and reset countdown", true],
             battery: ["Battery", "Only on a laptop  ·  shows while the launcher is open", true],
             system: ["System load", "CPU, RAM, GPU, temperatures  ·  shows while the launcher is open", true] };
         const left = Config.leftNames, right = Config.rightNames, off = Config.widgets.off || [];
@@ -530,15 +531,15 @@ Singleton {
             list[i] = list[j]; list[j] = id;
             write(l, r, off);
         };
-        // new widgets: listed in openOnly when hidden while closed; system / claude / battery are hidden by default and listed in `always` when shown all the time
+        // new widgets: listed in openOnly when hidden while closed; system / claude / codex / battery are hidden by default and listed in `always` when shown all the time
         const toggleOpenOnly = id => {
-            const legacy = ["system", "claude", "battery"].indexOf(id) >= 0;
+            const legacy = ["system", "claude", "codex", "battery"].indexOf(id) >= 0;
             const key = legacy ? "always" : "openOnly", cur = (Config.widgets[key] || []).slice();
             const has = cur.indexOf(id) >= 0, next = has ? cur.filter(x => x !== id) : cur.concat([id]);
             sh([bin("torii-config"), "set", "widgets." + key, JSON.stringify(next)]);
         };
         const ids = Object.keys(info).filter(id => id !== "system" || Config.features.systemInfo);
-        return { id: "widgets", name: "Widgets", glyph: Icons.apps, keywords: "notch system battery claude cpu left right hide move workspaces letters language weather special order",
+        return { id: "widgets", name: "Widgets", glyph: Icons.apps, keywords: "notch system battery claude codex chatgpt openai cpu left right hide move workspaces letters language weather special order",
                  sub: "Move what the notch shows: left or right of the clock, or off",
                  children: () => ids.map(id => ({
                     id: id, name: info[id][0], sub: info[id][1], badge: place(id), children: () => ["Left", "Right", "Off"].map(side => ({

@@ -32,7 +32,7 @@ Singleton {
     // is this widget hidden while no panel (launcher, control panel) is open?
     function openOnly(id) {
         const w = adapter.widgets;
-        return ["system", "claude", "battery"].indexOf(id) >= 0 ? (w.always || []).indexOf(id) < 0 : (w.openOnly || []).indexOf(id) >= 0;
+        return ["system", "claude", "codex", "battery"].indexOf(id) >= 0 ? (w.always || []).indexOf(id) < 0 : (w.openOnly || []).indexOf(id) >= 0;
     }
     readonly property var leftNames: {
         const w = adapter.widgets, l = w.left || [], r = w.right || [], o = w.off || [];
@@ -155,14 +155,14 @@ Singleton {
                 property int seekSeconds: 10           // Left/Right while the media activity is open
             }
             property JsonObject widgets: JsonObject {
-                // shown only while the launcher or the control panel is open: system, claude, battery
-                property var left: ["claude"]
+                // shown only while the launcher or the control panel is open: system, claude, codex, battery
+                property var left: ["claude", "codex"]
                 property var right: ["battery"]
                 // always-on widgets you moved off the notch (language, letters, workspaces, special, weather)
                 property var off: []
-                // hidden while the launcher and the control panel are closed (any widget, except system / claude / battery: those are like that by default, see `always`)
+                // hidden while the launcher and the control panel are closed (any widget, except system / claude / codex / battery: those are like that by default, see `always`)
                 property var openOnly: []
-                // system, claude and battery normally show only while the notch is open; the ones listed here show all the time
+                // system, claude, codex and battery normally show only while the notch is open; the ones listed here show all the time
                 property var always: []
             }
             property JsonObject features: JsonObject {

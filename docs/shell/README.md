@@ -257,11 +257,13 @@ play / next, a seek bar you can drag, wheel or Left/Right (`media.seekSeconds`, 
 `qs -c torii ipc call media toggle|next|previous|seek 10`. Every player that is playing gets its own circle (a browser and mpv at once); tabs of one browser share one player, so they stay one circle.
 
 **Widgets** (`widgets.left` / `widgets.right` in `config.json`, or Setup › Widgets): they only take room while the launcher or the
-control panel is open (defaults: `claude` on the left with the 5-hour usage and the time until it resets, `battery` on the right,
+control panel is open (defaults: `claude` and `codex` on the left with usage and the time until it resets, `battery` on the right,
 only if the machine has one). `system` (CPU, RAM, GPU, VRAM and temperatures, `torii-sys stats`; click: the process list) and
 the Processes menu are switched off for now: set `features.systemInfo` to `true` in `config.json` to bring them back. **Processes** (launcher root, `torii-sys procs`): sort by
 CPU / RAM / GPU with the first row, type to filter by name or pid, Enter asks `y` (stop) or `9` (force kill). The session,
 the shell, Hyprland, systemd, D-Bus, PipeWire and v2rayN are never listed.
+
+**ChatGPT / Codex usage** (`codex` in Setup › Widgets): a matching usage ring, percentage used and reset countdown for the Codex allowance on your ChatGPT plan. Sign into the local Codex CLI with `codex login`. `torii-codex-usage` queries the official `account/rateLimits/read` app-server method without starting a conversation. It refreshes at most every two minutes while the widget is visible and hides when limits cannot be fetched. If a direct request fails, it retries through the local proxy at `http://127.0.0.1:10808` (`TORII_CODEX_PROXY` overrides that address). This is the coding allowance, separate from regular ChatGPT conversation limits. API-key-only logins do not provide this allowance. Move it, hide it, or keep it visible while the notch is closed through Setup › Widgets.
 
 **Popup windows and special workspaces in App rules:** *Add an app › Open windows* lists a browser's popups (for example the Google sign-in window) as their own rows ("… · popup of helium"); such a rule matches the title the popup opened with, so the next popup is caught too (it only has workspace, background and floating). The workspace picker also offers special workspaces (*Special magic*, any other existing one, or a new name), and *Capture special …* saves the apps on a special workspace. In the config a rule is `{"class": "helium", "title": "Sign in", "workspace": "special:magic"}`.
 
@@ -425,7 +427,7 @@ Where they were stays the default (language, letters, workspaces, special on the
 The control panel arrow is pinned to the notch's right edge, whatever is on the right. Layout: `widgets.left`, `widgets.right`, `widgets.off` in config.json.
 
 Each widget in Setup > Widgets also has "Hide when the notch is closed": it then shows only while the launcher or the control panel is open
-(`widgets.openOnly`; system load, Claude usage and battery are like that by default, and `widgets.always` lists the ones you made permanent).
+(`widgets.openOnly`; system load, Claude usage, Codex usage and battery are like that by default, and `widgets.always` lists the ones you made permanent).
 
 ## Audio recording (no picture)
 

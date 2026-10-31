@@ -155,7 +155,8 @@
     ],
     "right": [
       "workspaces",
-      "weather"
+      "weather",
+      "codex"
     ],
     "off": [
       "battery"

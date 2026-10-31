@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Read ChatGPT-plan Codex limits through the official local app-server protocol.
+
+No prompts, threads, or browser cookies are used. Codex manages its own login.
+Print {} on missing login, unsupported auth, or network failure.
+"""
+import datetime
+import json
+import math
+import os
+import selectors
+import subprocess
+import sys
+import time
+
+
+def normalize(result):
+    buckets = result.get("rateLimitsByLimitId") or {}
+    limits = buckets.get("codex") or result.get("rateLimits") or {}
+    primary = limits.get("primary") or {}
+    secondary = limits.get("secondary") or {}
+
+    def percent(window):
+        value = window.get("usedPercent")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            return -1
+        return max(0, min(100, value))
+
+    def reset(window):
+        value = window.get("resetsAt")
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            return ""
+        return datetime.datetime.fromtimestamp(value, datetime.timezone.utc).isoformat()
+
+    pct = percent(primary)
+    if pct < 0:
+        return {}
+    return {"pct": pct, "resets": reset(primary), "week": percent(secondary),
+            "weekResets": reset(secondary), "windowMinutes": primary.get("windowDurationMins"),
+            "plan": limits.get("planType") or ""}
+
+
+def fetch(proxy=None):
+    env = os.environ.copy()
+    if proxy:
+        env.update(HTTPS_PROXY=proxy, HTTP_PROXY=proxy, https_proxy=proxy, http_proxy=proxy)
+    proc = subprocess.Popen(["codex", "app-server"], stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env)
+    selector = selectors.DefaultSelector()
+    selector.register(proc.stdout, selectors.EVENT_READ)
+    buffer = b""
+    deadline = time.monotonic() + 25
+
+    def send(message):
+        proc.stdin.write((json.dumps(message) + "\n").encode())
+        proc.stdin.flush()
+
+    def response(request_id):
+        nonlocal buffer
+        while True:
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                message = json.loads(line)
+                if message.get("id") == request_id:
+                    if "error" in message:
+                        # Avoid logging server responses that may include account details.
+                        raise RuntimeError("Codex could not read account limits; check codex login")
+                    return message["result"]
+                if "id" in message and "method" in message:
+                    send({"id": message["id"], "error": {"code": -32601, "message": "Unsupported request"}})
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not selector.select(remaining):
+                raise TimeoutError("usage request timed out")
+            chunk = os.read(proc.stdout.fileno(), 65536)
+            if not chunk:
+                raise RuntimeError("Codex app-server closed")
+            buffer += chunk
+
+    try:
+        send({"id": 1, "method": "initialize", "params": {
+            "clientInfo": {"name": "torii_usage", "title": "Torii usage widget", "version": "1.0.0"}}})
+        response(1)
+        send({"method": "initialized"})
+        send({"id": 2, "method": "account/rateLimits/read"})
+        return normalize(response(2))
+    finally:
+        selector.close()
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        proc.stdin.close()
+        proc.stdout.close()
+
+
+if __name__ == "__main__":
+    try:
+        try:
+            data = fetch()
+        except (RuntimeError, TimeoutError):
+            # Desktop shells may not inherit terminal proxy variables. Torii's
+            # v2rayN mixed HTTP/SOCKS listener is the same one Helium uses.
+            data = fetch(os.environ.get("TORII_CODEX_PROXY", "http://127.0.0.1:10808"))
+        print(json.dumps(data))
+    except Exception as error:
+        print("{}")
+        print(f"torii-codex-usage: {error}", file=sys.stderr)
