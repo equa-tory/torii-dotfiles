@@ -29,6 +29,7 @@ ffmpegthumbnailer
 umu-launcher
 gamemode
 lib32-gamemode
+iw
 # NVIDIA driver + cuda: packages/nvidia.sh (pinned, only on machines with an NVIDIA GPU)
 
 nodejs

@@ -58,6 +58,9 @@ UNIT
   # Wi-Fi + Ethernet together made boot wait ~18 s for "network online" (docker waits for it too); nothing at boot needs it
   $SUDO systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
 
+  say "Wi-Fi latency (disable power saving without reconnecting)"
+  $SUDO bash "$REPO/packages/wifi-latency.sh"
+
   # ntsync: the kernel's Windows-style synchronisation; Proton (GE) uses it when /dev/ntsync exists, which takes load off the CPU
   if modinfo ntsync >/dev/null 2>&1; then
     echo ntsync | $SUDO tee /etc/modules-load.d/ntsync.conf >/dev/null
