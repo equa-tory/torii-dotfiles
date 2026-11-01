@@ -91,9 +91,9 @@ Item {
     property bool onHeader: false
     property int headerSel: 0
     readonly property var headerItems: {
-        const actions = [{kind: "new", text: "New folder"},
-                         {kind: "edit", text: membershipMode ? "Done" : "Edit"}];
-        if (customAlbum && !membershipMode) actions.push({kind: "delete", text: deleting ? "Confirm delete" : "Delete folder"});
+        const actions = [{kind: "new", text: "New folder (n)"},
+                         {kind: "edit", text: membershipMode ? "Done (esc)" : "Edit (e)"}];
+        if (customAlbum && !membershipMode) actions.push({kind: "delete", text: deleting ? "Confirm delete (d)" : "Delete folder (d)"});
         if (deleting) actions.push({kind: "cancel", text: "Cancel"});
         return actions.concat(albums.map(name => ({kind: "folder", name: name,
             text: (membershipMode && name !== "All" && name !== "Animated" ? (customFolders.indexOf(name) < 9 ? String(customFolders.indexOf(name) + 1) + " " : "")

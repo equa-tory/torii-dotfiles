@@ -132,5 +132,12 @@
     "float": true,
     "silent": true,
     "remember": true
+  },
+  {
+    "class": "Tk",
+    "name": "MultiTrack Player",
+    "silent": true,
+    "float": true,
+    "remember": true
   }
 ]
