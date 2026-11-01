@@ -97,7 +97,7 @@ Singleton {
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
     Connections { target: Config.launcher; function onSearchHiddenChanged() { root.bump(); } }
-    Connections { target: Config.notch; function onClockDateChanged() { root.bump(); } }
+    Connections { target: Config.notch; function onClockDateChanged() { root.bump(); } function onWindowGridChanged() { root.bump(); } }
     Connections { target: Config.install; function onTrackChanged() { root.bump(); } }
     Connections { target: Config.capture.audio; function onAppsChanged() { root.bump(); } function onMicChanged() { root.bump(); } function onSystemChanged() { root.bump(); } function onFolderChanged() { root.bump(); } }
     Connections { target: Config.capture.rec; function onAppsChanged() { root.bump(); } function onMicChanged() { root.bump(); } function onSystemChanged() { root.bump(); } function onFolderChanged() { root.bump(); } function onLanesChanged() { root.bump(); } }
@@ -1108,6 +1108,9 @@ Singleton {
         const refresh = () => later(fHypr, 700);
         return { id: "windows", name: "Windows", glyph: Icons.layout, sub: (floatOn ? "Floating" : "Tiled") + "  ·  buttons " + bars.side,
                  keywords: "float floating tile title bar buttons close minimise maximise", children: () => [
+            { id: "altTabGrid", name: "Alt+Tab: multiple rows", glyph: Icons.layout, badge: Config.notch.windowGrid ? "On" : "Off", keep: true,
+              sub: "Wrap window previews to fit the screen; Off restores the single row", keywords: "alt tab switcher grid rows",
+              run: () => sh([bin("torii-config"), "set", "notch.windowGrid", Config.notch.windowGrid ? "false" : "true"]) },
             { id: "float", name: floatOn ? "Switch to tiled" : "Switch to floating", glyph: Icons.layout, badge: floatOn ? "Floating" : "Tiled", keep: true,
               sub: "Alt+Shift+N  ·  every window floats with a title bar, and remembers its size and place",
               run: () => { sh([bin("torii-hypr"), "float", "toggle"]); refresh(); } },

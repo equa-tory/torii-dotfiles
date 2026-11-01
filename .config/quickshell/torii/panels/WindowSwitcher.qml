@@ -11,13 +11,18 @@ Item {
     id: root
 
     property real maxWidth: 1000
+    property real maxHeight: 700
+    readonly property bool multiRow: Config.notch.windowGrid
+    readonly property int columns: Math.max(1, Math.floor((maxWidth - 40) / (cardW + 14)))
+    readonly property int rows: multiRow ? Math.max(1, Math.ceil(count / columns)) : 1
     readonly property real cardW: 200
     readonly property real cardH: 128
     readonly property var wins: Windows.list
     readonly property int count: wins.length
 
-    implicitWidth: Math.min(maxWidth, Math.max(360, count * (cardW + 14) + 40))
-    implicitHeight: cardH + 82
+    implicitWidth: multiRow ? Math.min(maxWidth, Math.max(360, Math.min(count, columns) * (cardW + 14) + 40))
+                            : Math.min(maxWidth, Math.max(360, count * (cardW + 14) + 40))
+    implicitHeight: multiRow ? Math.min(rows, Math.max(1, Math.floor((maxHeight - 26) / (cardH + 56)))) * (cardH + 56) + 26 : cardH + 82
 
     opacity: 0
     focus: true
@@ -34,21 +39,26 @@ Item {
     Keys.onBacktabPressed: Windows.step(-1)
     Keys.onRightPressed: Windows.step(1)
     Keys.onLeftPressed: Windows.step(-1)
+    Keys.onUpPressed: if (multiRow) Windows.index = Math.max(0, Windows.index - columns)
+    Keys.onDownPressed: if (multiRow) Windows.index = Math.min(count - 1, Windows.index + columns)
     Keys.onReturnPressed: accept()
     Keys.onEnterPressed: accept()
     Keys.onEscapePressed: Panels.close()
     Keys.onReleased: event => { if (event.key === Qt.Key_Alt) { accept(); event.accepted = true; } }
 
-    ListView {
+    GridView {
         id: list
         anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 12; leftMargin: 20; rightMargin: 20 }
-        height: root.cardH + 56
-        orientation: ListView.Horizontal
-        spacing: 14
+        height: root.implicitHeight - 26
+        cellWidth: root.cardW + 14
+        cellHeight: root.cardH + 56
+        flow: root.multiRow ? GridView.FlowLeftToRight : GridView.FlowTopToBottom
         clip: true
         model: root.wins
         currentIndex: Windows.index
         highlightMoveDuration: 140
+        onCurrentIndexChanged: positionViewAtIndex(currentIndex, GridView.Contain)
+        Component.onCompleted: positionViewAtIndex(currentIndex, GridView.Contain)
         boundsBehavior: Flickable.StopAtBounds
 
         delegate: Item {
@@ -60,7 +70,7 @@ Item {
             readonly property bool minimised: Windows.minimised(modelData)
 
             width: root.cardW
-            height: list.height
+            height: list.cellHeight
 
             Rectangle {
                 id: frame

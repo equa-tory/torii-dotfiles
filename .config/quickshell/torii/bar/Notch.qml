@@ -191,7 +191,7 @@ PanelWindow {
 
     Component { id: controlPanel; ControlPanel {} }
     Component { id: switcherPanel; Switcher { maxWidth: win.width - 160 } }
-    Component { id: windowsPanel; WindowSwitcher { maxWidth: win.width - 160 } }
+    Component { id: windowsPanel; WindowSwitcher { maxWidth: win.width - 160; maxHeight: win.screen.height - win.topGap - win.barH - 40 } }
     Component { id: weatherPanel; WeatherPanel {} }
     Component { id: calendarPanel; CalendarPanel {} }
     Component { id: clipboardPanel; ClipboardPanel {} }

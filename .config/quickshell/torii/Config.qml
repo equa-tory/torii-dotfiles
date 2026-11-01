@@ -67,6 +67,7 @@ Singleton {
             property JsonObject notch: JsonObject {
                 property string shape: "attached"   // attached | floating
                 property real opacity: 1.0
+                property bool windowGrid: true       // Alt+Tab wraps cards into rows
                 property bool clockDate: false      // the clock shows the date next to the time
                 property int radius: 16
                 property int height: 34

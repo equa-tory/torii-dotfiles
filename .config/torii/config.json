@@ -5,7 +5,8 @@
     "radius": 16,
     "height": 30,
     "gap": 6,
-    "clockDate": true
+    "clockDate": true,
+    "windowGrid": true
   },
   "workspaces": {
     "count": 4
