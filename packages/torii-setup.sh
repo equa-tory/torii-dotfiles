@@ -119,10 +119,10 @@ UNIT
     # (private-push.sh) still signs you in to Telegram / Discord on a fresh install
     flags="${XDG_CONFIG_HOME:-$HOME/.config}/helium-browser-flags.conf"
     grep -qs -- '--password-store=basic' "$flags" || echo '--password-store=basic' >> "$flags"
-    # the local proxy (v2rayN / xray on 127.0.0.1:10808): used first, a direct connection when it is not running;
+    # the local proxy (v2rayN / xray on 127.0.0.1:10808), without a silent direct fallback;
     # the home network and local names never go through it. Edit ~/.config/helium-browser-flags.conf to change or remove.
     grep -qs -- '--proxy-server' "$flags" || {
-      echo '--proxy-server=socks5://127.0.0.1:10808,direct://' >> "$flags"
+      echo '--proxy-server=socks5://127.0.0.1:10808' >> "$flags"
       echo '--proxy-bypass-list="<local>;localhost;127.0.0.1;192.168.0.0/16;10.0.0.0/8;172.16.0.0/12;*.local"' >> "$flags"
     }
     # a dated copy of the profile on the home server every day (torii-private/snapshots/helium, the last 7); restore: launcher > Install > Sync torii > Restore Helium
