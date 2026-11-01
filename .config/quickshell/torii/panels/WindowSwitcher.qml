@@ -69,65 +69,73 @@ Item {
             readonly property var obj: modelData.lastIpcObject || ({})
             readonly property bool minimised: Windows.minimised(modelData)
 
-            width: root.cardW
+            width: list.cellWidth
             height: list.cellHeight
 
-            Rectangle {
-                id: frame
+            Item {
+                // Grid cells keep their positions; center the visible cards within each row.
+                readonly property int rowCount: Math.min(root.columns, root.count - Math.floor(card.index / root.columns) * root.columns)
+                x: root.multiRow ? (list.width - rowCount * list.cellWidth + 14) / 2 : 0
                 width: root.cardW
-                height: root.cardH
-                radius: 12
-                color: Theme.surface
-                border.width: card.selected ? 2 : 0
-                border.color: Theme.accent
-                clip: true
-                opacity: card.selected ? 1 : 0.7
-                Behavior on opacity { NumberAnimation { duration: 120 } }
+                height: parent.height
 
-                ScreencopyView {
-                    anchors.fill: parent
-                    anchors.margins: frame.border.width
-                    captureSource: card.modelData.wayland
-                    live: card.selected
-                    visible: !card.minimised || hasContent
+                Rectangle {
+                    id: frame
+                    width: root.cardW
+                    height: root.cardH
+                    radius: 12
+                    color: Theme.surface
+                    border.width: card.selected ? 2 : 0
+                    border.color: Theme.accent
+                    clip: true
+                    opacity: card.selected ? 1 : 0.7
+                    Behavior on opacity { NumberAnimation { duration: 120 } }
+
+                    ScreencopyView {
+                        anchors.fill: parent
+                        anchors.margins: frame.border.width
+                        captureSource: card.modelData.wayland
+                        live: card.selected
+                        visible: !card.minimised || hasContent
+                    }
+                    Label {
+                        anchors.centerIn: parent
+                        visible: card.minimised
+                        text: "minimised"
+                        color: Theme.muted
+                    }
+                }
+                Row {
+                    anchors { top: frame.bottom; topMargin: 8; left: frame.left; right: frame.right }
+                    spacing: 8
+                    Image {
+                        width: 20; height: 20
+                        source: Quickshell.iconPath(String(card.obj["class"] || "").toLowerCase(), "application-x-executable")
+                        sourceSize: Qt.size(40, 40)
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Label {
+                        width: parent.width - 28
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: card.modelData.title || card.obj["class"] || ""
+                        color: card.selected ? Theme.fg : Theme.subtle
+                        elide: Text.ElideRight
+                    }
                 }
                 Label {
-                    anchors.centerIn: parent
-                    visible: card.minimised
-                    text: "minimised"
+                    anchors { top: frame.bottom; topMargin: 30; left: frame.left }
+                    text: "workspace " + (card.obj.workspace ? card.obj.workspace.name : "")
                     color: Theme.muted
+                    font.pixelSize: 11
+                    visible: card.selected && !!card.obj.workspace
                 }
-            }
-            Row {
-                anchors { top: frame.bottom; topMargin: 8; left: frame.left; right: frame.right }
-                spacing: 8
-                Image {
-                    width: 20; height: 20
-                    source: Quickshell.iconPath(String(card.obj["class"] || "").toLowerCase(), "application-x-executable")
-                    sourceSize: Qt.size(40, 40)
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Label {
-                    width: parent.width - 28
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: card.modelData.title || card.obj["class"] || ""
-                    color: card.selected ? Theme.fg : Theme.subtle
-                    elide: Text.ElideRight
-                }
-            }
-            Label {
-                anchors { top: frame.bottom; topMargin: 30; left: frame.left }
-                text: "workspace " + (card.obj.workspace ? card.obj.workspace.name : "")
-                color: Theme.muted
-                font.pixelSize: 11
-                visible: card.selected && !!card.obj.workspace
-            }
 
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                onEntered: Windows.index = card.index
-                onClicked: { Windows.index = card.index; root.accept(); }
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onEntered: Windows.index = card.index
+                    onClicked: { Windows.index = card.index; root.accept(); }
+                }
             }
         }
     }
