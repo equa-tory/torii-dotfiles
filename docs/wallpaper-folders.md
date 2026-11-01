@@ -14,6 +14,8 @@ views cannot be deleted. Custom folders are collections of links, so the same
 image can belong to several folders without copying its file. No favorites are
 created.
 
+- **R**: select and preview a random wallpaper in the current folder; Enter applies it.
+  Chooses a different picture when more than one is available.
 - **New folder** (N): enter a name and press Enter.
 - **Edit** (E): select a picture first, then click folder chips
   to toggle its membership. The first nine custom folders also have number keys

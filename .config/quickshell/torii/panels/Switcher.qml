@@ -151,6 +151,16 @@ Item {
         list.currentIndex = Math.max(0, Math.min(count - 1, list.currentIndex + d));
     }
 
+    function selectRandom() {
+        onHeader = false; onBar = false; deleting = false;
+        if (count === 0) return;
+        // Choose a different picture when the folder has more than one.
+        const current = list.currentIndex;
+        let index = Math.floor(Math.random() * (current >= 0 && count > 1 ? count - 1 : count));
+        if (current >= 0 && count > 1 && index >= current) index++;
+        list.currentIndex = index;
+    }
+
     function page(d) {
         onBar = false; onHeader = false;
         step(d * Math.max(1, Math.floor((list.width + list.spacing) / (thumbW + list.spacing))));
@@ -166,6 +176,7 @@ Item {
             if (name && currentPath !== "") request("toggle", [name, currentPath]);
             event.accepted = true;
         }
+        else if (event.key === Qt.Key_R) { selectRandom(); event.accepted = true; }
         else if (event.key === Qt.Key_N) { startCreate(); event.accepted = true; }
         else if (event.key === Qt.Key_D) { if (customAlbum && !membershipMode) deleteAlbum(); event.accepted = true; }
         else if (event.key === Qt.Key_E) { toggleMembership(); event.accepted = true; }
