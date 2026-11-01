@@ -4,7 +4,7 @@ import QtQuick.Shapes
 import qs.widgets
 import qs.services
 
-// ChatGPT-plan Codex usage: a ring and the percentage. Shown by the widget slot while the launcher is open.
+// ChatGPT-plan Codex usage: a ring and minutes until reset.
 Item {
     id: root
 
@@ -13,7 +13,7 @@ Item {
     readonly property color tint: CodexUsage.pct >= 85 ? Theme.red : Theme.accent
 
     height: 20
-    width: active ? 20 + 5 + pctLabel.implicitWidth : 0
+    width: active ? 20 + (resetLabel.text !== "" ? 5 + resetLabel.implicitWidth : 0) : 0
     opacity: active ? 1 : 0
     visible: width > 0.5
     clip: true
@@ -45,10 +45,14 @@ Item {
         }
     }
     Label {
-        id: pctLabel
+        id: resetLabel
         x: 25
         anchors.verticalCenter: parent.verticalCenter
-        text: "Codex " + Math.round(CodexUsage.pct) + "%" + (CodexUsage.resetText !== "" ? "  ·  " + CodexUsage.resetText : "")
+        text: {
+            if (CodexUsage.resetIn < 0) return "";
+            const minutes = Math.ceil(CodexUsage.resetIn / 60);
+            return minutes > 60 ? Math.floor(minutes / 60) + "h" + (minutes % 60) + "m" : minutes + "m";
+        }
         color: Theme.fgDim
     }
 }

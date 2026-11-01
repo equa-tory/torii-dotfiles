@@ -33,8 +33,8 @@ Singleton {
         onTriggered: root.pendingWallpaper = ""
     }
 
-    // the widgets around the notch only run while the launcher or the control panel is open
-    readonly property bool widgetsOn: panel === "launcher" || panel === "control"
+    // the widgets around the notch only run while the launcher, control panel or wallpaper picker is open
+    readonly property bool widgetsOn: panel === "launcher" || panel === "control" || panel === "switcher"
     // (a widget set to show all the time keeps its data fresh too)
     Binding { target: CodexUsage; property: "watching"; value: (Config.leftNames.indexOf("codex") >= 0 || Config.rightNames.indexOf("codex") >= 0) && (root.widgetsOn || !Config.openOnly("codex")) }
     Binding { target: ClaudeUsage; property: "watching"; value: root.widgetsOn || !Config.openOnly("claude") }

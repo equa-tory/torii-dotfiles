@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Wallpaper collections: virtual All/Animated views and folders of symlinks.
+
+Originals stay in wallpaper.dir. No action deletes or moves source images.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import sys
+
+IMAGES = {'.jpg', '.jpeg', '.png', '.webp', '.bmp'}
+ANIMATED = {'.mp4', '.webm', '.mkv', '.mov', '.gif'}
+BUILTINS = ('All', 'Animated')
+
+
+def library_root():
+    if os.environ.get('TORII_WALLPAPER_DIR'):
+        return Path(os.environ['TORII_WALLPAPER_DIR']).expanduser().resolve()
+    config = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'torii/config.json'
+    try:
+        directory = json.loads(config.read_text()).get('wallpaper', {}).get('dir', '~/Pictures/wallpapers')
+    except (OSError, ValueError):
+        directory = '~/Pictures/wallpapers'
+    return Path(directory).expanduser().resolve()
+
+
+def album_path(root, name):
+    if (not name or name != name.strip() or name in ('.', '..') or name.startswith('.')
+            or '/' in name or '\\' in name or any(ord(c) < 32 for c in name)
+            or len(name) > 80 or name.casefold() in ('all', 'animated')):
+        raise ValueError('Choose a folder name other than All or Animated (no slashes).')
+    base = root / '.torii-albums'
+    if base.is_symlink():
+        raise ValueError('The collection directory must not be a symlink.')
+    p = base / name
+    if p.is_symlink():
+        raise ValueError('A collection folder must not itself be a symlink.')
+    return p
+
+
+def originals(root):
+    found = {}
+    if root.is_dir():
+        for p in sorted(root.rglob('*')):
+            if '.torii-albums' in p.relative_to(root).parts:
+                continue
+            if p.suffix.lower() in IMAGES | ANIMATED and p.is_file():
+                found.setdefault(str(p.resolve()), p.name)
+    return found
+
+
+def folders(root):
+    base = root / '.torii-albums'
+    if not base.is_dir() or base.is_symlink():
+        return []
+    names = []
+    for p in base.iterdir():
+        if not p.is_dir() or p.is_symlink():
+            continue
+        try:
+            album_path(root, p.name)
+        except ValueError:
+            continue
+        names.append(p.name)
+    return sorted(names, key=str.casefold)
+
+
+def folder_order(root):
+    names = list(BUILTINS) + folders(root)
+    try:
+        saved = json.loads((root / '.torii-albums/.order.json').read_text())
+        if not isinstance(saved, list):
+            return names
+    except (OSError, ValueError):
+        return names
+    ordered = []
+    for name in saved + names:
+        if isinstance(name, str) and name in names and name not in ordered:
+            ordered.append(name)
+    return ordered
+
+
+def links(folder, target):
+    return [p for p in folder.iterdir() if p.is_symlink() and str(p.resolve()) == target]
+
+
+def mutate(root, action, args, sources):
+    if action == 'list':
+        return
+    if action == 'reorder':
+        names = list(BUILTINS) + folders(root)
+        if len(args) != len(names) or set(args) != set(names):
+            raise ValueError('Folder list changed; try dragging again.')
+        base = root / '.torii-albums'
+        if base.is_symlink():
+            raise ValueError('The collection directory must not be a symlink.')
+        base.mkdir(exist_ok=True)
+        temporary = base / '.order.tmp'
+        # Replace metadata atomically; never follow an existing metadata symlink.
+        temporary.unlink(missing_ok=True)
+        temporary.write_text(json.dumps(args, ensure_ascii=False))
+        temporary.replace(base / '.order.json')
+        return
+    if not args:
+        raise ValueError('A folder name is required.')
+    folder = album_path(root, args[0])
+    if action == 'create':
+        folder.mkdir(parents=True, exist_ok=False)
+        return
+    if not folder.is_dir():
+        raise ValueError('That folder no longer exists.')
+    if action == 'delete':
+        entries = list(folder.iterdir())
+        if any(not p.is_symlink() for p in entries):
+            raise ValueError('Folder contains original files; remove those manually first.')
+        for p in entries:
+            p.unlink()
+        folder.rmdir()
+        return
+    if len(args) != 2:
+        raise ValueError('Select a wallpaper first.')
+    target = str(Path(args[1]).resolve())
+    if target not in sources:
+        raise ValueError('Wallpaper is not in the current library.')
+    existing = links(folder, target)
+    if existing:
+        for p in existing:
+            p.unlink()
+    elif action == 'toggle':
+        name = sources[target]
+        link = folder / name
+        if link.exists() or link.is_symlink():
+            source = Path(name)
+            name = source.stem + '-' + hashlib.sha256(target.encode()).hexdigest()[:12] + source.suffix
+            link = folder / name
+        # Never replace any existing file, even on a name collision.
+        link.symlink_to(os.path.relpath(target, folder))
+
+
+def snapshot(root, selected, current, sources):
+    custom = folders(root)
+    if selected not in BUILTINS and selected not in custom:
+        selected = 'All'
+    members = {}
+    for name in custom:
+        folder = album_path(root, name)
+        members[name] = {str(p.resolve()) for p in folder.iterdir() if p.is_symlink()}
+    paths = list(sources)
+    if selected == 'Animated':
+        paths = [p for p in paths if Path(p).suffix.lower() in ANIMATED]
+    elif selected != 'All':
+        paths = [p for p in paths if p in members[selected]]
+    paths.sort(key=lambda p: (sources[p].casefold(), p))
+    return {'folders': folder_order(root), 'folder': selected,
+            'items': [{'filePath': p, 'fileName': sources[p]} for p in paths],
+            'memberships': [name for name in custom if current and str(Path(current).resolve()) in members[name]]}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=['list', 'create', 'toggle', 'remove', 'delete', 'reorder'])
+    parser.add_argument('args', nargs='*')
+    parser.add_argument('--folder', default='All')
+    parser.add_argument('--current', default='')
+    a = parser.parse_args()
+    root = library_root()
+    sources = originals(root)
+    error = ''
+    try:
+        mutate(root, a.action, a.args, sources)
+    except (OSError, ValueError) as e:
+        error = str(e)
+    result = snapshot(root, a.folder, a.current, sources)
+    result['error'] = error
+    print(json.dumps(result, ensure_ascii=False))
+    return bool(error)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

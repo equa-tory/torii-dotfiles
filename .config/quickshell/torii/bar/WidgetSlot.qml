@@ -2,7 +2,7 @@ import qs
 import QtQuick
 
 // A row of the widgets named in the notch layout (Config.leftNames / rightNames, set in Setup > Widgets). system, claude, codex and battery only take
-// room while `shown` (the launcher or the control panel is open); language, letters, workspaces, special and weather are always there.
+// room while `shown` (the launcher, control panel or wallpaper picker is open); language, letters, workspaces, special and weather are always there.
 Row {
     id: root
 

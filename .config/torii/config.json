@@ -1,9 +1,9 @@
 {
   "notch": {
-    "shape": "attached",
+    "shape": "floating",
     "opacity": 1,
     "radius": 16,
-    "height": 32,
+    "height": 30,
     "gap": 6,
     "clockDate": true
   },
@@ -20,10 +20,13 @@
   "wallpaper": {
     "dir": "~/Pictures/wallpapers",
     "transitionMs": 600,
-    "shuffle": "5",
+    "shuffle": "login",
     "noShuffle": [
       "05.jpg",
+      "9770644-2067660354.png",
       "HVx6uWNbUAArVBd.jpeg",
+      "mahiru-shiina-christmas-eve.960x540.mp4",
+      "mahiru-shiina-sakura-whisper.960x540.mp4",
       "wp12027008-3506138153.png"
     ]
   },
@@ -86,24 +89,19 @@
         "name": "Watchcat",
         "where": ""
       },
-      "apps/portable:/home/equa/apps/claude-torii": {
-        "alias": "cx",
-        "name": "Claude Torii",
-        "where": ""
-      },
       "apps/portable:/home/equa/apps/dorm": {
         "alias": "dd",
         "name": "dorm",
         "where": ""
       },
-      "install/appopts/tui:Claude Torii": {
-        "alias": "cx",
-        "name": "Claude Torii",
-        "where": "Install \u203a Edit web apps and TUIs"
-      },
       "link:aur": {
         "hide": true,
         "name": "AUR",
+        "where": ""
+      },
+      "setup/nightlight/toggle": {
+        "name": "Turn off",
+        "pin": 1793302246454,
         "where": ""
       },
       "setup/rules": {
@@ -132,10 +130,10 @@
         "pin": 1792866180967,
         "where": ""
       },
-      "setup/nightlight/toggle": {
-        "name": "Turn off",
+      "apps/portable:/home/equa/apps/codex-cli": {
+        "name": "Codex CLI",
         "where": "",
-        "pin": 1793302246454
+        "alias": "cx"
       }
     }
   },
@@ -149,14 +147,14 @@
   "widgets": {
     "left": [
       "language",
+      "codex",
       "claude",
+      "weather",
       "letters",
       "special"
     ],
     "right": [
-      "workspaces",
-      "weather",
-      "codex"
+      "workspaces"
     ],
     "off": [
       "battery"

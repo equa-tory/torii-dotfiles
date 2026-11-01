@@ -15,7 +15,7 @@ PanelWindow {
     readonly property real barH: Config.notch.height
     readonly property real topGap: floating ? Config.notch.gap : 0
     readonly property real ear: floating ? 0 : Config.notch.radius
-    readonly property bool widgetsShown: panelHere && (Panels.panel === "launcher" || Panels.panel === "control")
+    readonly property bool widgetsShown: panelHere && Panels.widgetsOn
     readonly property bool notifSide: Config.notifications.expand === "side"
     readonly property bool panelHere: Panels.panel !== "" && Panels.panelScreen === screen.name
 

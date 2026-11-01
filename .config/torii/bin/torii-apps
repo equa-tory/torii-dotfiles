@@ -285,6 +285,7 @@ def sync_web():
             old.unlink()
 
 
+# TUI commands run in interactive zsh to load the same aliases/functions as Kitty.
 # apps started from the launcher do not get ~/.local/bin (claude, pipx and cargo tools live there)
 PATH_FIX = 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"\n'
 
@@ -308,7 +309,7 @@ def sync_aliases(items):
         if f.exists() and "torii-tui-alias" not in f.read_text(errors="replace")[:200]:
             continue                                          # somebody else's file: leave it
         f.write_text("#!/bin/sh\n# torii-tui-alias: made by Install > Edit web apps and TUIs, do not edit\n" + PATH_FIX
-                     + "exec sh -c " + shlex.quote(t["command"] + ' "$@"') + ' sh "$@"\n')
+                     + "exec zsh -ic " + shlex.quote(t["command"] + ' "$@"') + ' zsh "$@"\n')
         f.chmod(0o755)
 
 
@@ -325,7 +326,7 @@ def sync_tui():
         if t.get("quiet"):
             log = STATE / f"tui-{slug(t['name'])}.log"
             run.write_text("#!/bin/sh\n" + PATH_FIX +
-                           f"sh -c {shlex.quote(t['command'])} >{shlex.quote(str(log))} 2>&1 </dev/null\n"
+                           f"zsh -ic {shlex.quote(t['command'])} >{shlex.quote(str(log))} 2>&1 </dev/null\n"
                            "code=$?\n"
                            f"if [ $code = 0 ]; then notify-send -a torii {shlex.quote(t['name'])} done 2>/dev/null\n"
                            f"else a=$(notify-send -a torii -A default='Show the log' -w {shlex.quote(t['name'])} \"failed ($code), click to see the log\" 2>/dev/null)\n"
@@ -333,7 +334,7 @@ def sync_tui():
                            "fi\n")
             exec_line = f"Exec=sh {run}\n"
         else:
-            run.write_text("#!/bin/sh\n" + PATH_FIX + t["command"] + "\nprintf '\\n[done, Enter to close] '\nread _\n")
+            run.write_text("#!/bin/sh\n" + PATH_FIX + "zsh -ic " + shlex.quote(t["command"]) + "\nprintf '\\n[done, Enter to close] '\nread _\n")
             exec_line = f"Exec=kitty --title {shlex.quote(t['name'])} {run}\n"
         run.chmod(0o755)
         f.write_text("[Desktop Entry]\nType=Application\nVersion=1.0\n"
