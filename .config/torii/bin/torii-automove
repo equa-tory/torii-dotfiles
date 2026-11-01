@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""torii-automove on|off|status|apply  -  move NEW files from ~/Downloads to a folder, while it is switched on.
-A .zip is unzipped (in archive order) into <unzipTo>/<zip name>/ and the zip is deleted; every other file is moved
-into <to> as it is. unzipTo may be another path than <to>; empty means <to>/_.
+"""torii-automove on|off|status|apply  -  move visual media from ~/Downloads to a folder, while it is switched on.
+A .zip is unzipped (in archive order) into <unzipTo>/<zip name>/ and the zip is deleted; images and videos are moved
+into <to> as they are. Other file types are left alone. unzipTo may be another path than <to>; empty means <to>/_.
 
-  on       remember the time now; only files that appear after it are moved
+  on       process existing and incoming visual media and ZIPs until switched off
   off      stop
   status   JSON: {"enabled", "since", "from", "to", "unzipTo"}
   apply    start the watcher again after login when it was left on (autostart runs this)
@@ -16,6 +16,7 @@ import ctypes
 import json
 import os
 import shutil
+import select
 import subprocess
 import sys
 import time
@@ -25,6 +26,13 @@ from pathlib import Path
 HOME = Path.home()
 STATE = Path(os.environ.get("TORII_STATE", HOME / ".local/state/torii")) / "automove.json"
 SKIP_EXT = (".part", ".crdownload", ".tmp", ".download", ".opdownload", ".partial", ".!qb", ".aria2", "~")
+# Explicit allowlist: never move arbitrary documents, audio, code or executables.
+VISUAL_EXT = frozenset({
+    ".png", ".jpg", ".jpeg", ".jpe", ".jfif", ".webp", ".gif", ".apng",
+    ".avif", ".heic", ".heif", ".bmp", ".tif", ".tiff", ".ico", ".jxl",
+    ".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg",
+    ".mpe", ".ogv", ".wmv", ".flv", ".3gp", ".3g2",
+})
 IN_CLOSE_WRITE, IN_MOVED_TO = 0x8, 0x80
 
 
@@ -113,7 +121,7 @@ def unit(action):
                        capture_output=True)
 
 
-def sweep(src, dst, since, warned):
+def sweep(src, dst, warned):
     if not dst.is_dir():
         if dst.parent.is_dir():
             dst.mkdir(exist_ok=True)
@@ -125,9 +133,9 @@ def sweep(src, dst, since, warned):
     warned[0] = False
     for f in sorted(src.iterdir()):
         try:
-            if f.name.startswith(".") or f.name.lower().endswith(SKIP_EXT) or not f.is_file():
+            if f.name.startswith(".") or f.name.lower().endswith(SKIP_EXT) or f.is_symlink() or not f.is_file():
                 continue
-            if f.stat().st_mtime < since:
+            if f.suffix.lower() not in VISUAL_EXT and f.suffix.lower() != ".zip":
                 continue
             size = f.stat().st_size
             time.sleep(0.8)                       # still being written?
@@ -153,14 +161,17 @@ def watch():
     if fd < 0 or libc.inotify_add_watch(fd, str(src).encode(), IN_CLOSE_WRITE | IN_MOVED_TO) < 0:
         sys.exit("cannot watch " + str(src))
     warned = [False]
-    sweep(src, dst, load().get("since", 0), warned)
+    sweep(src, dst, warned)
     while True:
-        os.read(fd, 4096)                         # blocks until something lands in the folder
-        time.sleep(0.5)
+        # Retry pending files even if a write is unfinished or the NAS was offline.
+        ready, _, _ = select.select([fd], [], [], 10)
+        if ready:
+            os.read(fd, 4096)
+            time.sleep(0.5)
         s = load()
         if not s.get("enabled"):
             return
-        sweep(src, dst, s.get("since", 0), warned)
+        sweep(src, dst, warned)
 
 
 def main(a):
@@ -173,7 +184,7 @@ def main(a):
         save({"enabled": True, "since": time.time(), "from": str(src), "to": str(dst)})
         unit("start")
     elif cmd == "off":
-        save({"enabled": False, "since": load().get("since", 0), "from": str(src), "to": str(dst)})
+        save({"enabled": False, "since": 0, "from": str(src), "to": str(dst)})
         unit("stop")
     elif cmd == "apply":
         if load().get("enabled"):
