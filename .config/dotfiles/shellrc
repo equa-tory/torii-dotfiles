@@ -64,16 +64,16 @@ port() { $SUDO lsof -i :"$1"; }
 
 # Claude Code through the local xray proxy
 claude-xray() {
-  HTTPS_PROXY="http://127.0.0.1:10808" HTTP_PROXY="http://127.0.0.1:10808" \
-  https_proxy="http://127.0.0.1:10808" http_proxy="http://127.0.0.1:10808" \
+  HTTPS_PROXY="http://127.0.0.1:1080" HTTP_PROXY="http://127.0.0.1:1080" \
+  https_proxy="http://127.0.0.1:1080" http_proxy="http://127.0.0.1:1080" \
   NO_PROXY="" claude "$@"
 }
 alias cx='codex-xray'
 
 # Codex through the local xray proxy
 codex-xray() {
-  HTTPS_PROXY="http://127.0.0.1:10808" HTTP_PROXY="http://127.0.0.1:10808" \
-  https_proxy="http://127.0.0.1:10808" http_proxy="http://127.0.0.1:10808" \
+  HTTPS_PROXY="http://127.0.0.1:1080" HTTP_PROXY="http://127.0.0.1:1080" \
+  https_proxy="http://127.0.0.1:1080" http_proxy="http://127.0.0.1:1080" \
   NO_PROXY="" codex "$@"
 }
 
@@ -140,8 +140,9 @@ alias myip='curl ifconfig.me'
 alias t='tmux'
 alias ta='tmux attach'
 alias ju='journalctl -u'
-alias jssh='journalctl -u ssh'
 alias jsshd='journalctl -u sshd'
+#alias jssh='journalctl -u ssh'
+alias jssh='journalctl -u ssh --since "24 hours ago" | grep "Accepted"'
 
 # ==============================
 # SYSTEMCTL
