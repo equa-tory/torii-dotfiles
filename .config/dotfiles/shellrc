@@ -135,6 +135,15 @@ alias trru='trans -b :ru'
 alias myip='curl ifconfig.me'
 
 # ==============================
+# TMUX & JOURNAL
+# ==============================
+alias t='tmux'
+alias ta='tmux attach'
+alias ju='journalctl -u'
+alias jssh='journalctl -u ssh'
+alias jsshd='journalctl -u sshd'
+
+# ==============================
 # SYSTEMCTL
 # ==============================
 alias sstatus='$SUDO systemctl status'
