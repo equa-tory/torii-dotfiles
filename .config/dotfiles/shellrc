@@ -140,9 +140,9 @@ alias myip='curl ifconfig.me'
 alias t='tmux'
 alias ta='tmux attach'
 alias ju='journalctl -u'
-alias jsshd='journalctl -u sshd'
-#alias jssh='journalctl -u ssh'
+alias jsshd='journalctl -u sshd --since "24 hours ago" | grep "Accepted"'
 alias jssh='journalctl -u ssh --since "24 hours ago" | grep "Accepted"'
+alias jsudo='journalctl _COMM=sudo'
 
 # ==============================
 # SYSTEMCTL
