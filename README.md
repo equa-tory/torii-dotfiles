@@ -38,3 +38,28 @@ The terminal profile links these paths only: `.zshrc .zprofile .p10k.zsh .config
 .config/tmux` (+ `.config/kitty` on macOS). The files work without the desktop: the wallpaper-theme parts are optional.
 
 The desktop is a Quickshell shell with a wallpaper-driven theme: see [docs/shell/README.md](docs/shell/README.md).
+
+### SSH terminal compatibility
+
+The shared shell config uses `TERM=xterm-256color` for outgoing `ssh` commands
+when running in Kitty or Ghostty. This avoids depending on their terminal
+definitions being installed on every destination. Other terminal types, including
+screen/tmux, are preserved. The local terminal environment is unchanged.
+
+Update this repo on every machine you connect **from**, then open a fresh shell.
+Zsh loads the shared config automatically. For Bash, add this to `~/.bashrc`:
+
+```bash
+[[ -r ~/.config/dotfiles/shellrc ]] && source ~/.config/dotfiles/shellrc
+```
+
+This also covers nested SSH when the intermediate machine loads the shared config.
+It applies to interactive shell invocations of `ssh`; applications calling SSH
+directly bypass shell functions. Use `command ssh` to bypass the fallback, or
+`kitten ssh` for Kitty's native terminal-definition and shell-integration setup.
+
+If redraw problems remain, try `TERM=xterm-256color command ssh user@host`, then
+run `zsh -f` on the destination. If the clean shell works, inspect that host's
+prompt/plugins. In an affected zsh, `unset RPS1 RPROMPT; PROMPT='%n@%m:%~%# '`
+and `(( $+functions[autosuggest-disable] )) && autosuggest-disable` can help
+isolate prompt-width and autosuggestion issues. These are temporary diagnostics.

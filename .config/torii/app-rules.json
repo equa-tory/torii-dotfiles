@@ -139,5 +139,11 @@
     "silent": true,
     "float": true,
     "remember": true
+  },
+  {
+    "class": "steam_app_1808500",
+    "name": "steam_app_1808500",
+    "workspace": 3,
+    "silent": true
   }
 ]

@@ -17,6 +17,18 @@ else
   SUDO=""
 fi
 
+# Use a widely available terminal definition for SSH from Kitty/Ghostty.
+# Scope TERM to the SSH process; preserve screen/tmux and other terminal types.
+# `command ssh ...` bypasses this compatibility wrapper when needed.
+ssh() {
+  case "${TERM:-}" in
+    xterm-kitty|xterm-ghostty|ghostty)
+      TERM=xterm-256color command ssh "$@"
+      ;;
+    *) command ssh "$@" ;;
+  esac
+}
+
 # ==============================
 # PYTHON
 # ==============================

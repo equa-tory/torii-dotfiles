@@ -21,7 +21,7 @@
   "wallpaper": {
     "dir": "~/Pictures/wallpapers",
     "transitionMs": 600,
-    "shuffle": "5",
+    "shuffle": "off",
     "noShuffle": [
       "05.jpg",
       "9770644-2067660354.png",
@@ -149,9 +149,9 @@
     "left": [
       "language",
       "claude",
-      "weather",
       "letters",
-      "special"
+      "special",
+      "weather"
     ],
     "right": [
       "workspaces",

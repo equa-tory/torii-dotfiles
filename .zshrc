@@ -1,3 +1,8 @@
+# Fall back before prompt/plugins initialize when this host lacks the terminal definition.
+if [[ -n $TERM ]] && (( $+commands[infocmp] )) && ! command infocmp "$TERM" >/dev/null 2>&1; then
+  export TERM=xterm-256color
+fi
+
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
