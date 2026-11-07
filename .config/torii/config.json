@@ -90,10 +90,20 @@
         "name": "Watchcat",
         "where": ""
       },
+      "apps/portable:/home/equa/apps/codex-cli": {
+        "name": "Codex CLI",
+        "where": "",
+        "alias": "cx"
+      },
       "apps/portable:/home/equa/apps/dorm": {
         "alias": "dd",
         "name": "dorm",
         "where": ""
+      },
+      "install/appopts/tui:Codex CLI": {
+        "alias": "cxx",
+        "name": "Codex CLI",
+        "where": "Edit web apps and TUIs"
       },
       "link:aur": {
         "hide": true,
@@ -130,11 +140,6 @@
         "name": "Weather",
         "pin": 1792866180967,
         "where": ""
-      },
-      "apps/portable:/home/equa/apps/codex-cli": {
-        "name": "Codex CLI",
-        "where": "",
-        "alias": "cx"
       }
     }
   },

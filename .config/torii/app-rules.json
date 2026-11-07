@@ -105,7 +105,8 @@
   {
     "class": "steam_app_1422450",
     "name": "Deadlock",
-    "workspace": 3
+    "workspace": 3,
+    "silent": false
   },
   {
     "class": "v2rayN",

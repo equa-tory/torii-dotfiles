@@ -74,18 +74,38 @@ d() {
 mdd()  { mkdir -p "$1" && cd "$1"; }
 port() { $SUDO lsof -i :"$1"; }
 
+# Find the local xray HTTP proxy (ports vary by host/config).
+_xray_proxy_url() {
+  local p fd
+  zmodload zsh/net/tcp 2>/dev/null || { print -u2 "cannot load zsh TCP support to check xray proxy"; return 1; }
+  for p in 10808 1080; do
+    if ztcp 127.0.0.1 $p 2>/dev/null; then
+      fd=$REPLY
+      ztcp -c $fd 2>/dev/null
+      REPLY="http://127.0.0.1:$p"
+      return 0
+    fi
+  done
+  print -u2 "xray proxy unavailable: neither 127.0.0.1:10808 nor 127.0.0.1:1080 is accepting connections"
+  return 1
+}
+
 # Claude Code through the local xray proxy
 claude-xray() {
-  HTTPS_PROXY="http://127.0.0.1:1080" HTTP_PROXY="http://127.0.0.1:1080" \
-  https_proxy="http://127.0.0.1:1080" http_proxy="http://127.0.0.1:1080" \
+  local proxy
+  _xray_proxy_url || return 1
+  proxy=$REPLY
+  HTTPS_PROXY=$proxy HTTP_PROXY=$proxy https_proxy=$proxy http_proxy=$proxy \
   NO_PROXY="" claude "$@"
 }
-alias cx='codex-xray'
+alias cx=codex-xray
 
 # Codex through the local xray proxy
 codex-xray() {
-  HTTPS_PROXY="http://127.0.0.1:1080" HTTP_PROXY="http://127.0.0.1:1080" \
-  https_proxy="http://127.0.0.1:1080" http_proxy="http://127.0.0.1:1080" \
+  local proxy
+  _xray_proxy_url || return 1
+  proxy=$REPLY
+  HTTPS_PROXY=$proxy HTTP_PROXY=$proxy https_proxy=$proxy http_proxy=$proxy \
   NO_PROXY="" codex "$@"
 }
 
