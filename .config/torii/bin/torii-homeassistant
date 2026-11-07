@@ -49,10 +49,17 @@ def sync(settings, runtime, force=False):
     accent = read(STATE / 'theme/tokens.json', {}).get('accent', '')
     if not re.fullmatch(r'#[0-9a-fA-F]{6}', accent):
         raise ValueError('No wallpaper theme color available yet.')
-    signature = [settings['url'], settings['lights'], settings['brightness'], accent]
+    signature = ['on-lights-only', settings['url'], settings['lights'], settings['brightness'], accent]
     if not force and runtime.get('applied') == signature:
         return
-    payload = {'entity_id': settings['lights']}
+    # Read current states before sending any command: turn_on also powers up
+    # an off light, even when the intent is only to change its color.
+    states = {light['entity_id']: light.get('state') for light in api(settings, 'states')}
+    active = [entity for entity in settings['lights'] if states.get(entity) == 'on']
+    if not active:
+        runtime['applied'] = signature
+        return
+    payload = {'entity_id': active}
     brightness = settings['brightness']
     if brightness:
         payload.update(rgb_color=[int(accent[i:i + 2], 16) for i in (1, 3, 5)], brightness_pct=brightness)

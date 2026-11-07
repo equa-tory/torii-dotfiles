@@ -18,7 +18,12 @@ class LightingTest(unittest.TestCase):
         self.color.start()
         self.addCleanup(self.color.stop)
         self.calls = []
-        self.api = patch.dict(SYNC.__globals__, api=lambda *args: self.calls.append(args))
+        self.states = [{'entity_id': 'light.rgb2', 'state': 'on'}]
+        def api(*args):
+            if args[1] == 'states':
+                return self.states
+            self.calls.append(args)
+        self.api = patch.dict(SYNC.__globals__, api=api)
         self.api.start()
         self.addCleanup(self.api.stop)
 
@@ -43,6 +48,22 @@ class LightingTest(unittest.TestCase):
         self.settings['brightness'] = 0
         SYNC(self.settings, self.runtime)
         self.assertEqual(self.calls[0][1:], ('services/light/turn_off', {'entity_id': ['light.rgb2']}))
+
+    def test_only_on_lights_receive_theme_updates(self):
+        self.settings['lights'] += ['light.off', 'light.unavailable', 'light.unknown', 'light.missing']
+        self.states += [
+            {'entity_id': 'light.off', 'state': 'off'},
+            {'entity_id': 'light.unavailable', 'state': 'unavailable'},
+            {'entity_id': 'light.unknown', 'state': 'unknown'}]
+        SYNC(self.settings, self.runtime, force=True)
+        self.assertEqual(self.calls[0][2]['entity_id'], ['light.rgb2'])
+
+    def test_all_off_never_sends_power_or_color_commands_even_forced(self):
+        self.states[0]['state'] = 'off'
+        for brightness in (67, 0):
+            self.settings['brightness'] = brightness
+            SYNC(self.settings, self.runtime, force=True)
+        self.assertEqual(self.calls, [])
 
     def test_failure_does_not_mark_color_applied(self):
         def fail(*args):

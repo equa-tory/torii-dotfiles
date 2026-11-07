@@ -9,7 +9,7 @@ Open **Setup → Home Assistant lights** in the notch.
 - **Access token** is a masked input for a long-lived token. **Server address** changes the instance URL.
 - **Apply current theme now** reapplies the color and brightness when following is enabled.
 
-Applied wallpaper/theme changes update the lights automatically, including wallpaper shuffle. Picker previews do not. Added lights are turned on when a new color is applied with nonzero brightness. Home Assistant may slightly adjust RGB values to the device's color gamut.
+Applied wallpaper/theme changes update the lights automatically, including wallpaper shuffle. Picker previews do not. Before applying a color or brightness update, Torii checks current Home Assistant states and targets only added lights that are already on. Off, unavailable, unknown and missing lights are skipped, including when using Apply current theme now. Turning a light on manually leaves its saved color until the next theme or brightness update. Home Assistant may slightly adjust RGB values to the device's color gamut.
 
 Settings, token, discovered lights and synchronization status stay under `~/.local/state/torii/homeassistant*.json`, outside the dotfiles repository. JSON files have mode 0600. Tokens pass to the helper over stdin, never as process arguments or menu status. LAN API requests bypass shell proxy variables.
 

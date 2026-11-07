@@ -101,6 +101,21 @@
         "name": "dorm",
         "where": ""
       },
+      "homeassistant/light.0xa4c1387ab89700bc": {
+        "name": "RGB2",
+        "pin": 1794093120817,
+        "where": "Home Assistant"
+      },
+      "homeassistant/switch.0xa4c138b93aaf6287_left": {
+        "name": "\u0421\u043f\u043e\u0442\u044b",
+        "pin": 1794093110549,
+        "where": ""
+      },
+      "homeassistant/switch.0xa4c138b93aaf6287_right": {
+        "name": "\u041b\u044e\u0441\u0442\u0440\u0430",
+        "pin": 1794093146256,
+        "where": "Home Assistant"
+      },
       "install/appopts/tui:Codex CLI": {
         "alias": "cxx",
         "name": "Codex CLI",
@@ -111,15 +126,9 @@
         "name": "AUR",
         "where": ""
       },
-      "setup/nightlight/toggle": {
-        "name": "Turn off",
-        "pin": 1793302246454,
-        "where": ""
-      },
       "setup/rules": {
         "alias": "window rule",
         "name": "App rules",
-        "pin": 1792520314664,
         "where": "Setup"
       },
       "setup/rules/addfocused": {
@@ -136,11 +145,6 @@
         "name": "File auto mover",
         "pin": 1792436427507,
         "where": "Trigger"
-      },
-      "weather": {
-        "name": "Weather",
-        "pin": 1792866180967,
-        "where": ""
       }
     }
   },
