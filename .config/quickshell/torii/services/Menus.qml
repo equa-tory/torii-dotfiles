@@ -91,8 +91,9 @@ Singleton {
     JsonFetch { id: fMons;     command: [root.bin("torii-hypr"), "monitors"];              onDataChanged: root.bump() }
     JsonFetch { id: fRecApps;  command: [root.bin("torii-record"), "apps"];               onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
+    JsonFetch { id: fHomeAssistant; command: [root.bin("torii-homeassistant"), "status"]; onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fBootImgs, fTrans, fHypr, fMons, fRecApps, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fBootImgs, fTrans, fHypr, fMons, fRecApps, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes, fHomeAssistant]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
@@ -1049,7 +1050,64 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), wallpapersMenu(), bootMenu(), snapshotsMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), wallpapersMenu(), homeAssistantMenu(), bootMenu(), snapshotsMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+    }
+
+    property var homeAssistantQueue: []
+    function homeAssistantAction(action, args, input) {
+        homeAssistantQueue.push({ command: [bin("torii-homeassistant"), action].concat(args || []), input: input || "" });
+        nextHomeAssistantAction();
+    }
+    function nextHomeAssistantAction() {
+        if (haCommand.running || !homeAssistantQueue.length) return;
+        const next = homeAssistantQueue.shift();
+        haCommand.command = next.command;
+        haCommand.input = next.input;
+        haCommand.stdinEnabled = true;
+        haCommand.running = true;
+    }
+    Process {
+        id: haCommand
+        property string input: ""
+        stdinEnabled: true
+        onStarted: { write(input + "\n"); input = ""; stdinEnabled = false; }
+        onExited: { fHomeAssistant.refresh(); Qt.callLater(root.nextHomeAssistantAction); }
+    }
+    function homeAssistantMenu() {
+        fHomeAssistant.ensure();
+        const d = fHomeAssistant.data || {};
+        return { id: "homeassistant", name: "Home Assistant lights", glyph: Icons.home || Icons.apps,
+            sub: d.error || (d.enabled ? "Following wallpaper color" : "Theme following off"), keywords: "rgb lights home assistant brightness wallpaper token", children: () => [
+            { id: "enabled", name: "Follow wallpaper color", badge: d.enabled ? "On" : "Off", keep: true,
+              sub: "Off stops Torii controlling these lights; their current color stays",
+              run: () => homeAssistantAction("enabled", [d.enabled ? "false" : "true"]) },
+            { id: "brightness", name: "Global brightness", glyph: Icons.tune,
+              sub: "All added lights · 0 turns them off while following is on",
+              slider: { min: 0, max: 100, step: 1, value: d.brightness === undefined ? 50 : d.brightness, unit: " %", decimals: 0 },
+              onSlide: value => { haBrightness.value = Math.round(value); haBrightness.restart(); } },
+            { id: "add", name: "Add new light", glyph: Icons.apps, onOpen: () => homeAssistantAction("discover"),
+              children: () => [{ id: "manual", name: "Enter light entity ID…", keep: true,
+                run: () => ask("Light entity ID (light.rgb2 or light.0x…)", false, entity => homeAssistantAction("add", [entity.trim()])) }]
+                .concat((d.available || []).filter(light => (d.lights || []).indexOf(light.entity_id) < 0).map(light => ({
+                    id: light.entity_id, name: light.name, sub: light.entity_id, keep: true,
+                    run: () => homeAssistantAction("add", [light.entity_id]) }))) },
+            { id: "lights", name: "Added lights", sub: String((d.lights || []).length) + " selected",
+              children: () => (d.lights || []).map(entity => ({ id: entity, name: ((d.available || []).find(light => light.entity_id === entity) || {}).name || entity,
+                sub: "Remove from Torii theme following", keep: true, run: () => homeAssistantAction("remove", [entity]) })) },
+            { id: "apply", name: "Apply current theme now", keep: true, run: () => homeAssistantAction("apply") },
+            { id: "url", name: "Server address…", sub: d.url || "", keep: true,
+              run: () => ask("Home Assistant URL (http://host:8123)", false, url => homeAssistantAction("url", [url])) },
+            { id: "token", name: "Access token…", badge: d.configured ? "Saved" : "Not set", keep: true,
+              sub: "Stored privately on this machine",
+              run: () => ask("Home Assistant long-lived access token", true, token =>
+                homeAssistantAction("token", [], token)) }
+        ] };
+    }
+    Timer {
+        id: haBrightness
+        property int value: 50
+        interval: 300
+        onTriggered: root.homeAssistantAction("brightness", [String(value)])
     }
 
     // ================= Clean up: caches, logs, Docker, big files (torii-clean)

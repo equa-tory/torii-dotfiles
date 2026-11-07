@@ -1,6 +1,7 @@
 //@ pragma UseQApplication
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import QtQuick
 import qs
 import qs.bar
@@ -19,6 +20,22 @@ ShellRoot {
             Notch { screen: perScreen.modelData }
             NightOverlay { screen: perScreen.modelData }
         }
+    }
+
+    // Synchronize only the committed theme, not wallpaper-picker previews.
+    Process {
+        id: homeAssistantSync
+        command: [Config.home + "/.config/torii/bin/torii-homeassistant", "sync"]
+    }
+    Timer {
+        id: homeAssistantDebounce
+        interval: 500
+        onTriggered: if (!homeAssistantSync.running) homeAssistantSync.running = true
+    }
+    Connections { target: Theme; function onAccentChanged() { homeAssistantDebounce.restart(); } }
+    Timer {
+        interval: 30000; running: true; repeat: true; triggeredOnStart: true
+        onTriggered: if (!homeAssistantSync.running) homeAssistantSync.running = true
     }
 
     // leaving the workspace (bind, gesture) also dismisses an open panel

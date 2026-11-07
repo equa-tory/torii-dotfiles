@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Private Home Assistant light settings and wallpaper accent synchronization."""
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+STATE = Path(os.environ.get('TORII_STATE', Path.home() / '.local/state/torii'))
+SETTINGS = STATE / 'homeassistant.json'
+RUNTIME = STATE / 'homeassistant-runtime.json'
+DEFAULTS = dict(url='http://192.168.1.160:8123', token='', enabled=False, brightness=50, lights=[])
+
+
+def read(path, default):
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return default.copy()
+
+
+def write(path, data):
+    temporary = path.with_suffix('.tmp')
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, 'w') as stream:
+        json.dump(data, stream)
+    temporary.replace(path)
+
+
+def api(settings, endpoint, payload=None):
+    if not settings['token']:
+        raise ValueError('Set a Home Assistant token first.')
+    request = urllib.request.Request(settings['url'].rstrip('/') + '/api/' + endpoint,
+        data=json.dumps(payload).encode() if payload is not None else None,
+        headers={'Authorization': 'Bearer ' + settings['token'], 'Content-Type': 'application/json'})
+    # LAN requests must not inherit desktop proxy variables.
+    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=6) as response:
+        return json.load(response)
+
+
+def sync(settings, runtime, force=False):
+    if not settings['enabled'] or not settings['lights']:
+        return
+    accent = read(STATE / 'theme/tokens.json', {}).get('accent', '')
+    if not re.fullmatch(r'#[0-9a-fA-F]{6}', accent):
+        raise ValueError('No wallpaper theme color available yet.')
+    signature = [settings['url'], settings['lights'], settings['brightness'], accent]
+    if not force and runtime.get('applied') == signature:
+        return
+    payload = {'entity_id': settings['lights']}
+    brightness = settings['brightness']
+    if brightness:
+        payload.update(rgb_color=[int(accent[i:i + 2], 16) for i in (1, 3, 5)], brightness_pct=brightness)
+    api(settings, 'services/light/' + ('turn_on' if brightness else 'turn_off'), payload)
+    runtime['applied'] = signature
+
+
+def main(args):
+    STATE.mkdir(parents=True, exist_ok=True)
+    with (STATE / 'homeassistant.lock').open('w') as lock:
+        os.chmod(lock.name, 0o600)
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        settings = DEFAULTS | read(SETTINGS, {})
+        runtime = read(RUNTIME, {})
+        action = args[0] if args else 'status'
+        try:
+            changed = False
+            if action == 'token':
+                settings['token'] = sys.stdin.read().strip()
+                changed = True
+            elif action == 'url':
+                url = args[1].strip().rstrip('/')
+                parsed = urllib.parse.urlsplit(url)
+                if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+                    raise ValueError('Enter an http:// or https:// Home Assistant address.')
+                settings['url'] = url
+                runtime.pop('available', None)
+                changed = True
+            elif action == 'enabled':
+                settings['enabled'] = args[1] == 'true'
+                changed = True
+            elif action == 'brightness':
+                settings['brightness'] = max(0, min(100, round(float(args[1]))))
+                changed = True
+            elif action in ('add', 'remove'):
+                entity = args[1]
+                if not re.fullmatch(r'light\.[a-z0-9_]+', entity):
+                    raise ValueError('Use a light entity ID, such as light.rgb2.')
+                if action == 'add':
+                    light = api(settings, 'states/' + entity)
+                    modes = light.get('attributes', {}).get('supported_color_modes', [])
+                    if not set(modes) & {'rgb', 'rgbw', 'rgbww', 'hs', 'xy'}:
+                        raise ValueError('This light does not support RGB colors.')
+                    if entity not in settings['lights']:
+                        settings['lights'].append(entity)
+                else:
+                    settings['lights'] = [x for x in settings['lights'] if x != entity]
+                changed = True
+            elif action == 'discover':
+                runtime['available'] = [dict(entity_id=x['entity_id'], name=x['attributes'].get('friendly_name', x['entity_id']), state=x['state'])
+                    for x in api(settings, 'states') if x['entity_id'].startswith('light.')
+                    and set(x['attributes'].get('supported_color_modes', [])) & {'rgb', 'rgbw', 'rgbww', 'hs', 'xy'}]
+            elif action not in ('status', 'sync', 'apply'):
+                raise ValueError('Unknown action.')
+            if changed:
+                write(SETTINGS, settings)
+                runtime.pop('applied', None)
+            if action != 'status':
+                sync(settings, runtime, force=action == 'apply')
+                runtime['error'] = ''
+        except urllib.error.HTTPError as error:
+            runtime['error'] = 'Home Assistant HTTP ' + str(error.code) + (' — check your token.' if error.code in (401, 403) else '')
+        except (OSError, ValueError, IndexError) as error:
+            runtime['error'] = str(error) if isinstance(error, (ValueError, IndexError)) else 'Cannot reach Home Assistant.'
+        write(RUNTIME, runtime)
+        public = {key: value for key, value in settings.items() if key != 'token'}
+        public.update(configured=bool(settings['token']), available=runtime.get('available', []), error=runtime.get('error', ''))
+        print(json.dumps(public))
+        return bool(public['error'])
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

@@ -146,5 +146,14 @@
     "name": "steam_app_1808500",
     "workspace": 2,
     "silent": true
+  },
+  {
+    "class": "torii-app-cava",
+    "name": "cava",
+    "workspace": 3,
+    "silent": true,
+    "float": false,
+    "autostart": true,
+    "exec": "desktop:torii-app-cava.desktop"
   }
 ]
