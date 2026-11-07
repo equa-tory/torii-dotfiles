@@ -21,13 +21,14 @@
   "wallpaper": {
     "dir": "~/Pictures/wallpapers",
     "transitionMs": 600,
-    "shuffle": "off",
+    "shuffle": "5",
     "noShuffle": [
       "05.jpg",
       "9770644-2067660354.png",
       "HVx6uWNbUAArVBd.jpeg",
       "mahiru-shiina-christmas-eve.960x540.mp4",
       "mahiru-shiina-sakura-whisper.960x540.mp4",
+      "sig_wallpaper.jpg",
       "wp12027008-3506138153.png"
     ]
   },
@@ -187,7 +188,8 @@
     }
   },
   "limine": {
-    "image": "/home/equa/Pictures/wallpapers/sig_wallpaper.jpg"
+    "image": "/home/equa/Pictures/wallpapers/sig_wallpaper.jpg",
+    "blur": 2.5
   },
   "install": {
     "track": false

@@ -1,0 +1,7 @@
+[general]
+framerate = 240
+
+[smoothing]
+integral = 0
+noise_reduction = 0
+gravity = 1000

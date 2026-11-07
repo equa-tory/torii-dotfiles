@@ -69,13 +69,13 @@
     "name": "Steam",
     "float": false,
     "silent": true,
-    "workspace": 3
+    "workspace": 2
   },
   {
     "class": "steam_app_4162040",
     "name": "Zenless Zone Zero",
     "silent": true,
-    "workspace": 3
+    "workspace": 2
   },
   {
     "class": "unityhub",
@@ -105,7 +105,7 @@
   {
     "class": "steam_app_1422450",
     "name": "Deadlock",
-    "workspace": 3,
+    "workspace": 2,
     "silent": false
   },
   {
@@ -118,13 +118,13 @@
   {
     "class": "steam_app_1262350",
     "name": "SIGNALIS",
-    "workspace": 3,
+    "workspace": 2,
     "silent": true
   },
   {
     "class": "steam_app_3195790",
     "name": "White Knuckle",
-    "workspace": 3,
+    "workspace": 2,
     "silent": true
   },
   {
@@ -144,7 +144,7 @@
   {
     "class": "steam_app_1808500",
     "name": "steam_app_1808500",
-    "workspace": 3,
+    "workspace": 2,
     "silent": true
   }
 ]
