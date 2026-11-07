@@ -92,8 +92,9 @@ Singleton {
     JsonFetch { id: fRecApps;  command: [root.bin("torii-record"), "apps"];               onDataChanged: root.bump() }
     JsonFetch { id: fTrans;    command: [root.bin("torii-transcode"), "list"];            onDataChanged: root.bump() }
     JsonFetch { id: fHomeAssistant; command: [root.bin("torii-homeassistant"), "status"]; onDataChanged: root.bump() }
+    JsonFetch { id: fRemotePower; command: [root.bin("torii-remote-power"), "status"]; onDataChanged: root.bump() }
     property var emojiNodes: []
-    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fBootImgs, fTrans, fHypr, fMons, fRecApps, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes, fHomeAssistant]
+    readonly property var allFetch: [fBrowser, fFiles, fTerminal, fEditor, fEmoji, fProcs, fSounds, fRules, fWins, fSpecials, fSyncApps, fSyncStatus, fBootImgs, fTrans, fHypr, fMons, fRecApps, fClean, fBig, fCalSync, fGit, fWeb, fTui, fLearnHypr, fLearnTmux, fLearnNvim, fNotes, fHomeAssistant, fRemotePower]
     Connections { target: Theme; function onModeChanged() { root.bump(); } }
     // switches kept in config.json (the badge of a toggle must change at once, not when the menu is reopened)
     Connections { target: Config.capture; function onFreezeChanged() { root.bump(); } }
@@ -1050,7 +1051,38 @@ Singleton {
     // ================= Setup
     function setupMenu() {
         return { id: "setup", name: "Setup", glyph: Icons.cog, sub: "Configs, defaults, night light, network",
-                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), wallpapersMenu(), homeAssistantMenu(), bootMenu(), snapshotsMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+                 children: () => [configsMenu(), defaultsMenu(), nightMenu(), widgetsMenu(), appearanceMenu(), wallpapersMenu(), homeAssistantMenu(), remotePowerMenu(), bootMenu(), snapshotsMenu(), windowsMenu(), searchMenu(), calendarSetupMenu(), soundsMenu(), rulesMenu(), networkMenu(), bluetoothMenu(), audioMenu("input"), audioMenu("output"), mouseNode()] };
+    }
+
+    function remotePowerAction(action) {
+        runWithInput([bin("torii-remote-power"), action], "", code => {
+            fRemotePower.refresh();
+            if (code !== 0) say("Remote shutdown command failed; check service status");
+            else if (action === "copy") say("Shutdown token copied");
+            else if (action === "regenerate") say("New token saved; old token revoked");
+        });
+    }
+    function remotePowerMenu() {
+        fRemotePower.ensure();
+        const d = fRemotePower.data || {};
+        return { id: "remotepower", name: "Remote shutdown API", glyph: Icons.poweroff,
+            sub: d.error || (d.active ? "Listening on port " + d.port : "Off"),
+            keywords: "remote shutdown power api token server", children: () => [
+                { id: "enabled", name: "Enable remote shutdown", badge: d.enabled ? "On" : "Off", keep: true,
+                  sub: d.enabled && !d.active ? "Service stopped — toggle off and on to retry" : "Starts automatically after login; token survives reboots",
+                  run: () => remotePowerAction(d.enabled ? "disable" : "enable") },
+                { id: "authorize", name: "Authorize shutdown without a password", keep: true,
+                  sub: "One-time administrator setup for this user; permits power off only",
+                  run: () => sh(["pkexec", bin("torii-remote-power"), "install-policy", Quickshell.env("USER")]) },
+                { id: "copy", name: "Copy token", keep: true, sub: "Private bearer token for shutdown requests",
+                  run: () => remotePowerAction("copy") },
+                { id: "regenerate", name: "Regenerate token", keep: true, sub: "Immediately revokes the previous token",
+                  run: () => remotePowerAction("regenerate") },
+                { id: "endpoint", name: "POST /shutdown · port " + (d.port || 10809),
+                  sub: (d.urls || []).join(" · ") || "Connect using this PC's LAN IP" },
+                { id: "auth", name: "Authorization: Bearer <token>", sub: "Send an HTTP POST request with this header" },
+                { id: "network", name: "Local network access", sub: "HTTP on all IPv4 interfaces · use a trusted LAN or VPN" }
+            ] };
     }
 
     property var homeAssistantQueue: []
