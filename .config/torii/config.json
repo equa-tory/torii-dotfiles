@@ -92,9 +92,9 @@
         "where": ""
       },
       "apps/portable:/home/equa/apps/codex-cli": {
+        "alias": "cx",
         "name": "Codex CLI",
-        "where": "",
-        "alias": "cx"
+        "where": ""
       },
       "apps/portable:/home/equa/apps/dorm": {
         "alias": "dd",

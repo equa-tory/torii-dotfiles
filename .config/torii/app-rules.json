@@ -100,7 +100,7 @@
   },
   {
     "class": "helium",
-    "name": "New Tab - Helium"
+    "name": "helium"
   },
   {
     "class": "steam_app_1422450",
@@ -150,7 +150,7 @@
   {
     "class": "torii-app-cava",
     "name": "cava",
-    "workspace": 3,
+    "workspace": "w",
     "silent": true,
     "float": false,
     "autostart": true,
