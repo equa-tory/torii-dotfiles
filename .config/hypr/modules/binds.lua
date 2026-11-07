@@ -202,8 +202,8 @@ for _, e in ipairs({
 end
 
 
--- keys: ALT + ← / → | Focus the window on the left / right, across monitors (moves the selection while Alt+Tab is open)
-for _, d in ipairs({ "left", "right" }) do
+-- keys: ALT + ← ↑ ↓ → | Focus adjacent windows; navigate previews while Alt+Tab is open
+for _, d in ipairs({ "left", "right", "up", "down" }) do
     bind(mainMod .. " + " .. d, function()
         if torii_panel_open() then
             hl.exec_cmd("sh -c 'r=$(qs -c torii ipc call windows " .. d .. "); [ \"$r\" = ok ] || hyprctl dispatch \"hl.dsp.focus({ direction = \\\"" .. d .. "\\\" })\"'")
@@ -212,10 +212,7 @@ for _, d in ipairs({ "left", "right" }) do
         end
     end)
 end
--- Focus the window above
-bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
--- Focus the window below
-bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
+
 
 
 -- keys: ALT + 1 … 0 | Go to workspace 1 … 10

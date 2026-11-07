@@ -38,6 +38,8 @@ Scope {
         function prev(id: string): void { Windows.step(-1, id); }
         function commit(id: string): void { Windows.commit(id); }
         // the Alt+arrow and Alt+Q binds ask first: "ok" when the switcher took the key, "no" when it is not open
+        function up(): string { return Windows.vertical(-1); }
+        function down(): string { return Windows.vertical(1); }
         function left(): string { return Windows.arrow(-1); }
         function right(): string { return Windows.arrow(1); }
         function close(): string { return Windows.closeSelected(); }

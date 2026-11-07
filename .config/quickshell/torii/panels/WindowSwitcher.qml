@@ -39,8 +39,18 @@ Item {
     Keys.onBacktabPressed: Windows.step(-1)
     Keys.onRightPressed: Windows.step(1)
     Keys.onLeftPressed: Windows.step(-1)
-    Keys.onUpPressed: if (multiRow) Windows.index = Math.max(0, Windows.index - columns)
-    Keys.onDownPressed: if (multiRow) Windows.index = Math.min(count - 1, Windows.index + columns)
+    function moveRow(direction) {
+        if (!multiRow || count === 0) return;
+        const row = Math.floor(Windows.index / columns);
+        if (row + direction < 0 || row + direction >= rows) return;
+        Windows.index = Math.min(count - 1, Windows.index + direction * columns);
+    }
+    Connections {
+        target: Windows
+        function onVerticalRequested(direction) { root.moveRow(direction); }
+    }
+    Keys.onUpPressed: moveRow(-1)
+    Keys.onDownPressed: moveRow(1)
     Keys.onReturnPressed: accept()
     Keys.onEnterPressed: accept()
     Keys.onEscapePressed: Panels.close()

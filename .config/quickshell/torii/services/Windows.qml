@@ -129,6 +129,13 @@ Singleton {
         Quickshell.execDetached(["sh", "-c", cmd]);
     }
 
+    signal verticalRequested(int direction)
+    function vertical(d) {
+        if (Panels.panel !== "windows") return "no";
+        if (Config.notch.windowGrid) verticalRequested(d);
+        return "ok";
+    }
+
     function arrow(d) {
         if (Panels.panel !== "windows") return "no";
         step(d);
