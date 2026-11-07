@@ -60,6 +60,18 @@ def sync(settings, runtime, force=False):
     runtime['applied'] = signature
 
 
+def controls(settings):
+    return [dict(entity_id=x['entity_id'], name=x.get('attributes', {}).get('friendly_name', x['entity_id']), state=x['state'])
+        for x in api(settings, 'states')
+        if x['entity_id'].split('.')[0] in {'light', 'switch', 'fan', 'input_boolean'}]
+
+
+def toggle(settings, entity):
+    if not re.fullmatch(r'(light|switch|fan|input_boolean)\.[a-z0-9_]+', entity):
+        raise ValueError('Use a light, switch, fan or input_boolean entity ID.')
+    api(settings, 'services/' + entity.split('.')[0] + '/toggle', {'entity_id': entity})
+
+
 def main(args):
     STATE.mkdir(parents=True, exist_ok=True)
     with (STATE / 'homeassistant.lock').open('w') as lock:
@@ -101,6 +113,11 @@ def main(args):
                 else:
                     settings['lights'] = [x for x in settings['lights'] if x != entity]
                 changed = True
+            elif action == 'controls':
+                runtime['controls'] = controls(settings)
+            elif action == 'toggle':
+                toggle(settings, args[1])
+                runtime['controls'] = controls(settings)
             elif action == 'discover':
                 runtime['available'] = [dict(entity_id=x['entity_id'], name=x['attributes'].get('friendly_name', x['entity_id']), state=x['state'])
                     for x in api(settings, 'states') if x['entity_id'].startswith('light.')
@@ -111,7 +128,8 @@ def main(args):
                 write(SETTINGS, settings)
                 runtime.pop('applied', None)
             if action != 'status':
-                sync(settings, runtime, force=action == 'apply')
+                if action not in ('controls', 'toggle'):
+                    sync(settings, runtime, force=action == 'apply')
                 runtime['error'] = ''
         except urllib.error.HTTPError as error:
             runtime['error'] = 'Home Assistant HTTP ' + str(error.code) + (' — check your token.' if error.code in (401, 403) else '')
@@ -119,7 +137,7 @@ def main(args):
             runtime['error'] = str(error) if isinstance(error, (ValueError, IndexError)) else 'Cannot reach Home Assistant.'
         write(RUNTIME, runtime)
         public = {key: value for key, value in settings.items() if key != 'token'}
-        public.update(configured=bool(settings['token']), available=runtime.get('available', []), error=runtime.get('error', ''))
+        public.update(configured=bool(settings['token']), available=runtime.get('available', []), controls=runtime.get('controls', []), error=runtime.get('error', ''))
         print(json.dumps(public))
         return bool(public['error'])
 

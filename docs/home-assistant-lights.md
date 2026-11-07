@@ -16,3 +16,11 @@ Settings, token, discovered lights and synchronization status stay under `~/.loc
 The shell debounces theme changes and checks every 30 seconds to retry failed requests or pick up settings. An unchanged successfully applied theme makes no network request. Errors appear in the Setup menu. Disabling following prevents further light commands.
 
 Implementation uses Home Assistant's [REST API](https://developers.home-assistant.io/docs/api/rest/) and `light.turn_on` / `light.turn_off`. Tests: `python tests/test_homeassistant.py`.
+
+## Manual controls and keyboard shortcuts
+
+Open **Home Assistant** from the launcher's main menu for lights, switches, fans and input booleans. Enter toggles the selected entity; its current state appears alongside its name. **Refresh devices** reloads states, as does opening this menu.
+
+Select any device and press **Ctrl+K → Add binding** to assign a global keyboard shortcut. The same menu supports aliases and pinning. Device IDs keep bindings stable when friendly names change. Connection credentials are shared with Setup → Home Assistant lights.
+
+Manual toggles do not apply wallpaper colors or change theme-following settings. A light still enrolled in theme following can turn on again at the next wallpaper/theme update; disable following or remove that light if you want only manual control.

@@ -277,7 +277,7 @@ Singleton {
     // last highlighted row in each menu (kept while the shell runs, nothing is written to disk)
     property var memory: ({})
 
-    function rootNodes() { return ordered("", [appsMenu(), triggerMenu()].concat(Config.features.systemInfo ? [processesMenu()] : []).concat([weatherNode(), calendarNode(), notificationsMenu(), setupMenu(), installMenu(), removeMenu(), cleanMenu(), learnMenu(), todoMenu(), vmMenu(), systemMenu()])); }
+    function rootNodes() { return ordered("", [appsMenu(), triggerMenu()].concat(Config.features.systemInfo ? [processesMenu()] : []).concat([weatherNode(), calendarNode(), notificationsMenu(), homeAssistantControlsMenu(), setupMenu(), installMenu(), removeMenu(), cleanMenu(), learnMenu(), todoMenu(), vmMenu(), systemMenu()])); }
     function isMenu(n) { return n.children !== undefined; }
 
     // ---- search: every node below `scope` (everything when null), with the path it was found under
@@ -1072,6 +1072,23 @@ Singleton {
         stdinEnabled: true
         onStarted: { write(input + "\n"); input = ""; stdinEnabled = false; }
         onExited: { fHomeAssistant.refresh(); Qt.callLater(root.nextHomeAssistantAction); }
+    }
+    function homeAssistantControlsMenu() {
+        fHomeAssistant.ensure();
+        const d = fHomeAssistant.data || {};
+        return { id: "homeassistant", name: "Home Assistant", glyph: Icons.home || Icons.apps,
+            sub: d.error || "Device toggles · Ctrl+K to bind a shortcut",
+            keywords: "smart home lights switches fans toggles",
+            onOpen: () => homeAssistantAction("controls"),
+            children: () => (d.controls || []).map(device => ({
+                id: device.entity_id, name: device.name, badge: device.state,
+                sub: device.entity_id + " · Ctrl+K to add a binding", keep: true,
+                run: () => homeAssistantAction("toggle", [device.entity_id])
+            })).concat([
+                { id: "refresh", name: "Refresh devices", keep: true, run: () => homeAssistantAction("controls") },
+                { id: "settings", name: "Connection and wallpaper settings", children: () => homeAssistantMenu().children() }
+            ])
+        };
     }
     function homeAssistantMenu() {
         fHomeAssistant.ensure();

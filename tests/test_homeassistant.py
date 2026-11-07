@@ -1,4 +1,7 @@
 import runpy
+import tempfile
+import contextlib
+import io
 import unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -48,6 +51,30 @@ class LightingTest(unittest.TestCase):
             with self.assertRaises(OSError):
                 SYNC(self.settings, self.runtime)
         self.assertNotIn('applied', self.runtime)
+
+
+class ControlsTest(unittest.TestCase):
+    def test_toggle_targets_only_requested_entity(self):
+        calls = []
+        fn = API['toggle']
+        with patch.dict(fn.__globals__, api=lambda *args: calls.append(args)):
+            fn({}, 'switch.desk')
+            with self.assertRaises(ValueError):
+                fn({}, 'lock.front_door')
+        self.assertEqual(calls, [({}, 'services/switch/toggle', {'entity_id': 'switch.desk'})])
+
+    def test_controls_and_toggle_never_sync_wallpaper(self):
+        main = API['main']
+        for action in (['controls'], ['toggle', 'light.rgb2']):
+            with tempfile.TemporaryDirectory() as directory:
+                state = Path(directory)
+                def fail_sync(*args, **kwargs):
+                    raise AssertionError('Manual controls must not apply wallpaper colors')
+                with patch.dict(main.__globals__, STATE=state, SETTINGS=state / 'settings.json',
+                                RUNTIME=state / 'runtime.json', controls=lambda settings: [],
+                                toggle=lambda *args: None, sync=fail_sync):
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        self.assertFalse(main(action))
 
 
 if __name__ == '__main__':
