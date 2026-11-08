@@ -12,7 +12,7 @@ return {
 		if hovered_is_dir() then
 			ya.emit("enter", {})
 		else
-			ya.emit("shell", { 'torii-open "$@"', block = true })
+			ya.emit("shell", { 'torii-open %s', block = true })
 		end
 	end,
 }

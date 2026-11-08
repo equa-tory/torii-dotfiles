@@ -111,17 +111,43 @@ codex-xray() {
 
 # Update Codex through the local xray proxy
 codex-update() {
-  local proxy prefix
+  local proxy prefix metadata latest installed
   local -a elevate
   _xray_proxy_url || return 1
   proxy=$REPLY
+  printf 'Checking npm registry through %s...\n' "$proxy"
+  if ! metadata=$(curl --noproxy '' --proxy "$proxy" --connect-timeout 5 --max-time 15 \
+    --fail --silent --show-error https://registry.npmjs.org/@openai%2fcodex/latest); then
+    printf 'Cannot reach npm through xray; check the proxy connection and try again.\n' >&2
+    return 1
+  fi
+  latest=$(printf '%s' "$metadata" | node -e '
+    let s = ""; process.stdin.on("data", d => s += d);
+    process.stdin.on("end", () => {
+      try {
+        const v = JSON.parse(s).version;
+        if (!/^\d+\.\d+\.\d+$/.test(v)) process.exit(1);
+        console.log(v);
+      } catch { process.exit(1); }
+    });') || { printf 'Invalid version returned by npm registry.\n' >&2; return 1; }
   prefix=$(npm prefix -g) || return 1
+  installed=$(node -p 'require(process.argv[1]).version' "$prefix/lib/node_modules/@openai/codex/package.json" 2>/dev/null)
+  if [ "$installed" = "$latest" ] && [ "$#" -eq 0 ]; then
+    printf 'Codex %s is already up to date.\n' "$installed"
+    return 0
+  fi
   elevate=()
   if [ ! -w "$prefix" ] || { [ -d "$prefix/lib/node_modules" ] && [ ! -w "$prefix/lib/node_modules" ]; }; then
     elevate=(sudo)
+    printf 'Updating the system installation; sudo may ask for your password.\n'
+    sudo -v || return 1
   fi
+  printf 'Updating Codex (npm download progress follows)...\n'
   "${elevate[@]}" env HTTPS_PROXY="$proxy" HTTP_PROXY="$proxy" https_proxy="$proxy" http_proxy="$proxy" \
-    NO_PROXY="" no_proxy="" npm install -g @openai/codex --proxy="$proxy" --https-proxy="$proxy" "$@"
+    NO_PROXY="" no_proxy="" npm install -g "@openai/codex@$latest" --prefix="$prefix" \
+    --registry=https://registry.npmjs.org --proxy="$proxy" --https-proxy="$proxy" \
+    --fetch-retries=0 \
+    --fetch-timeout=60000 --no-audit --no-fund --loglevel=http "$@"
 }
 alias cx-update=codex-update
 

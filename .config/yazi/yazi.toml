@@ -8,10 +8,10 @@ linemode = "size"
 
 [opener]
 torii = [
-  { run = 'torii-open "$@"', desc = "Open", for = "unix", block = true },
+  { run = 'torii-open %s', desc = "Open", for = "unix", block = true },
 ]
 edit = [
-  { run = '${EDITOR:-nvim} "$@"', desc = "Edit", for = "unix", block = true },
+  { run = '${EDITOR:-nvim} %s', desc = "Edit", for = "unix", block = true },
 ]
 
 [open]
