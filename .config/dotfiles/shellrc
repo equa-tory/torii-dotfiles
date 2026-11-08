@@ -109,6 +109,22 @@ codex-xray() {
   NO_PROXY="" codex "$@"
 }
 
+# Update Codex through the local xray proxy
+codex-update() {
+  local proxy prefix
+  local -a elevate
+  _xray_proxy_url || return 1
+  proxy=$REPLY
+  prefix=$(npm prefix -g) || return 1
+  elevate=()
+  if [ ! -w "$prefix" ] || { [ -d "$prefix/lib/node_modules" ] && [ ! -w "$prefix/lib/node_modules" ]; }; then
+    elevate=(sudo)
+  fi
+  "${elevate[@]}" env HTTPS_PROXY="$proxy" HTTP_PROXY="$proxy" https_proxy="$proxy" http_proxy="$proxy" \
+    NO_PROXY="" no_proxy="" npm install -g @openai/codex --proxy="$proxy" --https-proxy="$proxy" "$@"
+}
+alias cx-update=codex-update
+
 # ==============================
 # ALIASES - GENERAL
 # ==============================
