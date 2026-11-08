@@ -155,5 +155,12 @@
     "float": false,
     "autostart": true,
     "exec": "desktop:torii-app-cava.desktop"
+  },
+  {
+    "class": "org.prismlauncher.PrismLauncher",
+    "name": "Please wait... — Prism Launcher 11.1.1",
+    "float": true,
+    "remember": false,
+    "workspace": 2
   }
 ]

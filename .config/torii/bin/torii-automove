@@ -3,7 +3,7 @@
 A .zip is unzipped (in archive order) into <unzipTo>/<zip name>/ and the zip is deleted; images and videos are moved
 into <to> as they are. Other file types are left alone. unzipTo may be another path than <to>; empty means <to>/_.
 
-  on       process existing and incoming visual media and ZIPs until switched off
+  on       leave existing files alone; process only incoming visual media and ZIPs
   off      stop
   status   JSON: {"enabled", "since", "from", "to", "unzipTo"}
   apply    start the watcher again after login when it was left on (autostart runs this)
@@ -18,6 +18,7 @@ import os
 import shutil
 import select
 import subprocess
+import struct
 import sys
 import time
 import zipfile
@@ -34,6 +35,8 @@ VISUAL_EXT = frozenset({
     ".mpe", ".ogv", ".wmv", ".flv", ".3gp", ".3g2",
 })
 IN_CLOSE_WRITE, IN_MOVED_TO = 0x8, 0x80
+IN_MOVED_FROM, IN_DELETE = 0x40, 0x200
+IN_Q_OVERFLOW = 0x4000
 
 
 def cfg():
@@ -121,7 +124,43 @@ def unit(action):
                        capture_output=True)
 
 
-def sweep(src, dst, warned):
+
+def identity(path):
+    stat = path.lstat()
+    return [stat.st_dev, stat.st_ino]
+
+
+def snapshot(src):
+    ignored = {}
+    for path in src.iterdir():
+        try:
+            ignored[path.name] = identity(path)
+        except FileNotFoundError:
+            pass  # A download may finish or leave while taking the snapshot.
+    return ignored
+
+
+def arrivals(events, ignored):
+    """Forget departed names even if the same inode comes back before a sweep."""
+    offset = 0
+    overflow = False
+    while offset + 16 <= len(events):
+        _, mask, _, length = struct.unpack_from('iIII', events, offset)
+        name = os.fsdecode(events[offset + 16:offset + 16 + length].split(b'\0', 1)[0])
+        if mask & (IN_MOVED_FROM | IN_DELETE):
+            ignored.pop(name, None)
+        overflow |= bool(mask & IN_Q_OVERFLOW)
+        offset += 16 + length
+    return overflow
+
+
+def sweep(src, dst, warned, ignored):
+    for name in list(ignored):
+        try:
+            if identity(src / name) != ignored[name]:
+                ignored.pop(name)
+        except FileNotFoundError:
+            ignored.pop(name)
     if not dst.is_dir():
         if dst.parent.is_dir():
             dst.mkdir(exist_ok=True)
@@ -133,6 +172,8 @@ def sweep(src, dst, warned):
     warned[0] = False
     for f in sorted(src.iterdir()):
         try:
+            if f.name in ignored:
+                continue
             if f.name.startswith(".") or f.name.lower().endswith(SKIP_EXT) or f.is_symlink() or not f.is_file():
                 continue
             if f.suffix.lower() not in VISUAL_EXT and f.suffix.lower() != ".zip":
@@ -158,20 +199,25 @@ def watch():
     src, dst = cfg()
     libc = ctypes.CDLL("libc.so.6", use_errno=True)
     fd = libc.inotify_init1(os.O_CLOEXEC)
-    if fd < 0 or libc.inotify_add_watch(fd, str(src).encode(), IN_CLOSE_WRITE | IN_MOVED_TO) < 0:
+    if fd < 0 or libc.inotify_add_watch(fd, str(src).encode(), IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVED_FROM | IN_DELETE) < 0:
         sys.exit("cannot watch " + str(src))
+    ignored = load().get("ignored")
+    if ignored is None:  # Safe migration from an older session.
+        ignored = snapshot(src)
     warned = [False]
-    sweep(src, dst, warned)
+    sweep(src, dst, warned, ignored)
     while True:
         # Retry pending files even if a write is unfinished or the NAS was offline.
         ready, _, _ = select.select([fd], [], [], 10)
         if ready:
-            os.read(fd, 4096)
+            if arrivals(os.read(fd, 65536), ignored):
+                # Lost events cannot safely distinguish old files from arrivals.
+                ignored = snapshot(src)
             time.sleep(0.5)
         s = load()
         if not s.get("enabled"):
             return
-        sweep(src, dst, warned)
+        sweep(src, dst, warned, ignored)
 
 
 def main(a):
@@ -181,13 +227,18 @@ def main(a):
         s = load()
         print(json.dumps({"enabled": bool(s.get("enabled")), "since": s.get("since", 0), "from": str(src), "to": str(dst), "unzipTo": str(unzip_to(dst))}))
     elif cmd == "on":
-        save({"enabled": True, "since": time.time(), "from": str(src), "to": str(dst)})
+        unit("stop")
+        save({"enabled": True, "since": time.time(), "from": str(src), "to": str(dst), "ignored": snapshot(src)})
         unit("start")
     elif cmd == "off":
         save({"enabled": False, "since": 0, "from": str(src), "to": str(dst)})
         unit("stop")
     elif cmd == "apply":
-        if load().get("enabled"):
+        s = load()
+        if s.get("enabled"):
+            unit("stop")
+            s["ignored"] = snapshot(src)
+            save(s)
             unit("start")
     elif cmd == "watch":
         watch()
