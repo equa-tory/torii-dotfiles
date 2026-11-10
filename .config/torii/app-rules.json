@@ -162,5 +162,11 @@
     "float": true,
     "remember": false,
     "workspace": 2
+  },
+  {
+    "class": "steam_app_default",
+    "name": "Voices of the Void  ",
+    "workspace": 2,
+    "silent": true
   }
 ]

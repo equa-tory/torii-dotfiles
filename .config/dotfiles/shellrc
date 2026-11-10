@@ -204,8 +204,47 @@ if command -v fd >/dev/null 2>&1; then
 elif command -v fdfind >/dev/null 2>&1; then
   alias f='fdfind'
 fi
-alias tren='trans -b :en'
-alias trru='trans -b :ru'
+
+#alias tren='trans -b :en'
+#alias trru='trans -b :ru'
+function _translate {
+  local lang="$1" text payload response result
+  shift
+
+  if (( $# )); then
+    text="$*"
+  else
+    text="$(cat)"
+  fi
+  [[ -n "$text" ]] || return 0
+
+  if payload="$(python3 -c '
+import json, sys
+print(json.dumps({"q": sys.argv[1], "source": "auto",
+                 "target": sys.argv[2], "format": "text"}))
+' "$text" "$lang" 2>/dev/null)" &&
+     response="$(curl --noproxy '*' -fsS \
+       --connect-timeout 2 --max-time 30 \
+       http://192.168.1.50:8791/translate \
+       -H 'Content-Type: application/json' \
+       --data-binary "$payload" 2>/dev/null)" &&
+     result="$(python3 -c '
+import json, sys
+value = json.load(sys.stdin)["translatedText"]
+assert isinstance(value, str) and value.strip()
+print(value)
+' <<< "$response" 2>/dev/null)"
+  then
+    print -r -- "$result"
+  else
+    command trans -b ":$lang" -- "$text"
+  fi
+}
+
+function tren { _translate en "$@"; }
+function trru { _translate ru "$@"; }
+
+
 alias myip='curl ifconfig.me'
 
 # ==============================

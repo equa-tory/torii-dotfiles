@@ -375,7 +375,7 @@ hl.define_submap("game", function()
 end)
 local function game_keys()
     local w = hl.get_active_window()
-    local game = w ~= nil and (w.class or ""):match("^steam_app_%d+$") ~= nil and w.fullscreen ~= 0 and not torii_panel_open()
+    local game = w ~= nil and ((w.class or ""):match("^steam_app_%d+$") ~= nil or w.class == "steam_app_default") and w.fullscreen ~= 0 and not torii_panel_open()
     -- leaving for another (maybe empty) workspace can keep the game as the "active window" for a while: it only counts while it is on screen
     if game then
         local ws, cur = w.workspace, hl.get_active_workspace and hl.get_active_workspace()

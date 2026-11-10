@@ -121,7 +121,12 @@ run() {       # app file
       local ge; ge=$(ls -d "$HOME"/.local/share/Steam/compatibilitytools.d/GE-Proton* 2>/dev/null | tail -1)
       mkdir -p "$HOME/.local/share/torii/wine-prefix" "$STATE"
       f=$(readlink -f "$f")
-      (cd "$(dirname "$f")" && WINEPREFIX="$HOME/.local/share/torii/wine-prefix" PROTONPATH="${ge:-GE-Proton}" GAMEID=umu-default \
+      # Multivoid's native loader must override Wine's built-in dwmapi.
+      local dll_overrides="${WINEDLLOVERRIDES:-}"
+      if [[ ${f,,} == */votv.exe || ${f,,} == */votv-win64-shipping.exe || ${f,,} == */a09n/yeetpatch/yeetpatch.exe ]]; then
+        dll_overrides="${dll_overrides:+$dll_overrides;}dwmapi.dll,main.dll,UE4SS=n,b"
+      fi
+      (cd "$(dirname "$f")" && WINEDLLOVERRIDES="$dll_overrides" WINEPREFIX="$HOME/.local/share/torii/wine-prefix" PROTONPATH="${ge:-GE-Proton}" GAMEID=umu-default \
         setsid umu-run "$f" >"$STATE/umu.log" 2>&1 &)
       echo "  started $(basename "$f") (first run sets up the prefix, give it a minute; log: $STATE/umu.log)" ;;
     *) p=$(desktop_path "$app") || return 1
