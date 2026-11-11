@@ -21,7 +21,7 @@
   "wallpaper": {
     "dir": "~/Pictures/wallpapers",
     "transitionMs": 600,
-    "shuffle": "off",
+    "shuffle": "5",
     "noShuffle": [
       "05.jpg",
       "HVx6uWNbUAArVBd.jpeg",

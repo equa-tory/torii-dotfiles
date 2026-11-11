@@ -1034,7 +1034,7 @@ Singleton {
     function systemMenu() {
         return { id: "system", name: "System", glyph: Icons.poweroff, sub: "Shut down, restart, log out, sleep", keywords: "power shutdown poweroff reboot restart logout suspend",
                  children: () => [
-            { id: "poweroff", name: "Shut down", glyph: Icons.poweroff, keep: true, run: () => confirm("Shut down", ["systemctl", "poweroff"]) },
+            { id: "poweroff", name: "Shut down", glyph: Icons.poweroff, keep: true, run: () => confirm("Shut down", [bin("torii-power")]) },
             { id: "reboot", name: "Reboot", glyph: Icons.restart, keep: true, run: () => confirm("Reboot", ["systemctl", "reboot"]) },
             { id: "logout", name: "Log out", glyph: Icons.logout, keep: true, run: () => confirm("Log out", ["sh", "-c", "uwsm stop || hyprctl dispatch 'hl.dsp.exit()'"]) },
             { id: "suspend", name: "Sleep", glyph: Icons.sleep, keep: true, run: () => confirm("Suspend", ["systemctl", "suspend"]) } ] };

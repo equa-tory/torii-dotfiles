@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Stop the UWSM desktop before requesting normal system power-off."""
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+
+def execute():
+    active = subprocess.run(['systemctl', '--user', 'is-active', '--quiet', 'graphical-session.target']).returncode == 0
+    if active and shutil.which('uwsm'):
+        print('Stopping the UWSM desktop before power-off', flush=True)
+        try:
+            subprocess.run(['uwsm', 'stop'], timeout=30, check=False)
+            # Wait for the stop job, including clients ordered before this target.
+            subprocess.run(['systemctl', '--user', 'stop', 'graphical-session.target'],
+                           timeout=30, check=False)
+        except subprocess.TimeoutExpired:
+            print('Desktop stop timed out; proceeding with normal power-off', flush=True)
+    print('Requesting system power-off', flush=True)
+    subprocess.run(['systemctl', 'poweroff'], check=True)
+
+
+def main(args):
+    if args == ['--execute']:
+        execute()
+    elif not args:
+        # This service belongs to the user manager, not the graphical session's
+        # application scopes: closing the notch must not cancel the power action.
+        subprocess.run(['systemd-run', '--user', '--collect', '--quiet',
+                        '--unit=torii-poweroff', '--service-type=exec',
+                        str(Path(__file__).resolve()), '--execute'], check=True)
+    else:
+        raise SystemExit('Usage: torii-power')
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
