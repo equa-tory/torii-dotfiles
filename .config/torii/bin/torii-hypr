@@ -242,7 +242,7 @@ def main(a):
                            "modes": ["%dx%d@%d" % k for k in short_modes(m)[:14]]} for m in monitors()]))
         return
     if a[:1] == ["status"]:
-        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20, "border": 1, "rounding": 14, "grab": 12, "sens": live_sensitivity(), "opacity": 1.0,
+        cur = {"layout": "dwindle", "gaps_in": 8, "gaps_out": 20, "border": 1, "rounding": 14, "grab": 3, "sens": live_sensitivity(), "opacity": 1.0,
                "blur": {"enabled": True, "size": 3, "passes": 1, "vibrancy": 0.17},
                "float": float_mode(), "bars": bars(), "bigPercent": big_percent()}
         print(json.dumps({**cur, **s}))

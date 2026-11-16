@@ -3,6 +3,8 @@
 -- that combination to the game; add a line to keep one of the normal binds working. Only binds from modules/binds.lua can be listed.
 -- Reload with `hyprctl reload`. (Alt+Shift+G, which turns the game keys off by hand, is always there.)
 return {
+    "ALT + SHIFT + Shift_L",   -- switch keyboard language, either release order
+    "ALT + SHIFT + Alt_L",
     "ALT + SHIFT + F",         -- fullscreen on / off
     "ALT + TAB",               -- switch window
     "ALT + SHIFT + TAB",
