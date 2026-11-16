@@ -300,11 +300,13 @@ bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
 
+require("modules.mouseguard")
+
 -- Move/resize windows with mainMod + LMB/RMB and dragging
 -- Hold and drag with the left mouse button to move a window
-bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
+bind(mainMod .. " + mouse:272", torii_guard_mouse(hl.dsp.window.drag()), { mouse = true })
 -- Hold and drag with the right mouse button to resize a window
-bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+bind(mainMod .. " + mouse:273", torii_guard_mouse(hl.dsp.window.resize()), { mouse = true })
 
 
 -- Laptop multimedia keys for volume and LCD brightness

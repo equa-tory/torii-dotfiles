@@ -1324,7 +1324,7 @@ Singleton {
                             run: () => { sh([bin("torii-hypr"), "mode", m.name, md]); later(fMons, 1500); } })) } ] })) },
             hyprSlider("wborder", "Window border width", v => ["border", String(v)], 0, 10, 1, h.border === undefined ? 1 : h.border, " px", 0, "The coloured frame around windows"),
             hyprSlider("wround", "Window corner radius", v => ["rounding", String(v)], 0, 30, 1, h.rounding === undefined ? 14 : h.rounding, " px", 0, "How round the corners of windows are (0 = square)"),
-            hyprSlider("wgrab", "Resize edge", v => ["grab", String(v)], 0, 40, 1, h.grab === undefined ? 3 : h.grab, " px", 0, "Drag the edge of a window to resize it: how far outside the window the grab area reaches (0 = off)"),
+            hyprSlider("wgrab", "Resize edge", v => ["grab", String(v)], 0, 40, 1, h.grab === undefined ? 12 : h.grab, " px", 0, "Drag the edge of a window to resize it: how far outside the window the grab area reaches (0 = off)"),
             hyprSlider("wopac", "Window opacity", v => ["opacity", String(v)], 0.3, 1, 0.05, h.opacity === undefined ? 1 : h.opacity, "", 2, "Transparent windows show the blur behind them"),
             { id: "blur", name: "Blur", glyph: Icons.tune, sub: b.enabled === false ? "Off" : b.size + " · " + b.passes + " passes · " + b.vibrancy, children: () => [
                 { id: "bon", name: b.enabled === false ? "Turn on" : "Turn off", glyph: Icons.power, badge: b.enabled === false ? "Off" : "On", keep: true,
